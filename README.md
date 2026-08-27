@@ -16,7 +16,8 @@ a verse and the plugin will show you — or jump you to — that exact verse in 
 in your vault, keeping chapter *and* verse alignment.
 
 - **Sidebar** listing the current verse in every other version at once, following your cursor
-  as you read. Pin it to hold a verse while you scroll.
+  while editing and your scroll position while reading — click a verse in reading mode to hold
+  it there. Pin it to hold a verse while you scroll.
 - **Version picker** (`Open this verse in another version`) with a preview of each version's
   text before you jump.
 - **One command per version**, so each translation can get its own hotkey.

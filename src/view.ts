@@ -37,6 +37,8 @@ export class KingdoneChapelView extends ItemView {
 
     this.registerEvent(this.app.workspace.on('active-leaf-change', () => this.refresh()));
     this.registerEvent(this.app.workspace.on('file-open', () => this.refresh()));
+    // Switching between editing and reading swaps where the verse comes from.
+    this.registerEvent(this.app.workspace.on('layout-change', () => this.refresh()));
     // Obsidian emits no cursor event, so poll the active editor for verse changes.
     this.registerInterval(window.setInterval(() => this.refresh(), 400));
 
