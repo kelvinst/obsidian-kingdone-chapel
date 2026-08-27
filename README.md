@@ -1,12 +1,19 @@
 # Kingdone Chapel
 
-An [Obsidian](https://obsidian.md) plugin for reading the same Bible passage across several
-translations without losing your place.
+An [Obsidian](https://obsidian.md) plugin for spiritual life inside your vault — Scripture,
+study, and devotional practice in the same place you already take notes.
 
-Put the cursor on a verse and it will show you — or jump you to — that exact verse in every
-other version in your vault, keeping chapter *and* verse alignment.
+The plugin is built as a set of features around that theme. The first one shipped is **Bible
+version management and navigation**; study and prayer journaling are planned (see
+[Roadmap](#roadmap)).
 
 ## Features
+
+### Bible versions
+
+Read the same passage across several translations without losing your place. Put the cursor on
+a verse and the plugin will show you — or jump you to — that exact verse in every other version
+in your vault, keeping chapter *and* verse alignment.
 
 - **Sidebar** listing the current verse in every other version at once, following your cursor
   as you read. Pin it to hold a verse while you scroll.
@@ -18,10 +25,18 @@ other version in your vault, keeping chapter *and* verse alignment.
   finds it and labels the card `v.1`.
 - Alt-click a card to copy that version's verse text.
 
+## Roadmap
+
+Planned additions, all sharing the same vault-native, no-lock-in approach:
+
+- **Study journaling** — notes tied to the passage you are reading.
+- **Prayer journaling** — recording requests and answers over time.
+- More devotional tooling as it takes shape.
+
 ## Expected vault layout
 
-Version folders live under one Bible folder, each holding book folders, each holding one file
-per chapter:
+Used by the Bible version features. Version folders live under one Bible folder, each holding
+book folders, each holding one file per chapter:
 
 ```
 <bibleFolder>/<VERSION>/<NN-Book>/<VERSION>-<NN-Book>-<CCC>.md
