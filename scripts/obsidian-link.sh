@@ -31,7 +31,9 @@ USAGE
 while [ $# -gt 0 ]; do
   case "$1" in
     --main) TARGET="__MAIN__"; shift ;;
-    --vault) VAULT="$2"; shift 2 ;;
+    --vault)
+      [ $# -ge 2 ] || { echo "--vault needs a path" >&2; usage >&2; exit 2; }
+      VAULT="$2"; shift 2 ;;
     --no-build) DO_BUILD=0; shift ;;
     -h|--help) usage; exit 0 ;;
     -*) echo "unknown option: $1" >&2; usage >&2; exit 2 ;;
