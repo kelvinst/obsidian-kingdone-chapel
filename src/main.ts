@@ -48,7 +48,7 @@ export default class KingdoneChapelPlugin extends Plugin {
       callback: () => this.activateView(),
     });
 
-    this.addRibbonIcon('book-open', 'Kingdone Chapel sidebar', () => this.activateView());
+    this.addRibbonIcon('church', 'Kingdone Chapel sidebar', () => this.activateView());
 
     // One command per version, so each can get its own hotkey.
     this.registerVersionCommands();

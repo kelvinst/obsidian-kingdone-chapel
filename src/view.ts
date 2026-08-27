@@ -27,7 +27,7 @@ export class KingdoneChapelView extends ItemView {
   }
 
   getIcon(): string {
-    return 'book-open';
+    return 'church';
   }
 
   async onOpen() {
