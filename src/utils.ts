@@ -12,22 +12,22 @@ export interface ChapterName {
  *
  * Folders are never part of it, so every version is free to organise its books
  * however it likes (flat, by testament, by category...). When `version` is
- * given (the version folder the file lives in) it wins over the file's own
- * prefix, which is only used as a fallback.
+ * given (the version folder the file lives in), the name must start with it:
+ * chapter files always carry their version, so anything else is an ordinary
+ * note that happens to live under a version folder, and is not a chapter.
  */
 export function parseChapterName(basename: string, version?: string): ChapterName | null {
   if (version) {
     const prefix = version.toLowerCase() + '-';
-    if (basename.toLowerCase().startsWith(prefix)) {
-      const rest = splitBook(basename.slice(prefix.length));
-      if (rest) return { version, ...rest };
-    }
+    if (!basename.toLowerCase().startsWith(prefix)) return null;
+    const rest = splitBook(basename.slice(prefix.length));
+    return rest ? { version, ...rest } : null;
   }
 
   const m = basename.match(/^(.+?)-(\d+)-(.+)-(\d+)$/);
   if (!m) return null;
   return {
-    version: version || m[1],
+    version: m[1],
     bookIndex: parseInt(m[2], 10),
     book: m[3],
     chapter: parseInt(m[4], 10),
