@@ -112,6 +112,8 @@ if (!list.includes(id)) {
   list.push(id);
   fs.writeFileSync(file, JSON.stringify(list, null, 2) + "\n");
   console.log("enabled: added " + id + " to community-plugins.json");
+  console.log("note: restart Obsidian - a running one can write this list back from");
+  console.log("      memory and drop the entry again");
 }
 ' "$VAULT/.obsidian/community-plugins.json" "$PLUGIN_ID"
 
