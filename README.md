@@ -35,15 +35,29 @@ Planned additions, all sharing the same vault-native, no-lock-in approach:
 
 ## Expected vault layout
 
-Used by the Bible version features. Version folders live under one Bible folder, each holding
-book folders, each holding one file per chapter:
+Used by the Bible version features. Only two things are structural:
+
+1. Each direct subfolder of the Bible folder is a **version**.
+2. Chapter files are named `<VERSION>-<NN>-<Book>-<CCC>.md` — version, book number, book name,
+   chapter.
 
 ```
-<bibleFolder>/<VERSION>/<NN-Book>/<VERSION>-<NN-Book>-<CCC>.md
+<bibleFolder>/<VERSION>/<any folders you like>/<VERSION>-<NN>-<Book>-<CCC>.md
 ```
 
-For example, `Bibles/ARA/19-Salmos/ARA-19-Salmos-004.md`. Chapter numbers may be zero-padded to
-three digits or not; commentaries that keep a single file per book can use `-000`.
+Everything between the version folder and the file is ignored, so each version can be laid out
+its own way — flat, split by testament, grouped by category — and versions do not have to agree
+with each other:
+
+```
+Bibles/ARA/19-Salmos/ARA-19-Salmos-004.md
+Bibles/NVI/Antigo Testamento/Poéticos/NVI-19-Salmos-004.md
+Bibles/KJV/KJV-19-Psalms-4.md
+```
+
+Books are matched across versions by their number, not by folder or book name. Chapter numbers
+may be zero-padded to three digits or not; commentaries that keep a single file per book can
+use `-000`.
 
 Inside a chapter file, each verse starts with its number in bold and may carry a block id:
 
@@ -62,7 +76,8 @@ Inside a chapter file, each verse starts with its number in bold and may carry a
 | Show the version you are reading | off | Include the current version in the list |
 | Open sidebar on startup | off | |
 
-Versions are detected from the folder structure. Use **Reload version list** after adding one.
+Versions are the subfolders of the Bible folder that hold chapter files. Use **Reload version
+list** after adding one.
 
 ## Install
 

@@ -3,7 +3,7 @@ import type { PaneType } from 'obsidian';
 
 import { DEFAULT_SETTINGS, VIEW_TYPE } from './types';
 import type { KingdoneChapelSettings, Location, Verse, VersionItem } from './types';
-import { escapeRegex, pad3 } from './utils';
+import { chapterKey, parseChapterName } from './utils';
 import { VersionSuggestModal } from './modal';
 import { KingdoneChapelSettingTab } from './settings';
 import { KingdoneChapelView } from './view';
@@ -12,6 +12,8 @@ export default class KingdoneChapelPlugin extends Plugin {
   settings: KingdoneChapelSettings;
   /** path -> { mtime, verses } */
   chapterCache: Map<string, { mtime: number; verses: Verse[] }>;
+  /** version -> "book:chapter" -> file. Built lazily, dropped on vault changes. */
+  bibleIndex: Map<string, Map<string, TFile>> | null = null;
   /** Last location read from a real editor, kept for when focus leaves it. */
   lastLocation: Location | null = null;
 
@@ -44,6 +46,7 @@ export default class KingdoneChapelPlugin extends Plugin {
       id: 'reload-versions',
       name: 'Reload version list',
       callback: () => {
+        this.invalidateIndex();
         this.registerVersionCommands();
         this.chapterCache.clear();
         new Notice(`Versions found: ${this.listVersions().join(', ') || 'none'}`);
@@ -51,6 +54,9 @@ export default class KingdoneChapelPlugin extends Plugin {
     });
 
     this.registerEvent(this.app.vault.on('modify', (file) => this.chapterCache.delete(file.path)));
+    this.registerEvent(this.app.vault.on('create', () => this.invalidateIndex()));
+    this.registerEvent(this.app.vault.on('delete', () => this.invalidateIndex()));
+    this.registerEvent(this.app.vault.on('rename', () => this.invalidateIndex()));
 
     if (this.settings.openSidebarOnStart) {
       this.app.workspace.onLayoutReady(() => this.activateView(false));
@@ -59,7 +65,44 @@ export default class KingdoneChapelPlugin extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings);
+    this.invalidateIndex();
     this.refreshViews();
+  }
+
+  invalidateIndex() {
+    this.bibleIndex = null;
+  }
+
+  /**
+   * Every chapter file under the Bible folder, grouped by version.
+   *
+   * Only two things are structural: the direct subfolders of the Bible folder
+   * are the versions, and file names follow `<VERSION>-<NN>-<Book>-<CCC>`.
+   * Whatever folders a version uses in between are ignored, so each version can
+   * be laid out flat, split by testament, or grouped any other way.
+   */
+  index(): Map<string, Map<string, TFile>> {
+    if (this.bibleIndex) return this.bibleIndex;
+
+    const index = new Map<string, Map<string, TFile>>();
+    const base = this.settings.bibleFolder;
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      if (!file.path.startsWith(base + '/')) continue;
+      const parts = file.path.slice(base.length + 1).split('/');
+      if (parts.length < 2) continue; // a loose file straight in the Bible folder
+
+      const version = parts[0];
+      const parsed = parseChapterName(file.basename, version);
+      if (!parsed) continue;
+
+      let chapters = index.get(version);
+      if (!chapters) index.set(version, (chapters = new Map()));
+      const key = chapterKey(parsed.bookIndex, parsed.chapter);
+      if (!chapters.has(key)) chapters.set(key, file);
+    }
+
+    this.bibleIndex = index;
+    return index;
   }
 
   refreshViews() {
@@ -100,21 +143,22 @@ export default class KingdoneChapelPlugin extends Plugin {
     return this.settings.labels[version] || version;
   }
 
-  /** Version folders = direct subfolders of the bible folder that contain book subfolders. */
+  /** Versions = direct subfolders of the Bible folder holding chapter files. */
   listVersions(): string[] {
     const root = this.app.vault.getAbstractFileByPath(this.settings.bibleFolder);
     if (!(root instanceof TFolder)) return [];
+    const index = this.index();
     return root.children
       .filter((c): c is TFolder => c instanceof TFolder)
-      .filter((c) => c.children.some((sub) => sub instanceof TFolder))
       .map((c) => c.name)
+      .filter((name) => index.has(name))
       .filter((name) => !this.settings.hiddenVersions.includes(name))
       .sort();
   }
 
   /**
-   * Parse the active file into { version, bookFolder, chapter, verse }.
-   * Expects <bibleFolder>/<VERSION>/<NN-Book>/<VERSION>-<NN-Book>-<CCC>.md
+   * Parse the active file into { version, bookIndex, book, chapter, verse }.
+   * Expects <bibleFolder>/<VERSION>/<any folders>/<VERSION>-<NN>-<Book>-<CCC>.md
    */
   currentLocation(): Location | null {
     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -143,19 +187,16 @@ export default class KingdoneChapelPlugin extends Plugin {
     if (!file.path.startsWith(base + '/')) return null;
 
     const parts = file.path.slice(base.length + 1).split('/');
-    if (parts.length !== 3) return null;
+    if (parts.length < 2) return null; // a loose file straight in the Bible folder
 
-    const [version, bookFolder, filename] = parts;
-    const name = filename.replace(/\.md$/, '');
-    const re = new RegExp(`^${escapeRegex(version)}-${escapeRegex(bookFolder)}-(\\d+)$`);
-    const m = name.match(re);
-    if (!m) return null;
+    const parsed = parseChapterName(file.basename, parts[0]);
+    if (!parsed) return null;
 
     return {
-      version,
-      bookFolder,
-      book: bookFolder.replace(/^\d+-/, ''),
-      chapter: parseInt(m[1], 10),
+      version: parsed.version,
+      bookIndex: parsed.bookIndex,
+      book: parsed.book,
+      chapter: parsed.chapter,
       verse: this.currentVerse(view),
       file,
     };
@@ -180,24 +221,14 @@ export default class KingdoneChapelPlugin extends Plugin {
 
   /** Resolve the chapter file of `version` matching the current location. */
   targetFile(version: string, loc: Location): TFile | null {
-    const dir = `${this.settings.bibleFolder}/${version}/${loc.bookFolder}`;
-    const candidates = [
-      `${dir}/${version}-${loc.bookFolder}-${pad3(loc.chapter)}.md`,
-      `${dir}/${version}-${loc.bookFolder}-${loc.chapter}.md`,
-      `${dir}/${version}-${loc.bookFolder}-000.md`, // commentaries: one file per book
-    ];
-    for (const path of candidates) {
-      const f = this.app.vault.getAbstractFileByPath(path);
-      if (f instanceof TFile) return f;
-    }
-    // Last resort: any file in the book folder ending with the chapter number.
-    const folder = this.app.vault.getAbstractFileByPath(dir);
-    if (folder instanceof TFolder) {
-      const re = new RegExp(`-0*${loc.chapter}$`);
-      const hit = folder.children.find((c): c is TFile => c instanceof TFile && re.test(c.basename));
-      if (hit) return hit;
-    }
-    return null;
+    const chapters = this.index().get(version);
+    if (!chapters) return null;
+    return (
+      chapters.get(chapterKey(loc.bookIndex, loc.chapter)) ||
+      // Commentaries keep a single -000 file per book.
+      chapters.get(chapterKey(loc.bookIndex, 0)) ||
+      null
+    );
   }
 
   /** Block ids of a file (from metadata cache, falling back to reading it). */
@@ -292,7 +323,7 @@ export default class KingdoneChapelPlugin extends Plugin {
   async jumpTo(version: string, loc: Location, newLeaf?: PaneType | boolean) {
     const file = this.targetFile(version, loc);
     if (!file) {
-      new Notice(`${this.label(version)} has no ${loc.book || loc.bookFolder} ${loc.chapter}.`);
+      new Notice(`${this.label(version)} has no ${loc.book} ${loc.chapter}.`);
       return;
     }
     const anchor = await this.findAnchor(file, loc.chapter, loc.verse);

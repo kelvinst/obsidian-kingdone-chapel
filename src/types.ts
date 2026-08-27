@@ -25,7 +25,8 @@ export const DEFAULT_SETTINGS: KingdoneChapelSettings = {
 /** Where the reader is: a chapter file, plus the verse under the cursor. */
 export interface Location {
   version: string;
-  bookFolder: string;
+  /** Book number from the file name — the key books are matched by. */
+  bookIndex: number;
   book: string;
   chapter: number;
   verse: number | null;

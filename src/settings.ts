@@ -17,7 +17,7 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Bible folder')
-      .setDesc('Folder holding the version folders (ARA, NVI, ...).')
+      .setDesc('Folder holding the version folders (ARA, NVI, ...). Inside each version, folders are ignored — only file names matter.')
       .addText((text) =>
         text
           .setPlaceholder('Bibles')
@@ -87,6 +87,7 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
       .setDesc(this.plugin.listVersions().join(', ') || 'none')
       .addButton((b) =>
         b.setButtonText('Reload').onClick(() => {
+          this.plugin.invalidateIndex();
           this.plugin.registerVersionCommands();
           this.plugin.chapterCache.clear();
           this.display();
