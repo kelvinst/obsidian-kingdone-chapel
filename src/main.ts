@@ -127,7 +127,11 @@ export default class KingdoneChapelPlugin extends Plugin {
    */
   currentLocation(): Location | null {
     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-    if (view) return this.remember(this.keepVerse(this.locationOf(view.file, view)));
+    if (view) {
+      const loc = this.locationOf(view.file, view);
+      // Only reading mode needs the guard below; a cursor above verse 1 really has no verse.
+      return this.remember(view.getMode() === 'preview' ? this.keepVerse(loc) : loc);
+    }
 
     // Focus is on something that is not an editor (the sidebar itself, a modal,
     // the file explorer...). There is no editor to read the cursor from, so the
@@ -185,7 +189,9 @@ export default class KingdoneChapelPlugin extends Plugin {
   /** Verse being read: the cursor while editing, the rendered page while reading. */
   currentVerse(view: MarkdownView | null): number | null {
     if (!view) return null;
-    return view.getMode() === 'preview' ? this.previewVerse(view) : this.cursorVerse(view);
+    if (view.getMode() === 'preview') return this.previewVerse(view);
+    this.previewLock = null; // leaving reading mode drops the clicked verse
+    return this.cursorVerse(view);
   }
 
   /** Verse number at the cursor: nearest **N** at or above the cursor line. */
@@ -223,9 +229,13 @@ export default class KingdoneChapelPlugin extends Plugin {
     }
 
     const lock = this.previewLock;
-    if (lock && view.file && lock.path === view.file.path) {
-      if (Math.abs(scroller.scrollTop - lock.scrollTop) <= SCROLL_SLACK) return lock.verse;
-      this.previewLock = null;
+    if (lock) {
+      const held =
+        !!view.file &&
+        lock.path === view.file.path &&
+        Math.abs(scroller.scrollTop - lock.scrollTop) <= SCROLL_SLACK;
+      if (held) return lock.verse;
+      this.previewLock = null; // another file, or this pane has scrolled on
     }
 
     const items = this.verseParagraphs(scroller);
