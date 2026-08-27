@@ -95,3 +95,8 @@
   font-size: var(--font-ui-small);
   text-align: center;
 }
+
+.kcp-conflicts {
+  margin: var(--size-4-1) 0 0;
+  padding-left: var(--size-4-4);
+}

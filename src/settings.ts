@@ -93,5 +93,17 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
           this.display();
         })
       );
+
+    // listVersions() above builds the index, so the conflicts are known by now.
+    const conflicts = this.plugin.chapterConflicts;
+    if (conflicts.size) {
+      const setting = new Setting(containerEl)
+        .setName('Duplicate chapter files')
+        .setDesc('Same chapter claimed by more than one file, so it is skipped. Keep one of each.');
+      const list = setting.descEl.createEl('ul', { cls: 'kcp-conflicts' });
+      for (const files of conflicts.values()) {
+        list.createEl('li', { text: files.map((f) => f.path).join('  |  ') });
+      }
+    }
   }
 }
