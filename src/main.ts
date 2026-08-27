@@ -284,7 +284,9 @@ export default class KingdoneChapelPlugin extends Plugin {
     if (!editor) return null;
     let line: number;
     try {
-      line = editor.getCursor().line;
+      // A selection spanning verses belongs to the one it starts on, not the one
+      // the drag ended on (`getCursor()` alone returns the head of the selection).
+      line = editor.getCursor(editor.somethingSelected() ? 'from' : 'head').line;
     } catch (e) {
       return null;
     }
@@ -302,6 +304,13 @@ export default class KingdoneChapelPlugin extends Plugin {
   previewVerse(view: MarkdownView): number | null {
     const scroller = this.previewScroller(view);
     if (!scroller) return null;
+
+    // Selected text wins: a drag across verses points at the one it starts on.
+    const selected = this.selectionParagraph(scroller);
+    if (selected) {
+      const verse = this.verseOf(selected);
+      if (verse !== null) return verse;
+    }
 
     const lock = this.previewLock;
     if (lock && view.file && lock.path === view.file.path) {
@@ -345,6 +354,19 @@ export default class KingdoneChapelPlugin extends Plugin {
     const verse = para ? this.verseOf(para) : null;
     this.previewLock =
       verse === null ? null : { path: view.file.path, verse, scrollTop: scroller.scrollTop };
+  }
+
+  /** Verse paragraph the selection starts in, when text is selected in this pane. */
+  selectionParagraph(scroller: HTMLElement): HTMLElement | null {
+    const win = scroller.ownerDocument.defaultView;
+    const sel = win && win.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
+
+    const node = sel.getRangeAt(0).startContainer; // always the earlier end of the range
+    if (!scroller.contains(node)) return null;
+
+    const el = node instanceof Element ? node : node.parentElement;
+    return el ? el.closest<HTMLElement>('.markdown-preview-sizer p') : null;
   }
 
   /** The scrolling element of a reading pane, verse positions are measured against it. */
