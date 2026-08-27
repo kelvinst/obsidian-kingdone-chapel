@@ -90,6 +90,15 @@ elif ! grep -q '"hot-reload"' "$VAULT/.obsidian/community-plugins.json" 2>/dev/n
 fi
 
 if [ "$DO_BUILD" = 1 ]; then
+  # A fresh worktree has no node_modules of its own, and the build needs tsc/esbuild.
+  if [ ! -d "$TARGET/node_modules" ]; then
+    echo "installing dependencies in $TARGET"
+    if [ -f "$TARGET/package-lock.json" ]; then
+      (cd "$TARGET" && npm ci)
+    else
+      (cd "$TARGET" && npm install)
+    fi
+  fi
   echo "building in $TARGET"
   (cd "$TARGET" && npm run --silent build)
   echo "done - Hot Reload picks up the new main.js"
