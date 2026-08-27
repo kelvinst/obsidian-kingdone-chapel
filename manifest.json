@@ -1,0 +1,9 @@
+{
+  "id": "kingdone-chapel",
+  "name": "Kingdone Chapel",
+  "version": "1.0.0",
+  "minAppVersion": "1.4.0",
+  "description": "Open the current Bible chapter/verse in another version (ARA, NVI, NVT, ACF, NTLH, MENS...).",
+  "author": "Kelvin",
+  "isDesktopOnly": false
+}

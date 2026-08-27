@@ -1,0 +1,97 @@
+/* --- picker modal --- */
+.kcp-version {
+  font-weight: 600;
+}
+
+.kcp-preview {
+  display: block;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- sidebar --- */
+.kcp-view {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.kcp-header {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+  padding: var(--size-4-2) var(--size-4-3);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.kcp-ref {
+  flex: 1;
+  font-weight: 600;
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+}
+
+.kcp-pin.is-active {
+  color: var(--text-accent);
+}
+
+.kcp-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--size-4-2);
+}
+
+.kcp-card {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: var(--size-4-2);
+  margin-bottom: var(--size-4-2);
+  cursor: pointer;
+}
+
+.kcp-card:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.kcp-card-current {
+  border-color: var(--text-accent);
+}
+
+.kcp-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--size-4-2);
+  margin-bottom: var(--size-2-2);
+}
+
+.kcp-card-head .kcp-version {
+  font-size: var(--font-ui-smaller);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-accent);
+}
+
+.kcp-merged {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+}
+
+.kcp-text {
+  font-size: var(--font-ui-small);
+  line-height: var(--line-height-tight);
+  color: var(--text-normal);
+}
+
+.kcp-text p {
+  margin: 0;
+}
+
+.kcp-empty {
+  padding: var(--size-4-4);
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  text-align: center;
+}
