@@ -132,3 +132,20 @@ const BOOK_NAMES: Record<string, string> = {
 export function bookName(code: string): string {
   return BOOK_NAMES[code.toUpperCase()] ?? code;
 }
+
+/** A verse line of a chapter file, split into its number and its text. */
+export interface VerseLine {
+  verse: number;
+  text: string;
+}
+
+/**
+ * Read a verse line. Chapters write their verses as an ordered list
+ * (`1. No princípio`); older ones bolded the number instead (`**1** No
+ * princípio`), and both are still around, so accept either.
+ */
+export function parseVerseLine(line: string): VerseLine | null {
+  const m = line.match(/^\s*(?:\*\*(\d+)\*\*|(\d+)\.)\s*(.*)$/);
+  if (!m) return null;
+  return { verse: parseInt(m[1] || m[2], 10), text: m[3] };
+}

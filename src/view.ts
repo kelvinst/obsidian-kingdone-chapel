@@ -102,7 +102,7 @@ export class KingdoneChapelView extends ItemView {
     const head = card.createDiv({ cls: 'kcp-card-head' });
     head.createSpan({ cls: 'kcp-version', text: item.label });
     if (item.matchedVerse && loc.verse && item.matchedVerse !== loc.verse) {
-      // e.g. MENS puts verses 1-2 under **1**
+      // e.g. MENS puts verses 1-2 under verse 1
       head.createSpan({ cls: 'kcp-merged', text: `v.${item.matchedVerse}` });
     }
 

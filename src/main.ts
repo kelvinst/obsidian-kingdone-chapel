@@ -3,10 +3,13 @@ import type { PaneType } from 'obsidian';
 
 import { DEFAULT_SETTINGS, VIEW_TYPE } from './types';
 import type { KingdoneChapelSettings, Location, Verse, VersionItem } from './types';
-import { bookName, chapterKey, parseChapterName } from './utils';
+import { bookName, chapterKey, parseChapterName, parseVerseLine } from './utils';
 import { VersionSuggestModal } from './modal';
 import { KingdoneChapelSettingTab } from './settings';
 import { KingdoneChapelView } from './view';
+
+/** Rendered elements a verse can be: a list item now, a paragraph in older chapters. */
+const VERSE_SELECTOR = '.markdown-preview-sizer li, .markdown-preview-sizer p';
 
 /** How far below the top of a reading pane a verse still counts as the one being read. */
 const PREVIEW_TOP_OFFSET = 48;
@@ -284,7 +287,7 @@ export default class KingdoneChapelPlugin extends Plugin {
     return this.cursorVerse(view);
   }
 
-  /** Verse number at the cursor: nearest **N** at or above the cursor line. */
+  /** Verse number at the cursor: the nearest verse line at or above the cursor. */
   cursorVerse(view: MarkdownView): number | null {
     const editor = view.editor;
     if (!editor) return null;
@@ -297,8 +300,8 @@ export default class KingdoneChapelPlugin extends Plugin {
       return null;
     }
     for (let i = line; i >= 0; i--) {
-      const m = editor.getLine(i).match(/^\s*\*\*(\d+)\*\*/);
-      if (m) return parseInt(m[1], 10);
+      const parsed = parseVerseLine(editor.getLine(i));
+      if (parsed) return parsed.verse;
     }
     return null;
   }
@@ -314,7 +317,7 @@ export default class KingdoneChapelPlugin extends Plugin {
     // Selected text wins: a drag across verses points at the one it starts on.
     const selected = this.selectionParagraph(scroller);
     if (selected) {
-      const verse = this.verseOf(selected);
+      const verse = this.verseAt(view, scroller, selected);
       if (verse !== null) return verse;
     }
 
@@ -328,7 +331,7 @@ export default class KingdoneChapelPlugin extends Plugin {
       this.previewLock = null; // another file, or this pane has scrolled on
     }
 
-    const items = this.verseParagraphs(scroller);
+    const items = this.verseParagraphs(view, scroller);
     if (!items.length) return null;
 
     // The paragraphs are in document order, so their tops are sorted: binary search
@@ -360,8 +363,8 @@ export default class KingdoneChapelPlugin extends Plugin {
     const scroller = this.previewScroller(view);
     if (!scroller || !scroller.contains(target)) return;
 
-    const para = target.closest('.markdown-preview-sizer p');
-    const verse = para ? this.verseOf(para) : null;
+    const para = target.closest<HTMLElement>(VERSE_SELECTOR);
+    const verse = para ? this.verseAt(view, scroller, para) : null;
     this.previewLock =
       verse === null ? null : { path: view.file.path, verse, scrollTop: scroller.scrollTop };
   }
@@ -376,7 +379,7 @@ export default class KingdoneChapelPlugin extends Plugin {
     if (!scroller.contains(node)) return null;
 
     const el = node instanceof Element ? node : node.parentElement;
-    return el ? el.closest<HTMLElement>('.markdown-preview-sizer p') : null;
+    return el ? el.closest<HTMLElement>(VERSE_SELECTOR) : null;
   }
 
   /** The scrolling element of a reading pane, verse positions are measured against it. */
@@ -386,14 +389,40 @@ export default class KingdoneChapelPlugin extends Plugin {
     return container.querySelector<HTMLElement>('.markdown-preview-view') || container;
   }
 
-  /** Verse paragraphs of a reading pane, in document order. */
-  verseParagraphs(scroller: HTMLElement): { verse: number; el: HTMLElement }[] {
-    const out: { verse: number; el: HTMLElement }[] = [];
-    for (const el of Array.from(scroller.querySelectorAll<HTMLElement>('.markdown-preview-sizer p'))) {
+  /**
+   * Verse elements of a reading pane, in document order.
+   *
+   * A rendered list item carries no number of its own: Markdown numbers a list
+   * from its first item and ignores the rest, so a version that merges verses
+   * (MENS opens Genesis 1 with `1.` then `3.`) reads off the screen as 1, 2.
+   * Take the numbers from the file and pair them up in order instead. Nothing
+   * separates the verses, so reading mode renders them as a single block —
+   * either every item is on the page or none is, and a count that disagrees
+   * means the pairing would be guesswork.
+   */
+  verseParagraphs(view: MarkdownView, scroller: HTMLElement): { verse: number; el: HTMLElement }[] {
+    const els = Array.from(scroller.querySelectorAll<HTMLElement>(VERSE_SELECTOR));
+
+    // Older chapters bold the number into the paragraph, where it can be read off.
+    const marked: { verse: number; el: HTMLElement }[] = [];
+    for (const el of els) {
       const verse = this.verseOf(el);
-      if (verse !== null) out.push({ verse, el });
+      if (verse !== null) marked.push({ verse, el });
     }
-    return out;
+    if (marked.length) return marked;
+
+    const items = els.filter((el) => el.tagName === 'LI');
+    const verses = this.cachedVerses(view.file);
+    if (!verses || verses.length !== items.length) return [];
+    return items.map((el, i) => ({ verse: verses[i].verse, el }));
+  }
+
+  /** Verse a reading-pane element belongs to. */
+  verseAt(view: MarkdownView, scroller: HTMLElement, el: HTMLElement): number | null {
+    const marked = this.verseOf(el);
+    if (marked !== null) return marked;
+    const found = this.verseParagraphs(view, scroller).find((item) => item.el === el);
+    return found ? found.verse : null;
   }
 
   /** Verse number of a rendered `**N** text` paragraph, if that is what `el` is. */
@@ -429,7 +458,7 @@ export default class KingdoneChapelPlugin extends Plugin {
 
   /**
    * Block id in `file` for chapter/verse. Versions like MENS merge verses
-   * (1-2 under **1**), so fall back to the closest anchor before the verse.
+   * (1-2 under verse 1), so fall back to the closest anchor before the verse.
    */
   async findAnchor(file: TFile, chapter: number, verse: number | null): Promise<string | null> {
     if (!verse) return null;
@@ -450,6 +479,18 @@ export default class KingdoneChapelPlugin extends Plugin {
     return best;
   }
 
+  /**
+   * Verses of a chapter already parsed, for callers that cannot wait for a read.
+   * Reading mode is polled, so a miss just warms the cache for the next round.
+   */
+  cachedVerses(file: TFile | null): Verse[] | null {
+    if (!file) return null;
+    const hit = this.chapterCache.get(file.path);
+    if (hit && hit.mtime === file.stat.mtime) return hit.verses;
+    void this.chapterVerses(file);
+    return null;
+  }
+
   /** Parsed verses of a chapter file, cached until the file changes. */
   async chapterVerses(file: TFile): Promise<Verse[]> {
     const hit = this.chapterCache.get(file.path);
@@ -458,11 +499,11 @@ export default class KingdoneChapelPlugin extends Plugin {
     const content = await this.app.vault.cachedRead(file);
     const verses: Verse[] = [];
     for (const line of content.split('\n')) {
-      const m = line.match(/^\s*\*\*(\d+)\*\*\s*(.*)$/);
-      if (!m) continue;
+      const parsed = parseVerseLine(line);
+      if (!parsed) continue;
       verses.push({
-        verse: parseInt(m[1], 10),
-        text: m[2].replace(/\s*\^[A-Za-z0-9-]+\s*$/, '').trim(),
+        verse: parsed.verse,
+        text: parsed.text.replace(/\s*\^[A-Za-z0-9-]+\s*$/, '').trim(),
       });
     }
     this.chapterCache.set(file.path, { mtime: file.stat.mtime, verses });
