@@ -46,7 +46,7 @@ export class KingdoneChapelView extends ItemView {
   /** Identity of what is currently rendered, so polling is a cheap no-op. */
   locKey(loc: Location | null): string {
     if (!loc) return 'none';
-    return `${loc.version}/${loc.bookFolder}/${loc.chapter}/${loc.verse}`;
+    return `${loc.version}/${loc.bookIndex}/${loc.chapter}/${loc.verse}`;
   }
 
   async refresh(force = false) {
