@@ -48,6 +48,7 @@ if [ "$TARGET" = "__MAIN__" ]; then
 elif [ -z "$TARGET" ]; then
   TARGET="$REPO_ROOT"
 fi
+[ -d "$TARGET" ] || { echo "not a plugin checkout: $TARGET" >&2; exit 1; }
 TARGET="$(cd "$TARGET" && pwd)"
 
 [ -f "$TARGET/manifest.json" ] || { echo "not a plugin checkout: $TARGET" >&2; exit 1; }
