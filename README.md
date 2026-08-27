@@ -57,7 +57,9 @@ Bibles/KJV/KJV-19-Psalms-4.md
 
 Books are matched across versions by their number, not by folder or book name. Chapter numbers
 may be zero-padded to three digits or not; commentaries that keep a single file per book can
-use `-000`.
+use `-000`. A file name must start with its version folder's name, and no two files inside one
+version may point at the same chapter — when they do, the plugin skips that chapter and tells
+you which files to sort out.
 
 Inside a chapter file, each verse starts with its number in bold and may carry a block id:
 

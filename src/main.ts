@@ -14,6 +14,10 @@ export default class KingdoneChapelPlugin extends Plugin {
   chapterCache: Map<string, { mtime: number; verses: Verse[] }>;
   /** version -> "book:chapter" -> file. Built lazily, dropped on vault changes. */
   bibleIndex: Map<string, Map<string, TFile>> | null = null;
+  /** "version/book:chapter" -> the files fighting over it. Filled by index(). */
+  chapterConflicts: Map<string, TFile[]> = new Map();
+  /** The conflicts the user was last warned about, so each is only said once. */
+  warnedConflicts = '';
   /** Last location read from a real editor, kept for when focus leaves it. */
   lastLocation: Location | null = null;
 
@@ -85,6 +89,7 @@ export default class KingdoneChapelPlugin extends Plugin {
     if (this.bibleIndex) return this.bibleIndex;
 
     const index = new Map<string, Map<string, TFile>>();
+    const conflicts = new Map<string, TFile[]>();
     const base = this.settings.bibleFolder;
     for (const file of this.app.vault.getMarkdownFiles()) {
       if (!file.path.startsWith(base + '/')) continue;
@@ -98,12 +103,55 @@ export default class KingdoneChapelPlugin extends Plugin {
       let chapters = index.get(version);
       if (!chapters) index.set(version, (chapters = new Map()));
       const key = chapterKey(parsed.bookIndex, parsed.chapter);
+
+      // Two files for one chapter is a mistake in the vault, and only the user
+      // knows which one to keep. Take neither, and say so.
+      const clash = conflicts.get(`${version}/${key}`);
+      if (clash) {
+        clash.push(file);
+        continue;
+      }
       const current = chapters.get(key);
-      if (!current || preferChapter(file, current) === file) chapters.set(key, file);
+      if (current) {
+        chapters.delete(key);
+        conflicts.set(`${version}/${key}`, [current, file]);
+        continue;
+      }
+      chapters.set(key, file);
     }
 
     this.bibleIndex = index;
+    this.chapterConflicts = conflicts;
+    this.warnAboutConflicts();
     return index;
+  }
+
+  /** The files claiming `loc` in `version`, when more than one does. */
+  conflictFor(version: string, loc: Location): TFile[] | null {
+    this.index(); // conflicts are a by-product of building it
+    for (const chapter of [loc.chapter, 0]) {
+      const clash = this.chapterConflicts.get(`${version}/${chapterKey(loc.bookIndex, chapter)}`);
+      if (clash) return clash;
+    }
+    return null;
+  }
+
+  /** Notice the user once per set of duplicates, when the index is rebuilt. */
+  warnAboutConflicts() {
+    const signature = Array.from(this.chapterConflicts.keys()).sort().join('|');
+    if (signature === this.warnedConflicts) return;
+    this.warnedConflicts = signature;
+    if (!this.chapterConflicts.size) return;
+
+    const names = Array.from(this.chapterConflicts.values(), (files) =>
+      files.map((f) => f.basename).join(' / ')
+    );
+    const shown = names.slice(0, 3).join('\n');
+    const rest = names.length > 3 ? `\n...and ${names.length - 3} more` : '';
+    new Notice(
+      `Kingdone Chapel: more than one file for the same chapter. Rename or remove one of each:\n${shown}${rest}`,
+      10000
+    );
   }
 
   refreshViews() {
@@ -324,7 +372,13 @@ export default class KingdoneChapelPlugin extends Plugin {
   async jumpTo(version: string, loc: Location, newLeaf?: PaneType | boolean) {
     const file = this.targetFile(version, loc);
     if (!file) {
-      new Notice(`${this.label(version)} has no ${loc.book} ${loc.chapter}.`);
+      const clash = this.conflictFor(version, loc);
+      new Notice(
+        clash
+          ? `${this.label(version)} has ${clash.length} files for ${loc.book} ${loc.chapter}: ` +
+            `${clash.map((f) => f.basename).join(', ')}. Rename or remove one.`
+          : `${this.label(version)} has no ${loc.book} ${loc.chapter}.`
+      );
       return;
     }
     const anchor = await this.findAnchor(file, loc.chapter, loc.verse);
@@ -346,16 +400,4 @@ export default class KingdoneChapelPlugin extends Plugin {
     }
     new VersionSuggestModal(this.app, this, loc, items).open();
   }
-}
-
-/**
- * Which of two files claiming the same chapter wins. Zero-padded names are the
- * canonical ones, and the path breaks the remaining ties, so the pick never
- * depends on the order the vault happens to list files in.
- */
-function preferChapter(a: TFile, b: TFile): TFile {
-  const paddedA = /-\d{3,}$/.test(a.basename);
-  const paddedB = /-\d{3,}$/.test(b.basename);
-  if (paddedA !== paddedB) return paddedA ? a : b;
-  return a.path < b.path ? a : b;
 }
