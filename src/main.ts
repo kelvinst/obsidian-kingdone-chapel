@@ -98,7 +98,8 @@ export default class KingdoneChapelPlugin extends Plugin {
       let chapters = index.get(version);
       if (!chapters) index.set(version, (chapters = new Map()));
       const key = chapterKey(parsed.bookIndex, parsed.chapter);
-      if (!chapters.has(key)) chapters.set(key, file);
+      const current = chapters.get(key);
+      if (!current || preferChapter(file, current) === file) chapters.set(key, file);
     }
 
     this.bibleIndex = index;
@@ -345,4 +346,16 @@ export default class KingdoneChapelPlugin extends Plugin {
     }
     new VersionSuggestModal(this.app, this, loc, items).open();
   }
+}
+
+/**
+ * Which of two files claiming the same chapter wins. Zero-padded names are the
+ * canonical ones, and the path breaks the remaining ties, so the pick never
+ * depends on the order the vault happens to list files in.
+ */
+function preferChapter(a: TFile, b: TFile): TFile {
+  const paddedA = /-\d{3,}$/.test(a.basename);
+  const paddedB = /-\d{3,}$/.test(b.basename);
+  if (paddedA !== paddedB) return paddedA ? a : b;
+  return a.path < b.path ? a : b;
 }
