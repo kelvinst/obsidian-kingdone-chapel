@@ -12,6 +12,8 @@ export default class KingdoneChapelPlugin extends Plugin {
   settings: KingdoneChapelSettings;
   /** path -> { mtime, verses } */
   chapterCache: Map<string, { mtime: number; verses: Verse[] }>;
+  /** Last location read from a real editor, kept for when focus leaves it. */
+  lastLocation: Location | null = null;
 
   async onload() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
@@ -116,8 +118,22 @@ export default class KingdoneChapelPlugin extends Plugin {
    */
   currentLocation(): Location | null {
     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-    const file = view ? view.file : this.app.workspace.getActiveFile();
-    return this.locationOf(file, view);
+    if (view) return this.remember(this.locationOf(view.file, view));
+
+    // Focus is on something that is not an editor (the sidebar itself, a modal,
+    // the file explorer...). There is no editor to read the cursor from, so the
+    // verse would come back null and the sidebar would snap to verse 1. Reuse
+    // the last location instead, as long as it is still the active file.
+    const file = this.app.workspace.getActiveFile();
+    if (this.lastLocation && file && this.lastLocation.file.path === file.path) {
+      return this.lastLocation;
+    }
+    return this.remember(this.locationOf(file, null));
+  }
+
+  remember(loc: Location | null): Location | null {
+    this.lastLocation = loc;
+    return loc;
   }
 
   locationOf(file: TFile | null, view: MarkdownView | null): Location | null {
