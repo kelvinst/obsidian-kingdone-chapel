@@ -78,6 +78,11 @@ elif [ -e "$PLUGIN_DIR" ]; then
 fi
 
 if [ -n "$CURRENT" ] && [ "$CURRENT" != "$TARGET" ] && [ -f "$CURRENT/data.json" ]; then
+  # The vault's settings win, but keep whatever the target had so it is recoverable.
+  if [ -f "$TARGET/data.json" ]; then
+    cp "$TARGET/data.json" "$TARGET/data.json.bak"
+    echo "settings: saved the target's own data.json as data.json.bak"
+  fi
   cp "$CURRENT/data.json" "$TARGET/data.json"
   echo "settings: copied data.json from $CURRENT"
 elif [ "$LINK_BROKEN" = 1 ]; then
