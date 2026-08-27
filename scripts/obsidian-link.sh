@@ -14,7 +14,11 @@ Usage: scripts/obsidian-link.sh [options] [checkout-path]
 
 Links <vault>/.obsidian/plugins/<plugin-id> to the given checkout (default: the
 checkout this script lives in), copies data.json over so settings survive, and builds
-main.js. The Hot Reload plugin then reloads this plugin by itself.
+main.js (installing dependencies first if the checkout has none). The Hot Reload plugin
+then reloads this plugin by itself.
+
+Settings are also backed up to <vault>/.obsidian/<plugin-id>-data.backup.json on every
+run, and restored from there if the previously linked checkout has been deleted.
 
 Options:
   --main            link the main checkout instead of the current worktree
@@ -52,21 +56,44 @@ TARGET="$(cd "$TARGET" && pwd)"
 PLUGIN_ID="$(node -p "require('$TARGET/manifest.json').id")"
 PLUGIN_DIR="$VAULT/.obsidian/plugins/$PLUGIN_ID"
 
-# Carry settings over from wherever the vault currently points.
+# Carry settings over from wherever the vault currently points. A worktree that was
+# linked and then deleted leaves a dangling symlink, so keep a backup in the vault too:
+# that checkout's data.json is deleted along with it and cannot be recovered otherwise.
+BACKUP="$VAULT/.obsidian/$PLUGIN_ID-data.backup.json"
+CURRENT=""
+LINK_BROKEN=0
+
 if [ -L "$PLUGIN_DIR" ]; then
-  CURRENT="$(cd "$(dirname "$PLUGIN_DIR")" && cd "$(readlink "$PLUGIN_DIR")" && pwd)"
-  if [ "$CURRENT" != "$TARGET" ] && [ -f "$CURRENT/data.json" ]; then
-    cp "$CURRENT/data.json" "$TARGET/data.json"
-    echo "settings: copied data.json from $CURRENT"
+  if [ -d "$PLUGIN_DIR" ]; then
+    CURRENT="$(cd "$PLUGIN_DIR" && pwd -P)"
+  else
+    LINK_BROKEN=1
   fi
 elif [ -e "$PLUGIN_DIR" ]; then
   echo "$PLUGIN_DIR exists and is not a symlink — refusing to replace it" >&2
   exit 1
 fi
 
+if [ -n "$CURRENT" ] && [ "$CURRENT" != "$TARGET" ] && [ -f "$CURRENT/data.json" ]; then
+  cp "$CURRENT/data.json" "$TARGET/data.json"
+  echo "settings: copied data.json from $CURRENT"
+elif [ "$LINK_BROKEN" = 1 ]; then
+  if [ -f "$BACKUP" ] && [ ! -f "$TARGET/data.json" ]; then
+    cp "$BACKUP" "$TARGET/data.json"
+    echo "settings: previous link target is gone - restored from $BACKUP"
+  else
+    echo "note: previous link target is gone - settings not carried over" >&2
+  fi
+fi
+
 mkdir -p "$(dirname "$PLUGIN_DIR")"
 ln -sfn "$TARGET" "$PLUGIN_DIR"
 echo "linked: $PLUGIN_DIR -> $TARGET"
+
+# Refresh the backup so a later `git worktree remove` cannot take the settings with it.
+if [ -f "$TARGET/data.json" ]; then
+  cp "$TARGET/data.json" "$BACKUP"
+fi
 
 # Make sure the plugin is in the vault's enabled list.
 node -e '
