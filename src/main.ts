@@ -3,7 +3,7 @@ import type { PaneType } from 'obsidian';
 
 import { DEFAULT_SETTINGS, VIEW_TYPE } from './types';
 import type { KingdoneChapelSettings, Location, Verse, VersionItem } from './types';
-import { chapterKey, parseChapterName } from './utils';
+import { bookName, chapterKey, parseChapterName } from './utils';
 import { VersionSuggestModal } from './modal';
 import { KingdoneChapelSettingTab } from './settings';
 import { KingdoneChapelView } from './view';
@@ -216,7 +216,7 @@ export default class KingdoneChapelPlugin extends Plugin {
 
   /**
    * Parse the active file into { version, bookIndex, book, chapter, verse }.
-   * Expects <bibleFolder>/<VERSION>/<any folders>/<VERSION>-<NN>-<Book>-<CCC>.md
+   * Expects <bibleFolder>/<VERSION>/<any folders>/<VERSION>-<NN>-<CODE>-<CCC>.md
    */
   currentLocation(): Location | null {
     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -269,7 +269,7 @@ export default class KingdoneChapelPlugin extends Plugin {
     return {
       version: parsed.version,
       bookIndex: parsed.bookIndex,
-      book: parsed.book,
+      book: bookName(parsed.book),
       chapter: parsed.chapter,
       verse: this.currentVerse(view),
       file,
