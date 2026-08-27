@@ -55,7 +55,10 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Follow cursor')
-      .setDesc('Off: the sidebar only updates when you switch notes.')
+      .setDesc(
+        'Follows the cursor while editing and the scroll position (or a clicked verse) ' +
+          'while reading. Off: the sidebar only updates when you switch notes.'
+      )
       .addToggle((t) =>
         t.setValue(this.plugin.settings.followCursor).onChange(async (value) => {
           this.plugin.settings.followCursor = value;

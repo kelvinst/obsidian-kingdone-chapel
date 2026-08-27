@@ -8,6 +8,11 @@ import { VersionSuggestModal } from './modal';
 import { KingdoneChapelSettingTab } from './settings';
 import { KingdoneChapelView } from './view';
 
+/** How far below the top of a reading pane a verse still counts as the one being read. */
+const PREVIEW_TOP_OFFSET = 48;
+/** Scroll movement (px) that releases a verse clicked in reading mode. */
+const SCROLL_SLACK = 4;
+
 export default class KingdoneChapelPlugin extends Plugin {
   settings: KingdoneChapelSettings;
   /** path -> { mtime, verses } */
@@ -20,6 +25,8 @@ export default class KingdoneChapelPlugin extends Plugin {
   warnedConflicts = '';
   /** Last location read from a real editor, kept for when focus leaves it. */
   lastLocation: Location | null = null;
+  /** Verse clicked in reading mode, held until that pane scrolls again. */
+  previewLock: { path: string; verse: number; scrollTop: number } | null = null;
 
   async onload() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
@@ -61,6 +68,8 @@ export default class KingdoneChapelPlugin extends Plugin {
     this.registerEvent(this.app.vault.on('create', () => this.invalidateIndex()));
     this.registerEvent(this.app.vault.on('delete', () => this.invalidateIndex()));
     this.registerEvent(this.app.vault.on('rename', () => this.invalidateIndex()));
+
+    this.registerDomEvent(document, 'click', (evt) => this.lockPreviewVerse(evt));
 
     if (this.settings.openSidebarOnStart) {
       this.app.workspace.onLayoutReady(() => this.activateView(false));
@@ -211,7 +220,7 @@ export default class KingdoneChapelPlugin extends Plugin {
    */
   currentLocation(): Location | null {
     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-    if (view) return this.remember(this.locationOf(view.file, view));
+    if (view) return this.remember(this.keepVerse(this.locationOf(view.file, view)));
 
     // Focus is on something that is not an editor (the sidebar itself, a modal,
     // the file explorer...). There is no editor to read the cursor from, so the
@@ -222,6 +231,18 @@ export default class KingdoneChapelPlugin extends Plugin {
       return this.lastLocation;
     }
     return this.remember(this.locationOf(file, null));
+  }
+
+  /**
+   * Reading mode renders lazily, so right after a mode switch the verse can come
+   * back null for a frame. Keep the verse we already had instead of snapping to 1.
+   */
+  keepVerse(loc: Location | null): Location | null {
+    const last = this.lastLocation;
+    if (loc && loc.verse === null && last && last.verse && last.file.path === loc.file.path) {
+      loc.verse = last.verse;
+    }
+    return loc;
   }
 
   remember(loc: Location | null): Location | null {
@@ -251,9 +272,15 @@ export default class KingdoneChapelPlugin extends Plugin {
     };
   }
 
-  /** Verse number at the cursor: nearest **N** at or above the cursor line. */
+  /** Verse being read: the cursor while editing, the rendered page while reading. */
   currentVerse(view: MarkdownView | null): number | null {
-    const editor = view && view.editor;
+    if (!view) return null;
+    return view.getMode() === 'preview' ? this.previewVerse(view) : this.cursorVerse(view);
+  }
+
+  /** Verse number at the cursor: nearest **N** at or above the cursor line. */
+  cursorVerse(view: MarkdownView): number | null {
+    const editor = view.editor;
     if (!editor) return null;
     let line: number;
     try {
@@ -266,6 +293,83 @@ export default class KingdoneChapelPlugin extends Plugin {
       if (m) return parseInt(m[1], 10);
     }
     return null;
+  }
+
+  /**
+   * Reading mode has no cursor: the verse is the one clicked last, or, once the
+   * pane scrolls again, the topmost one still on screen.
+   */
+  previewVerse(view: MarkdownView): number | null {
+    const scroller = this.previewScroller(view);
+    if (!scroller) return null;
+
+    const lock = this.previewLock;
+    if (lock && view.file && lock.path === view.file.path) {
+      if (Math.abs(scroller.scrollTop - lock.scrollTop) <= SCROLL_SLACK) return lock.verse;
+      this.previewLock = null;
+    }
+
+    const items = this.verseParagraphs(scroller);
+    if (!items.length) return null;
+
+    // The paragraphs are in document order, so their tops are sorted: binary search
+    // instead of measuring all of them (Psalm 119 has 176, and the sidebar polls).
+    const limit = scroller.getBoundingClientRect().top + PREVIEW_TOP_OFFSET;
+    let lo = 0;
+    let hi = items.length - 1;
+    let best = 0;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (items[mid].el.getBoundingClientRect().top <= limit) {
+        best = mid;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    return items[best].verse;
+  }
+
+  /** Clicking a verse in reading mode holds the sidebar on it until the pane scrolls. */
+  lockPreviewVerse(evt: MouseEvent) {
+    const target = evt.target instanceof Element ? evt.target : null;
+    if (!target || target.closest('a')) return; // links keep navigating untouched
+
+    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (!view || !view.file || view.getMode() !== 'preview') return;
+
+    const scroller = this.previewScroller(view);
+    if (!scroller || !scroller.contains(target)) return;
+
+    const para = target.closest('.markdown-preview-sizer p');
+    const verse = para ? this.verseOf(para) : null;
+    this.previewLock =
+      verse === null ? null : { path: view.file.path, verse, scrollTop: scroller.scrollTop };
+  }
+
+  /** The scrolling element of a reading pane, verse positions are measured against it. */
+  previewScroller(view: MarkdownView): HTMLElement | null {
+    const container = view.previewMode && view.previewMode.containerEl;
+    if (!container) return null;
+    return container.querySelector<HTMLElement>('.markdown-preview-view') || container;
+  }
+
+  /** Verse paragraphs of a reading pane, in document order. */
+  verseParagraphs(scroller: HTMLElement): { verse: number; el: HTMLElement }[] {
+    const out: { verse: number; el: HTMLElement }[] = [];
+    for (const el of Array.from(scroller.querySelectorAll<HTMLElement>('.markdown-preview-sizer p'))) {
+      const verse = this.verseOf(el);
+      if (verse !== null) out.push({ verse, el });
+    }
+    return out;
+  }
+
+  /** Verse number of a rendered `**N** text` paragraph, if that is what `el` is. */
+  verseOf(el: Element): number | null {
+    const strong = el.firstElementChild;
+    if (!strong || strong.tagName !== 'STRONG') return null;
+    const m = (strong.textContent || '').trim().match(/^(\d+)$/);
+    return m ? parseInt(m[1], 10) : null;
   }
 
   /** Resolve the chapter file of `version` matching the current location. */
