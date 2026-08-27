@@ -27,6 +27,7 @@ export interface Location {
   version: string;
   /** Book number from the file name — the key books are matched by. */
   bookIndex: number;
+  /** Readable book name, resolved from the code in the file name. */
   book: string;
   chapter: number;
   verse: number | null;
