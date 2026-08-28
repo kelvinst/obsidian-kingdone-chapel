@@ -215,13 +215,14 @@ export function matchBooks(query: string, limit = 8, langs: Lang[] = LANGS): Boo
     // language. It says nothing about which one to label the link in, so keep
     // whatever the names said, and fall back to the first one asked for. The
     // code is a short form like any other, so it stands in for the abbreviation
-    // when the names offered none.
+    // when the names offered none — lower cased, the way the table writes every
+    // other one, so that `@Rev` is offered back as `Rev` and not as `REV`.
     if (fold(book.code) === folded) {
       best = {
         book,
         lang: best ? best.lang : langs[0],
         rank: Rank.Abbr,
-        abbr: (best && best.abbr) || book.code,
+        abbr: (best && best.abbr) || book.code.toLowerCase(),
       };
     }
     if (best) matches.push(best);
@@ -232,8 +233,8 @@ export function matchBooks(query: string, limit = 8, langs: Lang[] = LANGS): Boo
 
 /**
  * An abbreviation the way it is written in a note: `jn` -> `Jn`, `1sm` -> `1Sm`.
- * The table keeps them in lower case so they can be compared; only the first
- * letter is raised, leaving forms already written out (`MRK`) as they are.
+ * The table keeps them in lower case so they can be compared, and only the
+ * first letter is raised — the rest is left to whatever the table said.
  */
 export function abbrLabel(abbr: string): string {
   return abbr.replace(/\p{L}/u, (c) => c.toUpperCase());
