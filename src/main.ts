@@ -398,15 +398,43 @@ export default class KingdoneChapelPlugin extends Plugin {
    * only writes once. Take the numbers from the file and pair them up in order
    * instead. Nothing separates the verses, so reading mode renders them as a
    * single block — either every one is on the page or none is, and a count that
-   * disagrees means the pairing would be guesswork.
+   * disagrees means something on the page is not a verse, which leaves nothing
+   * to pair against: fall back to the numbers the page writes for itself.
    */
   verseParagraphs(view: MarkdownView, scroller: HTMLElement): { verse: number; el: HTMLElement }[] {
     const els = Array.from(scroller.querySelectorAll<HTMLElement>(VERSE_SELECTOR)).filter(
       (el) => el.tagName === 'LI' || this.isVerseParagraph(el)
     );
+
     const verses = this.cachedVerses(view.file);
-    if (!verses || verses.length !== els.length) return [];
-    return els.map((el, i) => ({ verse: verses[i].verse, el }));
+    if (!verses) return []; // the file has not been read yet; the next poll has it
+    if (verses.length === els.length) return els.map((el, i) => ({ verse: verses[i].verse, el }));
+
+    const out: { verse: number; el: HTMLElement }[] = [];
+    for (const el of els) {
+      const verse = this.writtenVerse(el);
+      if (verse !== null) out.push({ verse, el });
+    }
+    return out;
+  }
+
+  /**
+   * The verse an element writes for itself, for when the file's verses cannot
+   * be paired with the page. This is the number the reader sees, which is the
+   * right one everywhere except a version that merges verses — Markdown numbers
+   * a list from its opening item and ignores the rest, so MENS reads one verse
+   * low from its first merge onwards. Close beats nothing.
+   */
+  writtenVerse(el: HTMLElement): number | null {
+    if (el.tagName !== 'LI') {
+      const strong = el.firstElementChild;
+      const m = strong && (strong.textContent || '').trim().match(/^(\d+)$/);
+      return m ? parseInt(m[1], 10) : null;
+    }
+    const list = el.parentElement;
+    if (!list || list.tagName !== 'OL') return null;
+    const index = Array.prototype.indexOf.call(list.children, el);
+    return index < 0 ? null : (list as HTMLOListElement).start + index;
   }
 
   /**
