@@ -409,9 +409,14 @@ export default class KingdoneChapelPlugin extends Plugin {
     return els.map((el, i) => ({ verse: verses[i].verse, el }));
   }
 
-  /** Verse a reading-pane element belongs to. */
+  /**
+   * Verse a reading-pane element belongs to. A verse with a blank line after it
+   * renders its text inside a paragraph of its own, and a click or a selection
+   * lands on that rather than on the item holding it, so take whichever verse
+   * the element sits in — `contains` counts the element itself.
+   */
   verseAt(view: MarkdownView, scroller: HTMLElement, el: HTMLElement): number | null {
-    const found = this.verseParagraphs(view, scroller).find((item) => item.el === el);
+    const found = this.verseParagraphs(view, scroller).find((item) => item.el.contains(el));
     return found ? found.verse : null;
   }
 
