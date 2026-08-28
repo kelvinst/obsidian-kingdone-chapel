@@ -3,9 +3,9 @@
 An [Obsidian](https://obsidian.md) plugin for spiritual life inside your vault — Scripture,
 study, and devotional practice in the same place you already take notes.
 
-The plugin is built as a set of features around that theme. The first one shipped is **Bible
-version management and navigation**; study and prayer journaling are planned (see
-[Roadmap](#roadmap)).
+The plugin is built as a set of features around that theme. The ones shipped so far are
+**Bible version management and navigation** and **`@` references**; study and prayer
+journaling are planned (see [Roadmap](#roadmap)).
 
 ## Features
 
@@ -25,6 +25,32 @@ in your vault, keeping chapter *and* verse alignment.
 - Handles versions that merge verses — if MENS puts verses 1–2 under `**1**`, asking for verse 2
   finds it and labels the card `v.1`.
 - Alt-click a card to copy that version's verse text.
+
+### `@` references
+
+Type `@` and a reference anywhere in a note to link to it. The suggestion list shows the
+books you could have meant with the opening verse of the passage, and picking one replaces
+what you typed with ordinary internal links.
+
+| You type | You get |
+|---|---|
+| `@Joao` | `[[NVI-43-Joao\|João]]` — the note listing the book's chapters |
+| `@Joao 1` | `[[NVI-43-JHN-001\|João 1]]` |
+| `@Joao 1.1` | `[[NVI-43-JHN-001#^nvi-jhn-1-1\|João 1.1]]` |
+| `@Joao 1.1,2` | `[[NVI-43-JHN-001#^nvi-jhn-1-1\|João 1.1]],[[NVI-43-JHN-001#^nvi-jhn-1-2\|2]]` — one link per verse |
+| `@Joao 1.1-3` | the same as `1.1,2,3` |
+
+Books are matched in Portuguese and English, by full name, by the two-letter Portuguese
+abbreviations (`Gn`, `Jz`, `Sl`, `Tg`, `Ap`), by the usual English ones (`Ps`, `Rev`,
+`1Cor`), and by their USFM code (`JHN`). Accents are optional — `@Joao` and `@João` both
+work — but writing them helps: `@Jo` offers João first and `@Jó` offers Jó first. A partial
+name lists every book it could still become, so `@Jo` also offers Josué, Joel and Jonas.
+
+References link to the version set in **Default version for @ references**, which starts on
+*Automatic*: the version of the note you are writing in when that note is itself a chapter,
+otherwise the first version in the vault. Name a version in the reference itself to override
+it for one link — `@ARA Joao 1.1`. Where a version merges verses, the link lands on the
+anchor covering the verse asked for, the same way the sidebar does.
 
 ## Roadmap
 
@@ -62,17 +88,23 @@ use `-000`. A file name must start with its version folder's name, and no two fi
 version may point at the same chapter — when they do, the plugin skips that chapter and tells
 you which files to sort out.
 
-Inside a chapter file, each verse starts with its number in bold and may carry a block id:
+Inside a chapter file, each verse starts with its number — as an ordered list, or in bold —
+and may carry a block id:
 
 ```markdown
-**4** Irai-vos e não pequeis; ^ara-19-4-4
+4. Irai-vos e não pequeis; ^ara-psa-4-4
 ```
+
+A book may also have a note listing its chapters, named `<VERSION>-<NN>-<Book>.md` — no
+chapter number. That is what a bare `@Joao` links to; without one it falls back to the
+book's first chapter.
 
 ## Settings
 
 | Setting | Default | What it does |
 |---|---|---|
 | Bible folder | `Bibles` | Folder holding the version folders |
+| Default version for @ references | Automatic | Version `@` references link to |
 | Open in new tab | off | Off replaces the current tab |
 | Hidden versions | — | Comma-separated version folders to ignore |
 | Follow cursor | on | Off updates the sidebar only when you switch notes |

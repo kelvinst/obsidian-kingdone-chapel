@@ -4,6 +4,8 @@ export const VIEW_TYPE = 'kingdone-chapel-view';
 
 export interface KingdoneChapelSettings {
   bibleFolder: string;
+  /** Version `@` references link to when they do not name one. Empty = pick one. */
+  defaultVersion: string;
   openInNewTab: boolean;
   hiddenVersions: string[];
   labels: Record<string, string>;
@@ -14,6 +16,7 @@ export interface KingdoneChapelSettings {
 
 export const DEFAULT_SETTINGS: KingdoneChapelSettings = {
   bibleFolder: 'Bibles',
+  defaultVersion: '',
   openInNewTab: false,
   hiddenVersions: [],
   labels: {},

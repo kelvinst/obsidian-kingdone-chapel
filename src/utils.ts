@@ -49,88 +49,16 @@ export function chapterKey(bookIndex: number, chapter: number): string {
 }
 
 /**
- * Book code -> display name. Chapter files are named by the USFM code
- * (`NVI-01-GEN-001`), which is stable across versions and languages but not
- * something to show a reader. The folder holding the chapters carries a
- * readable name, but reading it would tie the location to the vault layout,
- * which every version is free to choose. Keep the mapping here instead.
+ * Parse a book index file name: `<VERSION>-<NN>-<Name>` — the note that lists a
+ * book's chapters (`NVI-43-Joao`). It is named after the book, not its USFM
+ * code, and carries no chapter, which is what tells it apart from a chapter
+ * file; try `parseChapterName` first.
  */
-const BOOK_NAMES: Record<string, string> = {
-  GEN: 'Gênesis',
-  EXO: 'Êxodo',
-  LEV: 'Levítico',
-  NUM: 'Números',
-  DEU: 'Deuteronômio',
-  JOS: 'Josué',
-  JDG: 'Juízes',
-  RUT: 'Rute',
-  '1SA': '1 Samuel',
-  '2SA': '2 Samuel',
-  '1KI': '1 Reis',
-  '2KI': '2 Reis',
-  '1CH': '1 Crônicas',
-  '2CH': '2 Crônicas',
-  EZR: 'Esdras',
-  NEH: 'Neemias',
-  EST: 'Ester',
-  JOB: 'Jó',
-  PSA: 'Salmos',
-  PRO: 'Provérbios',
-  ECC: 'Eclesiastes',
-  SNG: 'Cânticos',
-  ISA: 'Isaías',
-  JER: 'Jeremias',
-  LAM: 'Lamentações de Jeremias',
-  EZK: 'Ezequiel',
-  DAN: 'Daniel',
-  HOS: 'Oseias',
-  JOL: 'Joel',
-  AMO: 'Amós',
-  OBA: 'Obadias',
-  JON: 'Jonas',
-  MIC: 'Miqueias',
-  NAM: 'Naum',
-  HAB: 'Habacuque',
-  ZEP: 'Sofonias',
-  HAG: 'Ageu',
-  ZEC: 'Zacarias',
-  MAL: 'Malaquias',
-  MAT: 'Mateus',
-  MRK: 'Marcos',
-  LUK: 'Lucas',
-  JHN: 'João',
-  ACT: 'Atos',
-  ROM: 'Romanos',
-  '1CO': '1 Coríntios',
-  '2CO': '2 Coríntios',
-  GAL: 'Gálatas',
-  EPH: 'Efésios',
-  PHP: 'Filipenses',
-  COL: 'Colossenses',
-  '1TH': '1 Tessalonicenses',
-  '2TH': '2 Tessalonicenses',
-  '1TI': '1 Timóteo',
-  '2TI': '2 Timóteo',
-  TIT: 'Tito',
-  PHM: 'Filemom',
-  HEB: 'Hebreus',
-  JAS: 'Tiago',
-  '1PE': '1 Pedro',
-  '2PE': '2 Pedro',
-  '1JN': '1 João',
-  '2JN': '2 João',
-  '3JN': '3 João',
-  JUD: 'Judas',
-  REV: 'Apocalipse',
-};
-
-/**
- * Name to show for a book code. A vault can hold books this plugin has never
- * heard of — an apocryphal one, or a version using its own codes — so fall
- * back to whatever the file name said rather than dropping the book.
- */
-export function bookName(code: string): string {
-  return BOOK_NAMES[code.toUpperCase()] ?? code;
+export function parseBookName(basename: string, version: string): number | null {
+  const prefix = version.toLowerCase() + '-';
+  if (!basename.toLowerCase().startsWith(prefix)) return null;
+  const m = basename.slice(prefix.length).match(/^(\d+)-(.+)$/);
+  return m ? parseInt(m[1], 10) : null;
 }
 
 /** A verse line of a chapter file, split into its number and its text. */
