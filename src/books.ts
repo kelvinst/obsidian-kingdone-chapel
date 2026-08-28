@@ -145,6 +145,18 @@ export interface BookMatch {
 
 const LANGS: Lang[] = ['pt', 'en'];
 
+/**
+ * Languages a query is read in, from the preferred one a reader may have set.
+ *
+ * Left unset, every language answers, which is how `@Jn` offers Jonas and John
+ * at once — the same two letters abbreviate one book in Portuguese and another
+ * in English. A reader who writes in one of them has no use for the other's
+ * rows, and naming their language is what tells the two apart.
+ */
+export function langsFor(preferred: Lang | ''): Lang[] {
+  return preferred ? [preferred] : LANGS;
+}
+
 /** How well a book answered a query, and which abbreviation got it there. */
 type RankIn = Pick<BookMatch, 'rank' | 'abbr'>;
 
@@ -167,11 +179,12 @@ function rankIn(book: Book, lang: Lang, exact: string, folded: string): RankIn |
 }
 
 /**
- * Books a reader could have meant by `query`, best first. Ties break on the
- * canonical order, and Portuguese wins a tie against English on the same book
- * (`Gen` is one word in both, and this plugin's own book names are Portuguese).
+ * Books a reader could have meant by `query`, best first, read in `langs`.
+ * Ties break on the canonical order, and the first language wins a tie against
+ * the rest on the same book (`Gen` is one word in Portuguese and English, and
+ * this plugin's own book names are Portuguese).
  */
-export function matchBooks(query: string, limit = 8): BookMatch[] {
+export function matchBooks(query: string, limit = 8, langs: Lang[] = LANGS): BookMatch[] {
   const exact = plain(query);
   const folded = fold(query);
   if (!folded) return [];
@@ -179,19 +192,19 @@ export function matchBooks(query: string, limit = 8): BookMatch[] {
   const matches: BookMatch[] = [];
   for (const book of BOOKS) {
     let best: BookMatch | null = null;
-    for (const lang of LANGS) {
+    for (const lang of langs) {
       const hit = rankIn(book, lang, exact, folded);
       if (hit && (!best || hit.rank < best.rank)) best = { book, lang, ...hit };
     }
     // The USFM code is what the files are named by, so accept it in any
     // language. It says nothing about which one to label the link in, so keep
-    // whatever the names said, and fall back to Portuguese. The code is a short
-    // form like any other, so it stands in for the abbreviation when the names
-    // offered none.
+    // whatever the names said, and fall back to the first one asked for. The
+    // code is a short form like any other, so it stands in for the abbreviation
+    // when the names offered none.
     if (fold(book.code) === folded) {
       best = {
         book,
-        lang: best ? best.lang : 'pt',
+        lang: best ? best.lang : langs[0],
         rank: Rank.Abbr,
         abbr: (best && best.abbr) || book.code,
       };

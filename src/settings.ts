@@ -1,6 +1,7 @@
 import { PluginSettingTab, Setting } from 'obsidian';
 import type { App } from 'obsidian';
 
+import type { Lang } from './books';
 import type KingdoneChapelPlugin from './main';
 
 export class KingdoneChapelSettingTab extends PluginSettingTab {
@@ -67,6 +68,24 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
         }
         drop.setValue(this.plugin.settings.defaultVersion).onChange(async (value) => {
           this.plugin.settings.defaultVersion = value;
+          await this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(containerEl)
+      .setName('Language for @ references')
+      .setDesc(
+        'Language book names and abbreviations are read and written in. ' +
+          'No preference reads every language at once, which is how `@Jn` offers ' +
+          'both Jonas and John — the same abbreviation stands for one book in ' +
+          'Portuguese and another in English. Naming a language leaves the rest out.'
+      )
+      .addDropdown((drop) => {
+        drop.addOption('', 'No preference');
+        drop.addOption('pt', 'Portuguese');
+        drop.addOption('en', 'English');
+        drop.setValue(this.plugin.settings.referenceLanguage).onChange(async (value) => {
+          this.plugin.settings.referenceLanguage = value as Lang | '';
           await this.plugin.saveSettings();
         });
       });

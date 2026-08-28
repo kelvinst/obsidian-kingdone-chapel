@@ -1,11 +1,15 @@
 import type { TFile } from 'obsidian';
 
+import type { Lang } from './books';
+
 export const VIEW_TYPE = 'kingdone-chapel-view';
 
 export interface KingdoneChapelSettings {
   bibleFolder: string;
   /** Version `@` references link to when they do not name one. Empty = pick one. */
   defaultVersion: string;
+  /** Language `@` references are read and written in. Empty = every one of them. */
+  referenceLanguage: Lang | '';
   openInNewTab: boolean;
   hiddenVersions: string[];
   labels: Record<string, string>;
@@ -17,6 +21,7 @@ export interface KingdoneChapelSettings {
 export const DEFAULT_SETTINGS: KingdoneChapelSettings = {
   bibleFolder: 'Bibles',
   defaultVersion: '',
+  referenceLanguage: '',
   openInNewTab: false,
   hiddenVersions: [],
   labels: {},
