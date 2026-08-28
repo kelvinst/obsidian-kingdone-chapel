@@ -30,7 +30,8 @@ in your vault, keeping chapter *and* verse alignment.
 
 Type `@` and a reference anywhere in a note to link to it. The suggestion list shows the
 books you could have meant with the opening verse of the passage, and picking one replaces
-what you typed with ordinary internal links.
+what you typed with ordinary internal links. Each row reads as the reference it will write,
+so what you pick is what the note ends up saying.
 
 | You type | You get |
 |---|---|
@@ -45,6 +46,11 @@ abbreviations (`Gn`, `Jz`, `Sl`, `Tg`, `Ap`), by the usual English ones (`Ps`, `
 `1Cor`), and by their USFM code (`JHN`). Accents are optional — `@Joao` and `@João` both
 work — but writing them helps: `@Jo` offers João first and `@Jó` offers Jó first. A partial
 name lists every book it could still become, so `@Jo` also offers Josué, Joel and Jonas.
+
+Writing an abbreviation gets each book twice: once keeping the abbreviation, once spelling
+the name out. `@Jn 1.1` offers `Jn 1.1` and `Jonas 1.1`, then `Jn 1.1` and `John 1.1` — `Jn`
+is Jonas in Portuguese and John in English, and the name is written in the language the
+abbreviation belongs to — so the rows carrying an abbreviation name the book they point at.
 
 References link to the version set in **Default version for @ references**, which starts on
 *Automatic*: the version of the note you are writing in when that note is itself a chapter,

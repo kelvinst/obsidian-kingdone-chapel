@@ -135,20 +135,34 @@ export interface BookMatch {
   /** Language the reader wrote it in, which the link label follows. */
   lang: Lang;
   rank: Rank;
+  /**
+   * The abbreviation the query matched, as the table writes it, or null when
+   * the query was the book's name. A reader who typed one means the note to go
+   * on saying it, so it is offered as a label of its own.
+   */
+  abbr: string | null;
 }
 
 const LANGS: Lang[] = ['pt', 'en'];
 
+/** How well a book answered a query, and which abbreviation got it there. */
+type RankIn = Pick<BookMatch, 'rank' | 'abbr'>;
+
 /** Best rank this book can offer for a query, or null when it cannot answer it. */
-function rankIn(book: Book, lang: Lang, exact: string, folded: string): Rank | null {
+function rankIn(book: Book, lang: Lang, exact: string, folded: string): RankIn | null {
   const abbrs = book.abbrs[lang];
   const name = book.names[lang];
-  if (abbrs.some((a) => plain(a) === exact)) return Rank.Abbr;
-  if (abbrs.some((a) => fold(a) === folded)) return Rank.FoldedAbbr;
-  if (plain(name) === exact) return Rank.Name;
-  if (fold(name) === folded) return Rank.FoldedName;
-  if (fold(name).startsWith(folded)) return Rank.NamePrefix;
-  if (abbrs.some((a) => fold(a).startsWith(folded))) return Rank.AbbrPrefix;
+  const abbr = (test: (a: string) => boolean): string | null => abbrs.find(test) ?? null;
+
+  const written = abbr((a) => plain(a) === exact);
+  if (written) return { rank: Rank.Abbr, abbr: written };
+  const unaccented = abbr((a) => fold(a) === folded);
+  if (unaccented) return { rank: Rank.FoldedAbbr, abbr: unaccented };
+  if (plain(name) === exact) return { rank: Rank.Name, abbr: null };
+  if (fold(name) === folded) return { rank: Rank.FoldedName, abbr: null };
+  if (fold(name).startsWith(folded)) return { rank: Rank.NamePrefix, abbr: null };
+  const partial = abbr((a) => fold(a).startsWith(folded));
+  if (partial) return { rank: Rank.AbbrPrefix, abbr: partial };
   return null;
 }
 
@@ -166,19 +180,35 @@ export function matchBooks(query: string, limit = 8): BookMatch[] {
   for (const book of BOOKS) {
     let best: BookMatch | null = null;
     for (const lang of LANGS) {
-      const rank = rankIn(book, lang, exact, folded);
-      if (rank !== null && (!best || rank < best.rank)) best = { book, lang, rank };
+      const hit = rankIn(book, lang, exact, folded);
+      if (hit && (!best || hit.rank < best.rank)) best = { book, lang, ...hit };
     }
     // The USFM code is what the files are named by, so accept it in any
     // language. It says nothing about which one to label the link in, so keep
-    // whatever the names said, and fall back to Portuguese.
+    // whatever the names said, and fall back to Portuguese. The code is a short
+    // form like any other, so it stands in for the abbreviation when the names
+    // offered none.
     if (fold(book.code) === folded) {
-      best = { book, lang: best ? best.lang : 'pt', rank: Rank.Abbr };
+      best = {
+        book,
+        lang: best ? best.lang : 'pt',
+        rank: Rank.Abbr,
+        abbr: (best && best.abbr) || book.code,
+      };
     }
     if (best) matches.push(best);
   }
 
   return matches.sort((a, b) => a.rank - b.rank || a.book.index - b.book.index).slice(0, limit);
+}
+
+/**
+ * An abbreviation the way it is written in a note: `jn` -> `Jn`, `1sm` -> `1Sm`.
+ * The table keeps them in lower case so they can be compared; only the first
+ * letter is raised, leaving forms already written out (`MRK`) as they are.
+ */
+export function abbrLabel(abbr: string): string {
+  return abbr.replace(/\p{L}/u, (c) => c.toUpperCase());
 }
 
 /**
