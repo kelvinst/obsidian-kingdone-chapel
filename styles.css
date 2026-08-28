@@ -100,3 +100,21 @@
   margin: var(--size-4-1) 0 0;
   padding-left: var(--size-4-4);
 }
+
+/* --- @ reference suggestions --- */
+.kcp-suggest-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--size-4-2);
+}
+
+.kcp-suggest-ref {
+  font-weight: 600;
+}
+
+.kcp-suggest-head .kcp-version {
+  font-size: var(--font-ui-smaller);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-accent);
+}

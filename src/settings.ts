@@ -51,6 +51,26 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
         })
       );
 
+    containerEl.createEl('h3', { text: 'References' });
+
+    new Setting(containerEl)
+      .setName('Default version for @ references')
+      .setDesc(
+        'Version `@Joao 1.1` links to. Name one in the reference itself (`@ARA Joao 1.1`) ' +
+          'to override it. Automatic uses the version of the note you are writing in, ' +
+          'falling back to the first one in the vault.'
+      )
+      .addDropdown((drop) => {
+        drop.addOption('', 'Automatic');
+        for (const version of this.plugin.listVersions()) {
+          drop.addOption(version, this.plugin.label(version));
+        }
+        drop.setValue(this.plugin.settings.defaultVersion).onChange(async (value) => {
+          this.plugin.settings.defaultVersion = value;
+          await this.plugin.saveSettings();
+        });
+      });
+
     containerEl.createEl('h3', { text: 'Sidebar' });
 
     new Setting(containerEl)

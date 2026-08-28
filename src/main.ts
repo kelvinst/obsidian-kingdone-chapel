@@ -3,8 +3,10 @@ import type { PaneType } from 'obsidian';
 
 import { DEFAULT_SETTINGS, VIEW_TYPE } from './types';
 import type { KingdoneChapelSettings, Location, Verse, VersionItem } from './types';
-import { bookName, chapterKey, parseChapterName, parseVerseLine } from './utils';
+import { chapterKey, parseBookName, parseChapterName, parseVerseLine } from './utils';
+import { bookName } from './books';
 import { VersionSuggestModal } from './modal';
+import { ReferenceSuggest } from './suggest';
 import { KingdoneChapelSettingTab } from './settings';
 import { KingdoneChapelView } from './view';
 
@@ -22,6 +24,8 @@ export default class KingdoneChapelPlugin extends Plugin {
   chapterCache: Map<string, { mtime: number; verses: Verse[] }>;
   /** version -> "book:chapter" -> file. Built lazily, dropped on vault changes. */
   bibleIndex: Map<string, Map<string, TFile>> | null = null;
+  /** version -> book number -> the note listing that book's chapters. */
+  bookNotes: Map<string, Map<number, TFile>> = new Map();
   /** "version/book:chapter" -> the files fighting over it. Filled by index(). */
   chapterConflicts: Map<string, TFile[]> = new Map();
   /** The conflicts the user was last warned about, so each is only said once. */
@@ -52,6 +56,8 @@ export default class KingdoneChapelPlugin extends Plugin {
     });
 
     this.addRibbonIcon('church', 'Kingdone Chapel sidebar', () => this.activateView());
+
+    this.registerEditorSuggest(new ReferenceSuggest(this));
 
     // One command per version, so each can get its own hotkey.
     this.registerVersionCommands();
@@ -101,6 +107,7 @@ export default class KingdoneChapelPlugin extends Plugin {
     if (this.bibleIndex) return this.bibleIndex;
 
     const index = new Map<string, Map<string, TFile>>();
+    const books = new Map<string, Map<number, TFile>>();
     const conflicts = new Map<string, TFile[]>();
     const base = this.settings.bibleFolder;
     for (const file of this.app.vault.getMarkdownFiles()) {
@@ -110,7 +117,15 @@ export default class KingdoneChapelPlugin extends Plugin {
 
       const version = parts[0];
       const parsed = parseChapterName(file.basename, version);
-      if (!parsed) continue;
+      if (!parsed) {
+        // Not a chapter, but it may be the note listing the book's chapters.
+        const bookNumber = parseBookName(file.basename, version);
+        if (bookNumber === null) continue;
+        let known = books.get(version);
+        if (!known) books.set(version, (known = new Map()));
+        if (!known.has(bookNumber)) known.set(bookNumber, file);
+        continue;
+      }
 
       let chapters = index.get(version);
       if (!chapters) index.set(version, (chapters = new Map()));
@@ -133,6 +148,7 @@ export default class KingdoneChapelPlugin extends Plugin {
     }
 
     this.bibleIndex = index;
+    this.bookNotes = books;
     this.chapterConflicts = conflicts;
     this.warnAboutConflicts();
     return index;
@@ -461,13 +477,55 @@ export default class KingdoneChapelPlugin extends Plugin {
 
   /** Resolve the chapter file of `version` matching the current location. */
   targetFile(version: string, loc: Location): TFile | null {
+    return this.referenceFile(version, loc.bookIndex, loc.chapter);
+  }
+
+  /**
+   * A version by the name a reader typed, case and all, or null if there is no
+   * such version. This is what tells `@ARA Joao` from a two-word book name.
+   */
+  findVersion(word: string): string | null {
+    const wanted = word.toLowerCase();
+    return this.listVersions().find((v) => v.toLowerCase() === wanted) || null;
+  }
+
+  /**
+   * Version a reference with none of its own points at: the one set in the
+   * settings, else the version of the note being written in when that note is
+   * itself a chapter, else the first version in the vault.
+   */
+  defaultVersion(from: TFile | null): string | null {
+    const versions = this.listVersions();
+    const preferred = this.settings.defaultVersion;
+    if (preferred && versions.includes(preferred)) return preferred;
+
+    const here = from ? this.locationOf(from, null) : null;
+    if (here && versions.includes(here.version)) return here.version;
+
+    return versions.length ? versions[0] : null;
+  }
+
+  /**
+   * File a reference points at: the chapter, or the note listing the book's
+   * chapters when no chapter was given. A version that keeps no such note
+   * (or a single `-000` file for the whole book) still resolves, to the
+   * nearest thing it has.
+   */
+  referenceFile(version: string, bookIndex: number, chapter: number | null): TFile | null {
     const chapters = this.index().get(version);
+    if (chapter === null) {
+      const note = this.bookNotes.get(version);
+      return (
+        (note && note.get(bookIndex)) ||
+        (chapters &&
+          (chapters.get(chapterKey(bookIndex, 0)) || chapters.get(chapterKey(bookIndex, 1)))) ||
+        null
+      );
+    }
     if (!chapters) return null;
+    // Commentaries keep a single -000 file per book.
     return (
-      chapters.get(chapterKey(loc.bookIndex, loc.chapter)) ||
-      // Commentaries keep a single -000 file per book.
-      chapters.get(chapterKey(loc.bookIndex, 0)) ||
-      null
+      chapters.get(chapterKey(bookIndex, chapter)) || chapters.get(chapterKey(bookIndex, 0)) || null
     );
   }
 
@@ -487,22 +545,40 @@ export default class KingdoneChapelPlugin extends Plugin {
    * (1-2 under verse 1), so fall back to the closest anchor before the verse.
    */
   async findAnchor(file: TFile, chapter: number, verse: number | null): Promise<string | null> {
-    if (!verse) return null;
-    const ids = await this.blockIds(file);
+    const found = await this.findAnchors(file, chapter, verse ? [verse] : []);
+    return found.length ? found[0] : null;
+  }
+
+  /**
+   * The same, for a run of verses, reading the file's block ids once. A
+   * reference like `1.1-20` would otherwise ask for them twenty times over.
+   */
+  async findAnchors(
+    file: TFile,
+    chapter: number | null,
+    verses: number[]
+  ): Promise<(string | null)[]> {
+    if (chapter === null || !verses.length) return verses.map(() => null);
+
     const re = new RegExp(`-${chapter}-(\\d+)$`);
-    let best: string | null = null;
-    let bestVerse = -1;
-    for (const id of ids) {
+    const numbered: { verse: number; id: string }[] = [];
+    for (const id of await this.blockIds(file)) {
       const m = id.match(re);
-      if (!m) continue;
-      const v = parseInt(m[1], 10);
-      if (v === verse) return id;
-      if (v < verse && v > bestVerse) {
-        bestVerse = v;
-        best = id;
-      }
+      if (m) numbered.push({ verse: parseInt(m[1], 10), id });
     }
-    return best;
+
+    return verses.map((verse) => {
+      let best: string | null = null;
+      let bestVerse = -1;
+      for (const item of numbered) {
+        if (item.verse === verse) return item.id;
+        if (item.verse < verse && item.verse > bestVerse) {
+          bestVerse = item.verse;
+          best = item.id;
+        }
+      }
+      return best;
+    });
   }
 
   /**
