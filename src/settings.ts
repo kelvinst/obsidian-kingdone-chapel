@@ -17,6 +17,25 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
     containerEl.empty();
 
     new Setting(containerEl)
+      .setName('Language')
+      .setDesc(
+        'Language book names are read and written in, in `@` references and ' +
+          'everywhere a book is named. No preference reads every language at once, ' +
+          'which is how `@Jn` offers both Jonas and John — the same abbreviation ' +
+          'stands for one book in Portuguese and another in English — and writes ' +
+          'the names in Portuguese. Naming a language leaves the rest out.'
+      )
+      .addDropdown((drop) => {
+        drop.addOption('', 'No preference');
+        drop.addOption('pt', 'Portuguese');
+        drop.addOption('en', 'English');
+        drop.setValue(this.plugin.settings.language).onChange(async (value) => {
+          this.plugin.settings.language = value as Lang | '';
+          await this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(containerEl)
       .setName('Bible folder')
       .setDesc('Folder holding the version folders (ARA, NVI, ...). Inside each version, folders are ignored — only file names matter.')
       .addText((text) =>
@@ -68,24 +87,6 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
         }
         drop.setValue(this.plugin.settings.defaultVersion).onChange(async (value) => {
           this.plugin.settings.defaultVersion = value;
-          await this.plugin.saveSettings();
-        });
-      });
-
-    new Setting(containerEl)
-      .setName('Language for @ references')
-      .setDesc(
-        'Language book names and abbreviations are read and written in. ' +
-          'No preference reads every language at once, which is how `@Jn` offers ' +
-          'both Jonas and John — the same abbreviation stands for one book in ' +
-          'Portuguese and another in English. Naming a language leaves the rest out.'
-      )
-      .addDropdown((drop) => {
-        drop.addOption('', 'No preference');
-        drop.addOption('pt', 'Portuguese');
-        drop.addOption('en', 'English');
-        drop.setValue(this.plugin.settings.referenceLanguage).onChange(async (value) => {
-          this.plugin.settings.referenceLanguage = value as Lang | '';
           await this.plugin.saveSettings();
         });
       });

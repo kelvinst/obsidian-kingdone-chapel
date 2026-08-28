@@ -8,8 +8,11 @@ export interface KingdoneChapelSettings {
   bibleFolder: string;
   /** Version `@` references link to when they do not name one. Empty = pick one. */
   defaultVersion: string;
-  /** Language `@` references are read and written in. Empty = every one of them. */
-  referenceLanguage: Lang | '';
+  /**
+   * Language book names are read and written in, throughout the plugin. Empty
+   * reads every language, and writes the first of them.
+   */
+  language: Lang | '';
   openInNewTab: boolean;
   hiddenVersions: string[];
   labels: Record<string, string>;
@@ -21,7 +24,7 @@ export interface KingdoneChapelSettings {
 export const DEFAULT_SETTINGS: KingdoneChapelSettings = {
   bibleFolder: 'Bibles',
   defaultVersion: '',
-  referenceLanguage: '',
+  language: '',
   openInNewTab: false,
   hiddenVersions: [],
   labels: {},

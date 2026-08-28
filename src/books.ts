@@ -157,6 +157,15 @@ export function langsFor(preferred: Lang | ''): Lang[] {
   return preferred ? [preferred] : LANGS;
 }
 
+/**
+ * The one language a name is written in. Reading every language is a choice a
+ * query can afford — it is answered by whichever book matched — but a book name
+ * shown on its own has to settle on one, and that is the first read.
+ */
+export function nameLang(preferred: Lang | ''): Lang {
+  return langsFor(preferred)[0];
+}
+
 /** How well a book answered a query, and which abbreviation got it there. */
 type RankIn = Pick<BookMatch, 'rank' | 'abbr'>;
 

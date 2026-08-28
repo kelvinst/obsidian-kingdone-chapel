@@ -57,7 +57,7 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
     if (!version) return [];
 
     const out: RefSuggestion[] = [];
-    const langs = langsFor(this.plugin.settings.referenceLanguage);
+    const langs = langsFor(this.plugin.settings.language);
     for (const match of matchBooks(parsed.book, 6, langs)) {
       const file = this.plugin.referenceFile(version, match.book.index, parsed.chapter);
       if (!file) continue;
