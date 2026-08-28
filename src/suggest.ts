@@ -1,7 +1,7 @@
 import { EditorSuggest } from 'obsidian';
 import type { Editor, EditorPosition, EditorSuggestContext, EditorSuggestTriggerInfo, TFile } from 'obsidian';
 
-import { abbrLabel, matchBooks, plain } from './books';
+import { abbrLabel, langsFor, matchBooks, plain } from './books';
 import { parseReference, verseLabels } from './reference';
 import type { BookMatch } from './books';
 import type KingdoneChapelPlugin from './main';
@@ -57,7 +57,8 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
     if (!version) return [];
 
     const out: RefSuggestion[] = [];
-    for (const match of matchBooks(parsed.book, 6)) {
+    const langs = langsFor(this.plugin.settings.referenceLanguage);
+    for (const match of matchBooks(parsed.book, 6, langs)) {
       const file = this.plugin.referenceFile(version, match.book.index, parsed.chapter);
       if (!file) continue;
 

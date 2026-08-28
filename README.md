@@ -52,6 +52,11 @@ the name out. `@Jn 1.1` offers `Jn 1.1` and `Jonas 1.1`, then `Jn 1.1` and `John
 is Jonas in Portuguese and John in English, and the name is written in the language the
 abbreviation belongs to — so the rows carrying an abbreviation name the book they point at.
 
+**Language for @ references** cuts that down to the language you write in: set to
+Portuguese, `@Jn` only offers Jonas, and English book names stop matching altogether. It
+starts on *No preference*, where every language answers. USFM codes are named the same
+everywhere, so `@JHN` keeps working either way, labelled in the language you chose.
+
 References link to the version set in **Default version for @ references**, which starts on
 *Automatic*: the version of the note you are writing in when that note is itself a chapter,
 otherwise the first version in the vault. Name a version in the reference itself to override
@@ -113,6 +118,7 @@ like two files claiming one chapter.
 |---|---|---|
 | Bible folder | `Bibles` | Folder holding the version folders |
 | Default version for @ references | Automatic | Version `@` references link to |
+| Language for @ references | No preference | Language book names are read and written in |
 | Open in new tab | off | Off replaces the current tab |
 | Hidden versions | — | Comma-separated version folders to ignore |
 | Follow cursor | on | Off updates the sidebar only when you switch notes |
