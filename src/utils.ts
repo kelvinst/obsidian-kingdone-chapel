@@ -139,13 +139,34 @@ export interface VerseLine {
   text: string;
 }
 
+/** The block id closing a verse line: `^nvi-gen-1-1`, ending in chapter and verse. */
+const BLOCK_ID = /\s*\^([A-Za-z0-9-]+)\s*$/;
+/** How a verse line opens: an ordered list item now, a bolded number in older chapters. */
+const VERSE_MARKER = /^\s*(?:\*\*(\d+)\*\*|(\d+)\.)\s*/;
+
 /**
- * Read a verse line. Chapters write their verses as an ordered list
- * (`1. No princípio`); older ones bolded the number instead (`**1** No
- * princípio`), and both are still around, so accept either.
+ * Read a verse line, taking its number from the block id that closes it.
+ *
+ * The number a line opens with is presentation, and there are two ways to
+ * write it — `1. No princípio` now, `**1** No princípio` in older chapters —
+ * neither of which can be trusted: a version that merges verses labels the
+ * whole run with the first of them, and a Markdown list renumbers itself from
+ * its opening item regardless. The block id is the verse's own name, and it
+ * ends in the chapter and verse it belongs to. Fall back to the written number
+ * only for a chapter that carries no ids at all.
  */
 export function parseVerseLine(line: string): VerseLine | null {
-  const m = line.match(/^\s*(?:\*\*(\d+)\*\*|(\d+)\.)\s*(.*)$/);
-  if (!m) return null;
-  return { verse: parseInt(m[1] || m[2], 10), text: m[3] };
+  const id = line.match(BLOCK_ID);
+  const marker = line.match(VERSE_MARKER);
+
+  const named = id ? Number(id[1].slice(id[1].lastIndexOf('-') + 1)) : NaN;
+  const written = marker ? Number(marker[1] || marker[2]) : NaN;
+  const verse = Number.isInteger(named) ? named : written;
+  if (!Number.isInteger(verse)) return null;
+
+  // The id sits at the end of the line, so drop it before the opening marker
+  // shifts everything left.
+  let text = id ? line.slice(0, line.length - id[0].length) : line;
+  if (marker) text = text.slice(marker[0].length);
+  return { verse, text: text.trim() };
 }

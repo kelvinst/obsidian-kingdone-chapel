@@ -392,45 +392,38 @@ export default class KingdoneChapelPlugin extends Plugin {
   /**
    * Verse elements of a reading pane, in document order.
    *
-   * A rendered list item carries no number of its own: Markdown numbers a list
-   * from its first item and ignores the rest, so a version that merges verses
-   * (MENS opens Genesis 1 with `1.` then `3.`) reads off the screen as 1, 2.
-   * Take the numbers from the file and pair them up in order instead. Nothing
-   * separates the verses, so reading mode renders them as a single block —
-   * either every item is on the page or none is, and a count that disagrees
-   * means the pairing would be guesswork.
+   * Nothing on the page says which verse an element holds: a list item carries
+   * no number of its own, and the number an older chapter bolds into the
+   * paragraph is the one the file wrote, which a version that merges verses
+   * only writes once. Take the numbers from the file and pair them up in order
+   * instead. Nothing separates the verses, so reading mode renders them as a
+   * single block — either every one is on the page or none is, and a count that
+   * disagrees means the pairing would be guesswork.
    */
   verseParagraphs(view: MarkdownView, scroller: HTMLElement): { verse: number; el: HTMLElement }[] {
-    const els = Array.from(scroller.querySelectorAll<HTMLElement>(VERSE_SELECTOR));
-
-    // Older chapters bold the number into the paragraph, where it can be read off.
-    const marked: { verse: number; el: HTMLElement }[] = [];
-    for (const el of els) {
-      const verse = this.verseOf(el);
-      if (verse !== null) marked.push({ verse, el });
-    }
-    if (marked.length) return marked;
-
-    const items = els.filter((el) => el.tagName === 'LI');
+    const els = Array.from(scroller.querySelectorAll<HTMLElement>(VERSE_SELECTOR)).filter(
+      (el) => el.tagName === 'LI' || this.isVerseParagraph(el)
+    );
     const verses = this.cachedVerses(view.file);
-    if (!verses || verses.length !== items.length) return [];
-    return items.map((el, i) => ({ verse: verses[i].verse, el }));
+    if (!verses || verses.length !== els.length) return [];
+    return els.map((el, i) => ({ verse: verses[i].verse, el }));
   }
 
   /** Verse a reading-pane element belongs to. */
   verseAt(view: MarkdownView, scroller: HTMLElement, el: HTMLElement): number | null {
-    const marked = this.verseOf(el);
-    if (marked !== null) return marked;
     const found = this.verseParagraphs(view, scroller).find((item) => item.el === el);
     return found ? found.verse : null;
   }
 
-  /** Verse number of a rendered `**N** text` paragraph, if that is what `el` is. */
-  verseOf(el: Element): number | null {
+  /**
+   * Whether `el` is a verse of an older chapter, which opens its paragraph with
+   * the number in bold. Only tells the verses apart from the rest of the page —
+   * the chapter's navigation is a paragraph too — never which verse it is.
+   */
+  isVerseParagraph(el: Element): boolean {
     const strong = el.firstElementChild;
-    if (!strong || strong.tagName !== 'STRONG') return null;
-    const m = (strong.textContent || '').trim().match(/^(\d+)$/);
-    return m ? parseInt(m[1], 10) : null;
+    if (!strong || strong.tagName !== 'STRONG') return false;
+    return /^\d+$/.test((strong.textContent || '').trim());
   }
 
   /** Resolve the chapter file of `version` matching the current location. */
@@ -501,10 +494,7 @@ export default class KingdoneChapelPlugin extends Plugin {
     for (const line of content.split('\n')) {
       const parsed = parseVerseLine(line);
       if (!parsed) continue;
-      verses.push({
-        verse: parsed.verse,
-        text: parsed.text.replace(/\s*\^[A-Za-z0-9-]+\s*$/, '').trim(),
-      });
+      verses.push(parsed);
     }
     this.chapterCache.set(file.path, { mtime: file.stat.mtime, verses });
     return verses;
