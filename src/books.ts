@@ -94,9 +94,16 @@ const BY_CODE = new Map(BOOKS.map((b) => [b.code, b]));
 /**
  * A typed book name reduced to its letters: `1 João`, `1João.` and `1JOÃO` all
  * become `1joão`. Accents survive — they are what tells `Jó` from `Jo`.
+ *
+ * Composed first, because an accent written as its own combining mark is not a
+ * letter and would be dropped along with the punctuation: text pasted out of a
+ * macOS file listing arrives that way, and `Jó` would arrive as `Jo`.
  */
 export function plain(raw: string): string {
-  return raw.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+  return raw
+    .normalize('NFC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '');
 }
 
 /**
