@@ -36,6 +36,7 @@ export function parseReference(query: string, isVersion: (word: string) => boole
   let book = (m ? m[1] : query).trim();
   const chapter = m ? parseInt(m[2], 10) : null;
   const verses = m && m[3] !== undefined ? expandVerses(m[3]) : [];
+  if (verses === null) return null; // more verses than a reference may carry
 
   let version: string | null = null;
   const named = book.match(/^(\S+)\s+(.+)$/);
@@ -47,15 +48,22 @@ export function parseReference(query: string, isVersion: (word: string) => boole
   return book ? { version, book, chapter, verses } : null;
 }
 
-/** `1,3-5` -> [1, 3, 4, 5]. An unfinished range (`3-`) is just its start. */
-function expandVerses(spec: string): number[] {
+/**
+ * `1,3-5` -> [1, 3, 4, 5]. An unfinished range (`3-`) is just its start.
+ *
+ * A reference asking for more than `MAX_VERSES` comes back as null rather than
+ * as its first fifty: a passage quietly cut short says something other than
+ * what was typed, and there is nothing in the finished links to show it was.
+ */
+function expandVerses(spec: string): number[] | null {
   const out: number[] = [];
   const seen = new Set<number>();
-  const add = (v: number) => {
-    if (v > 0 && !seen.has(v) && out.length < MAX_VERSES) {
-      seen.add(v);
-      out.push(v);
-    }
+  /** False once the reference has outgrown the cap. */
+  const add = (v: number): boolean => {
+    if (v <= 0 || seen.has(v)) return true;
+    seen.add(v);
+    out.push(v);
+    return out.length <= MAX_VERSES;
   };
 
   for (const part of spec.split(',')) {
@@ -63,11 +71,11 @@ function expandVerses(spec: string): number[] {
     if (range) {
       const from = parseInt(range[1], 10);
       const to = range[2] ? parseInt(range[2], 10) : from;
-      for (let v = from; v <= to && out.length < MAX_VERSES; v++) add(v);
+      for (let v = from; v <= to; v++) if (!add(v)) return null;
       continue;
     }
     const single = part.trim().match(/^\d+$/);
-    if (single) add(parseInt(single[0], 10));
+    if (single && !add(parseInt(single[0], 10))) return null;
   }
   return out;
 }
