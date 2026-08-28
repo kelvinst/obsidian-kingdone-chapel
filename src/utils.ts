@@ -143,6 +143,8 @@ export interface VerseLine {
 const BLOCK_ID = /\s*\^([A-Za-z0-9-]+)\s*$/;
 /** How a verse line opens: an ordered list item now, a bolded number in older chapters. */
 const VERSE_MARKER = /^\s*(?:\*\*(\d+)\*\*|(\d+)\.)\s*/;
+/** The verse a block id names, in the number it ends on. */
+const VERSE_ID = /-(\d+)$/;
 
 /**
  * Read a verse line, taking its number from the block id that closes it.
@@ -159,9 +161,12 @@ export function parseVerseLine(line: string): VerseLine | null {
   const id = line.match(BLOCK_ID);
   const marker = line.match(VERSE_MARKER);
 
-  const named = id ? Number(id[1].slice(id[1].lastIndexOf('-') + 1)) : NaN;
-  const written = marker ? Number(marker[1] || marker[2]) : NaN;
-  const verse = Number.isInteger(named) ? named : written;
+  // Only an id ending in a number names a verse. A block id that ends anywhere
+  // else belongs to something other than a verse, and one left mid-edit, ending
+  // on the dash itself, names nothing at all — both fall back to what the line
+  // writes rather than being read as a number.
+  const named = id && VERSE_ID.exec(id[1]);
+  const verse = named ? Number(named[1]) : marker ? Number(marker[1] || marker[2]) : NaN;
   if (!Number.isInteger(verse)) return null;
 
   // The id sits at the end of the line, so drop it before the opening marker

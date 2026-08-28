@@ -513,7 +513,9 @@ export default class KingdoneChapelPlugin extends Plugin {
     if (!file) return null;
     const hit = this.chapterCache.get(file.path);
     if (hit && hit.mtime === file.stat.mtime) return hit.verses;
-    void this.chapterVerses(file);
+    // Nothing waits on the read, and it can fail on a file that has just gone
+    // away. Returning no verses is the answer either way.
+    this.chapterVerses(file).catch(() => {});
     return null;
   }
 
