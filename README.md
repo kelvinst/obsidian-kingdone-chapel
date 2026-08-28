@@ -97,7 +97,9 @@ and may carry a block id:
 
 A book may also have a note listing its chapters, named `<VERSION>-<NN>-<Book>.md` — no
 chapter number. That is what a bare `@Joao` links to; without one it falls back to the
-book's first chapter.
+book's first chapter. Nothing separates such a note from an ordinary one that happens to
+be named the same way, so two of them claiming one book are reported and skipped, just
+like two files claiming one chapter.
 
 ## Settings
 

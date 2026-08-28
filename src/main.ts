@@ -18,6 +18,34 @@ const PREVIEW_TOP_OFFSET = 48;
 /** Scroll movement (px) that releases a verse clicked in reading mode. */
 const SCROLL_SLACK = 4;
 
+/**
+ * File `key` in `into`, unless another file already claims it.
+ *
+ * Two files for one chapter — or for one book — is a mistake in the vault, and
+ * only the user knows which of them to keep. Take neither, and record the pair
+ * under `conflictKey` so it can be reported.
+ */
+function claim<K>(
+  into: Map<K, TFile>,
+  key: K,
+  conflicts: Map<string, TFile[]>,
+  conflictKey: string,
+  file: TFile
+) {
+  const clash = conflicts.get(conflictKey);
+  if (clash) {
+    clash.push(file);
+    return;
+  }
+  const current = into.get(key);
+  if (current) {
+    into.delete(key);
+    conflicts.set(conflictKey, [current, file]);
+    return;
+  }
+  into.set(key, file);
+}
+
 export default class KingdoneChapelPlugin extends Plugin {
   settings: KingdoneChapelSettings;
   /** path -> { mtime, verses } */
@@ -119,32 +147,21 @@ export default class KingdoneChapelPlugin extends Plugin {
       const parsed = parseChapterName(file.basename, version);
       if (!parsed) {
         // Not a chapter, but it may be the note listing the book's chapters.
+        // Nothing in the name separates one from an ordinary note that opens
+        // the same way, so two of them are as much a mistake in the vault as
+        // two chapter files, and are treated the same.
         const bookNumber = parseBookName(file.basename, version);
         if (bookNumber === null) continue;
         let known = books.get(version);
         if (!known) books.set(version, (known = new Map()));
-        if (!known.has(bookNumber)) known.set(bookNumber, file);
+        claim(known, bookNumber, conflicts, `${version}/book:${bookNumber}`, file);
         continue;
       }
 
       let chapters = index.get(version);
       if (!chapters) index.set(version, (chapters = new Map()));
       const key = chapterKey(parsed.bookIndex, parsed.chapter);
-
-      // Two files for one chapter is a mistake in the vault, and only the user
-      // knows which one to keep. Take neither, and say so.
-      const clash = conflicts.get(`${version}/${key}`);
-      if (clash) {
-        clash.push(file);
-        continue;
-      }
-      const current = chapters.get(key);
-      if (current) {
-        chapters.delete(key);
-        conflicts.set(`${version}/${key}`, [current, file]);
-        continue;
-      }
-      chapters.set(key, file);
+      claim(chapters, key, conflicts, `${version}/${key}`, file);
     }
 
     this.bibleIndex = index;
@@ -177,7 +194,8 @@ export default class KingdoneChapelPlugin extends Plugin {
     const shown = names.slice(0, 3).join('\n');
     const rest = names.length > 3 ? `\n...and ${names.length - 3} more` : '';
     new Notice(
-      `Kingdone Chapel: more than one file for the same chapter. Rename or remove one of each:\n${shown}${rest}`,
+      `Kingdone Chapel: more than one file for the same chapter or book. ` +
+        `Rename or remove one of each:\n${shown}${rest}`,
       10000
     );
   }
