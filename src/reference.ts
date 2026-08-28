@@ -49,7 +49,9 @@ export function parseReference(query: string, isVersion: (word: string) => boole
 }
 
 /**
- * `1,3-5` -> [1, 3, 4, 5]. An unfinished range (`3-`) is just its start.
+ * `1,3-5` -> [1, 3, 4, 5]. An unfinished range (`3-`) is just its start, and so
+ * is one written backwards (`5-1`) — a reference reaching for no verse at all
+ * would be read below as a reference to the whole chapter.
  *
  * A reference asking for more than `MAX_VERSES` comes back as null rather than
  * as its first fifty: a passage quietly cut short says something other than
@@ -71,7 +73,7 @@ function expandVerses(spec: string): number[] | null {
     if (range) {
       const from = parseInt(range[1], 10);
       const to = range[2] ? parseInt(range[2], 10) : from;
-      for (let v = from; v <= to; v++) if (!add(v)) return null;
+      for (let v = from; v <= Math.max(from, to); v++) if (!add(v)) return null;
       continue;
     }
     const single = part.trim().match(/^\d+$/);
