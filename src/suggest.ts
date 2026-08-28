@@ -1,8 +1,9 @@
 import { EditorSuggest } from 'obsidian';
 import type { Editor, EditorPosition, EditorSuggestContext, EditorSuggestTriggerInfo, TFile } from 'obsidian';
 
-import { matchBooks } from './books';
+import { abbrLabel, matchBooks, plain } from './books';
 import { parseReference, verseLabels } from './reference';
+import type { BookMatch } from './books';
 import type KingdoneChapelPlugin from './main';
 
 /**
@@ -13,11 +14,14 @@ import type KingdoneChapelPlugin from './main';
  */
 const TRIGGER = /(?:^|[^\p{L}\p{N}_@])@([\p{L}\p{N} .,:-]{0,40})$/u;
 
-/** One book the query could have meant, already resolved to a file. */
+/** One way the query could be linked: a book the reader may have meant, under
+ * one of the names they may want it written as. */
 export interface RefSuggestion {
   version: string;
-  /** `João 1.1-3`, for the popup row. */
+  /** `João 1.1-3` — the reference as the note will read it, and the popup row. */
   ref: string;
+  /** Book `ref` points at, for the rows where an abbreviation hides it. */
+  book: string;
   /** First verse of the passage, as a taste of what the link points at. */
   preview: string;
   /** The links to insert, ready to go. */
@@ -58,17 +62,17 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
       if (!file) continue;
 
       const name = match.book.names[match.lang];
-      const labels = verseLabels(name, parsed.chapter, parsed.verses);
       try {
+        // The anchors and the opening verse are the passage, not the wording,
+        // so both forms of the same book share the one read.
         const anchors = await this.plugin.findAnchors(file, parsed.chapter, parsed.verses);
-        const links = labels.map((label, i) => this.link(file, anchors[i] || null, label, ctx.file));
+        const preview = await this.previewOf(file, parsed.chapter, parsed.verses);
 
-        out.push({
-          version,
-          ref: labels.join(','),
-          preview: await this.previewOf(file, parsed.chapter, parsed.verses),
-          markdown: links.join(','),
-        });
+        for (const form of this.forms(match, name)) {
+          const labels = verseLabels(form, parsed.chapter, parsed.verses);
+          const links = labels.map((label, i) => this.link(file, anchors[i] || null, label, ctx.file));
+          out.push({ version, ref: labels.join(','), book: name, preview, markdown: links.join(',') });
+        }
       } catch (e) {
         // Both reads go to the file the index named, which may have gone away
         // since it was indexed. Leave that book out rather than taking the
@@ -77,6 +81,17 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
       }
     }
     return out;
+  }
+
+  /**
+   * The names to offer one book under. Someone who wrote `@Jn 1.1` wants the
+   * note to go on saying `Jn 1.1`, so the abbreviation they typed comes first;
+   * the full name follows for when they meant it spelled out. Writing the name
+   * itself leaves nothing to choose between, and offers only the one row.
+   */
+  forms(match: BookMatch, name: string): string[] {
+    const abbr = match.abbr ? abbrLabel(match.abbr) : null;
+    return abbr && plain(abbr) !== plain(name) ? [abbr, name] : [name];
   }
 
   /** `[[NVI-43-JHN-001#^nvi-jhn-1-1|João 1.1]]`, with the link the vault expects. */
@@ -95,6 +110,12 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
   renderSuggestion(item: RefSuggestion, el: HTMLElement) {
     const head = el.createDiv({ cls: 'kcp-suggest-head' });
     head.createSpan({ cls: 'kcp-suggest-ref', text: item.ref });
+    // The row reads as the reference it will write. An abbreviation does not
+    // say which book that is — `Jn` is Jonas in Portuguese and John in English —
+    // so name the book behind it, and leave it off when the row already says it.
+    if (!item.ref.startsWith(item.book)) {
+      head.createSpan({ cls: 'kcp-suggest-book', text: item.book });
+    }
     head.createSpan({ cls: 'kcp-version', text: item.version });
     if (item.preview) el.createEl('small', { text: item.preview, cls: 'kcp-preview' });
   }

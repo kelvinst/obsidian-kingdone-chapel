@@ -112,6 +112,11 @@
   font-weight: 600;
 }
 
+.kcp-suggest-book {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
 .kcp-suggest-head .kcp-version {
   font-size: var(--font-ui-smaller);
   letter-spacing: 0.05em;
