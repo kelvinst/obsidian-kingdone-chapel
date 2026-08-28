@@ -152,9 +152,15 @@ const LANGS: Lang[] = ['pt', 'en'];
  * at once — the same two letters abbreviate one book in Portuguese and another
  * in English. A reader who writes in one of them has no use for the other's
  * rows, and naming their language is what tells the two apart.
+ *
+ * A language this table does not hold is read as none of them. Settings are a
+ * file in the vault, and one naming a language that was never here — typed by
+ * hand, restored from a backup, left behind by another version of the plugin —
+ * would otherwise index the table with a key it has no entry for, and every
+ * book would answer a query by throwing.
  */
 export function langsFor(preferred: Lang | ''): Lang[] {
-  return preferred ? [preferred] : LANGS;
+  return LANGS.includes(preferred as Lang) ? [preferred as Lang] : LANGS;
 }
 
 /**
