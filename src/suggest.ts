@@ -59,15 +59,22 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
 
       const name = match.book.names[match.lang];
       const labels = verseLabels(name, parsed.chapter, parsed.verses);
-      const anchors = await this.plugin.findAnchors(file, parsed.chapter, parsed.verses);
-      const links = labels.map((label, i) => this.link(file, anchors[i] || null, label, ctx.file));
+      try {
+        const anchors = await this.plugin.findAnchors(file, parsed.chapter, parsed.verses);
+        const links = labels.map((label, i) => this.link(file, anchors[i] || null, label, ctx.file));
 
-      out.push({
-        version,
-        ref: labels.join(','),
-        preview: await this.previewOf(file, parsed.chapter, parsed.verses),
-        markdown: links.join(','),
-      });
+        out.push({
+          version,
+          ref: labels.join(','),
+          preview: await this.previewOf(file, parsed.chapter, parsed.verses),
+          markdown: links.join(','),
+        });
+      } catch (e) {
+        // Both reads go to the file the index named, which may have gone away
+        // since it was indexed. Leave that book out rather than taking the
+        // whole popup down with it.
+        continue;
+      }
     }
     return out;
   }
