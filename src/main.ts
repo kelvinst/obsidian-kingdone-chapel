@@ -4,7 +4,7 @@ import type { PaneType } from 'obsidian';
 import { DEFAULT_SETTINGS, VIEW_TYPE } from './types';
 import type { KingdoneChapelSettings, Location, Verse, VersionItem } from './types';
 import { chapterKey, parseBookName, parseChapterName, parseVerseLine } from './utils';
-import { bookName } from './books';
+import { bookName, nameLang } from './books';
 import { VersionSuggestModal } from './modal';
 import { ReferenceSuggest } from './suggest';
 import { KingdoneChapelSettingTab } from './settings';
@@ -306,7 +306,7 @@ export default class KingdoneChapelPlugin extends Plugin {
     return {
       version: parsed.version,
       bookIndex: parsed.bookIndex,
-      book: bookName(parsed.book),
+      book: bookName(parsed.book, nameLang(this.settings.language)),
       chapter: parsed.chapter,
       verse: this.currentVerse(view),
       file,
