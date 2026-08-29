@@ -193,13 +193,29 @@
 .kcp-crumb-menu {
   position: fixed;
   z-index: var(--layer-menu);
+  display: flex;
+  flex-direction: column;
   max-height: 60vh;
-  overflow-y: auto;
   padding: var(--size-2-2);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-m);
   background-color: var(--background-secondary);
   box-shadow: var(--shadow-s);
+}
+
+.kcp-crumb-search {
+  flex: none;
+  padding-bottom: var(--size-2-2);
+}
+
+.kcp-crumb-input {
+  width: 100%;
+  font-size: var(--font-ui-small);
+}
+
+.kcp-crumb-list,
+.kcp-crumb-grid {
+  overflow-y: auto;
 }
 
 .kcp-crumb-list {
@@ -210,6 +226,17 @@
   display: grid;
   grid-template-columns: repeat(var(--kcp-crumb-columns, 5), 2.6em);
   gap: var(--size-2-1);
+}
+
+.kcp-crumb-empty {
+  padding: var(--size-2-2) var(--size-4-2);
+  font-size: var(--font-ui-small);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.kcp-crumb-menu .is-hidden {
+  display: none;
 }
 
 .kcp-crumb-item {
@@ -227,7 +254,8 @@
   text-align: center;
 }
 
-.kcp-crumb-item:hover {
+.kcp-crumb-item:hover,
+.kcp-crumb-item.is-active {
   background-color: var(--background-modifier-hover);
 }
 
