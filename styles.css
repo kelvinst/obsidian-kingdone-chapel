@@ -267,3 +267,30 @@
 .kcp-crumb-item.is-missing {
   color: var(--text-faint);
 }
+
+/* --- book dropdown headings --- */
+.kcp-crumb-group + .kcp-crumb-group {
+  margin-top: var(--size-2-3);
+}
+
+.kcp-crumb-head,
+.kcp-crumb-subhead {
+  padding: var(--size-2-1) var(--size-4-2);
+  font-size: var(--font-ui-smaller);
+  line-height: var(--line-height-tight);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.kcp-crumb-head {
+  font-weight: 600;
+  color: var(--text-accent);
+}
+
+.kcp-crumb-subhead {
+  color: var(--text-faint);
+}
+
+.kcp-crumb-subhead ~ .kcp-crumb-item {
+  padding-left: var(--size-4-4);
+}

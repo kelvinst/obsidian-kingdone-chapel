@@ -262,3 +262,53 @@ export function bookNameAt(index: number, lang: Lang = 'pt'): string {
   const book = BY_INDEX.get(index);
   return book ? book.names[lang] : String(index);
 }
+
+/**
+ * A run of consecutive books read together — a testament, or one of the
+ * divisions inside it. The books are numbered in canonical order, so every
+ * division any of them belongs to is a range, and a book's section is found by
+ * the number alone.
+ */
+export interface Section {
+  /** First and last book number the section covers, both included. */
+  from: number;
+  to: number;
+  names: Record<Lang, string>;
+}
+
+export const TESTAMENTS: Section[] = [
+  { from: 1, to: 39, names: { pt: 'Antigo Testamento', en: 'Old Testament' } },
+  { from: 40, to: 66, names: { pt: 'Novo Testamento', en: 'New Testament' } },
+];
+
+/**
+ * The divisions inside the testaments, as a Bible's own contents page draws
+ * them. Two of them hold a single book — Atos and Apocalipse — which is how
+ * the division is normally written, and leaving either out would put the book
+ * under a heading it does not belong to.
+ */
+export const CATEGORIES: Section[] = [
+  { from: 1, to: 5, names: { pt: 'Pentateuco', en: 'Pentateuch' } },
+  { from: 6, to: 17, names: { pt: 'Históricos', en: 'Historical' } },
+  { from: 18, to: 22, names: { pt: 'Poéticos', en: 'Poetic' } },
+  { from: 23, to: 27, names: { pt: 'Profetas Maiores', en: 'Major Prophets' } },
+  { from: 28, to: 39, names: { pt: 'Profetas Menores', en: 'Minor Prophets' } },
+  { from: 40, to: 43, names: { pt: 'Evangelhos', en: 'Gospels' } },
+  { from: 44, to: 44, names: { pt: 'Histórico', en: 'History' } },
+  { from: 45, to: 57, names: { pt: 'Cartas Paulinas', en: 'Pauline Epistles' } },
+  { from: 58, to: 65, names: { pt: 'Cartas Gerais', en: 'General Epistles' } },
+  { from: 66, to: 66, names: { pt: 'Profecia', en: 'Prophecy' } },
+];
+
+/** Where a book outside every section is filed, so none is left without a heading. */
+const OTHER: Record<Lang, string> = { pt: 'Outros', en: 'Other' };
+
+/**
+ * The heading a book falls under. A vault may hold books this table never
+ * heard of — an apocryphal one, or a version numbering its own way — and they
+ * are gathered under a heading of their own rather than left loose.
+ */
+export function sectionName(sections: Section[], index: number, lang: Lang = 'pt'): string {
+  const found = sections.find((s) => index >= s.from && index <= s.to);
+  return found ? found.names[lang] : OTHER[lang];
+}
