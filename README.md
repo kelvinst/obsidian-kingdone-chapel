@@ -41,6 +41,9 @@ ARA  ›  João  ›  ‹ 3 ›
 - **Book** lists every book that version has, and opens the first chapter of the one you pick.
 - **Chapter** lists the book's chapters in a grid, five to a row, so a whole book fits in a
   glance rather than a scroll.
+
+A list longer than a handful opens with a search field: type to narrow it (`joao` finds João,
+`sam` finds 1 Samuel), walk what is left with the arrow keys, and press Enter to open it.
 - **The arrows** walk the version chapter by chapter, on into the next book when a book runs
   out — the arrow after Genesis 50 is Exodus 1. They stop at either end of the version.
 
