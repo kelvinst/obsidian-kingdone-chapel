@@ -290,7 +290,7 @@ export const TESTAMENTS: Section[] = [
 export const CATEGORIES: Section[] = [
   { from: 1, to: 5, names: { pt: 'Lei', en: 'Law' } },
   { from: 6, to: 17, names: { pt: 'Históricos', en: 'Historical' } },
-  { from: 18, to: 22, names: { pt: 'Poéticos', en: 'Poetic' } },
+  { from: 18, to: 22, names: { pt: 'Sabedoria', en: 'Wisdom' } },
   { from: 23, to: 27, names: { pt: 'Profetas Maiores', en: 'Major Prophets' } },
   { from: 28, to: 39, names: { pt: 'Profetas Menores', en: 'Minor Prophets' } },
   { from: 40, to: 43, names: { pt: 'Evangelhos', en: 'Gospels' } },

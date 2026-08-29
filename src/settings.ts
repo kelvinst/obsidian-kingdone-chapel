@@ -90,7 +90,7 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
       .setName('Group books by category')
       .setDesc(
         'Break the testaments down in the book list the way a Bible\'s contents page ' +
-          'does — Lei, Históricos, Poéticos, Profetas, Evangelhos, Cartas — in ' +
+          'does — Lei, Históricos, Sabedoria, Profetas, Evangelhos, Cartas — in ' +
           'the language chosen above. Off: only the two testaments.'
       )
       .addToggle((t) =>
