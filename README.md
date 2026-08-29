@@ -41,6 +41,18 @@ so what you pick is what the note ends up saying.
 | `@Joao 1.1,2` | `[[NVI-43-JHN-001#^nvi-jhn-1-1\|João 1.1]],[[NVI-43-JHN-001#^nvi-jhn-1-2\|2]]` — one link per verse |
 | `@Joao 1.1-3` | the same as `1.1,2,3` |
 
+Put a `!` in front — `!@Joao 1.1` — and the same reference comes back as embeds, showing the
+text in the note instead of pointing at it. An embed carries no label, so a book's
+abbreviation and its full name write the same thing and the popup offers each book once,
+under its name.
+
+| You type | You get |
+|---|---|
+| `!@Joao` | `![[NVI-43-Joao]]` |
+| `!@Joao 1.1` | `![[NVI-43-JHN-001#^nvi-jhn-1-1]]` |
+| `!@Joao 1.1-3` | one embed per verse, a line each |
+| `!@Joao 1` | your pick of *whole file* (`![[NVI-43-JHN-001]]`) or *verse by verse* — one embed per verse of the chapter |
+
 Books are matched in Portuguese and English, by full name, by the two-letter Portuguese
 abbreviations (`Gn`, `Jz`, `Sl`, `Tg`, `Ap`), by the usual English ones (`Ps`, `Rev`,
 `1Cor`), and by their USFM code (`JHN`). Accents are optional — `@Joao` and `@João` both
