@@ -7,6 +7,7 @@
  *   @Joao 1.1,2      two verses
  *   @Joao 1.1-3      the same as 1,2,3
  *   @ARA Joao 1.1    the same verse in a named version
+ *   @Joao 1.1 ARA    the same, with the version said last
  *
  * The text is still being typed, so half-written references (`@Joao 1.`,
  * `@Joao 1.1-`) have to parse into the most complete thing they can be.
@@ -27,20 +28,34 @@ export interface ParsedRef {
 
 /**
  * Split `query` (everything after the `@`) into its parts. `isVersion` says
- * whether a leading word names a version, which is the only way to tell
- * `@ARA Joao` from a two-word book name.
+ * whether an outer word names a version, which is the only way to tell
+ * `@ARA Joao` from a two-word book name, or `@Joao ARA` from one whose name
+ * carries on.
  */
 export function parseReference(query: string, isVersion: (word: string) => boolean): ParsedRef | null {
+  let text = query;
+  let version: string | null = null;
+
+  // The version may come after the reference, the way it is said out loud
+  // (`Joao 1 NVI`). It comes off first, so the chapter is still the last
+  // number of what is left.
+  const trailing = text.match(/^\s*(.*\S)\s+(\S+)\s*$/);
+  if (trailing && isVersion(trailing[2])) {
+    version = trailing[2];
+    text = trailing[1];
+  }
+
   // The chapter is the last bare number, so `1 Joao 1.1` splits after `Joao`.
-  const m = query.match(/^\s*(.*?)\s+(\d+)\s*(?:[.:]\s*([\d,\s-]*))?\s*$/);
-  let book = (m ? m[1] : query).trim();
+  const m = text.match(/^\s*(.*?)\s+(\d+)\s*(?:[.:]\s*([\d,\s-]*))?\s*$/);
+  let book = (m ? m[1] : text).trim();
   const chapter = m ? parseInt(m[2], 10) : null;
   const verses = m && m[3] !== undefined ? expandVerses(m[3]) : [];
   if (verses === null) return null; // more verses than a reference may carry
 
-  let version: string | null = null;
+  // Or before it (`NVI Joao 1`), which is the only way to tell a version from
+  // the first word of a two-word book name.
   const named = book.match(/^(\S+)\s+(.+)$/);
-  if (named && isVersion(named[1])) {
+  if (version === null && named && isVersion(named[1])) {
     version = named[1];
     book = named[2];
   }
