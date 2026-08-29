@@ -123,3 +123,9 @@
   text-transform: uppercase;
   color: var(--text-accent);
 }
+
+.kcp-suggest-note {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  font-style: italic;
+}
