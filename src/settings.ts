@@ -71,6 +71,20 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
         })
       );
 
+    new Setting(containerEl)
+      .setName('Chapter breadcrumbs')
+      .setDesc(
+        'A `Version > Book > Chapter` bar above every chapter you open. Each part ' +
+          'opens a list to move by, and the arrows walk the version chapter by ' +
+          'chapter, on into the next book. Ctrl/Cmd-click any of them to open in a new tab.'
+      )
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.showBreadcrumbs).onChange(async (value) => {
+          this.plugin.settings.showBreadcrumbs = value;
+          await this.plugin.saveSettings();
+        })
+      );
+
     containerEl.createEl('h3', { text: 'References' });
 
     new Setting(containerEl)

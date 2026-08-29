@@ -2,13 +2,14 @@ import { MarkdownView, Notice, Plugin, TFile, TFolder, WorkspaceLeaf } from 'obs
 import type { PaneType } from 'obsidian';
 
 import { DEFAULT_SETTINGS, VIEW_TYPE } from './types';
-import type { KingdoneChapelSettings, Location, Verse, VersionItem } from './types';
+import type { ChapterRef, KingdoneChapelSettings, Location, Verse, VersionItem } from './types';
 import { chapterKey, parseBookName, parseChapterName, parseVerseLine } from './utils';
-import { bookName, nameLang } from './books';
+import { bookName, bookNameAt, nameLang } from './books';
 import { VersionSuggestModal } from './modal';
 import { ReferenceSuggest } from './suggest';
 import { KingdoneChapelSettingTab } from './settings';
 import { KingdoneChapelView } from './view';
+import { Breadcrumbs } from './breadcrumbs';
 
 /** Rendered elements a verse can be: a list item now, a paragraph in older chapters. */
 const VERSE_SELECTOR = '.markdown-preview-sizer li, .markdown-preview-sizer p';
@@ -54,6 +55,10 @@ export default class KingdoneChapelPlugin extends Plugin {
   bibleIndex: Map<string, Map<string, TFile>> | null = null;
   /** version -> book number -> the note listing that book's chapters. */
   bookNotes: Map<string, Map<number, TFile>> = new Map();
+  /** version -> every chapter it holds, in reading order. Built on demand. */
+  chapterOrders: Map<string, ChapterRef[]> = new Map();
+  /** The `Version > Book > Chapter` bar of every pane reading a chapter. */
+  breadcrumbs: Breadcrumbs;
   /** "version/book:chapter" -> the files fighting over it. Filled by index(). */
   chapterConflicts: Map<string, TFile[]> = new Map();
   /** The conflicts the user was last warned about, so each is only said once. */
@@ -70,6 +75,9 @@ export default class KingdoneChapelPlugin extends Plugin {
     this.addSettingTab(new KingdoneChapelSettingTab(this.app, this));
 
     this.registerView(VIEW_TYPE, (leaf) => new KingdoneChapelView(leaf, this));
+
+    this.breadcrumbs = new Breadcrumbs(this);
+    this.register(() => this.breadcrumbs.clear());
 
     this.addCommand({
       id: 'open-verse-in-another-version',
@@ -104,7 +112,22 @@ export default class KingdoneChapelPlugin extends Plugin {
     this.registerEvent(this.app.vault.on('modify', (file) => this.chapterCache.delete(file.path)));
     this.registerEvent(this.app.vault.on('create', () => this.invalidateIndex()));
     this.registerEvent(this.app.vault.on('delete', () => this.invalidateIndex()));
-    this.registerEvent(this.app.vault.on('rename', () => this.invalidateIndex()));
+    // A renamed file may be the one on screen, and nothing else says the bar
+    // above it now names another passage — or none.
+    this.registerEvent(
+      this.app.vault.on('rename', () => {
+        this.invalidateIndex();
+        this.breadcrumbs.refresh();
+      })
+    );
+
+    // A pane picks up the bar when it opens a chapter, and loses it when it
+    // moves on. Reading and editing look the same to it, but switching between
+    // them replaces the pane's contents, so `layout-change` has to put it back.
+    this.registerEvent(this.app.workspace.on('file-open', () => this.breadcrumbs.refresh()));
+    this.registerEvent(this.app.workspace.on('layout-change', () => this.breadcrumbs.refresh()));
+    this.registerEvent(this.app.workspace.on('active-leaf-change', () => this.breadcrumbs.refresh()));
+    this.app.workspace.onLayoutReady(() => this.breadcrumbs.refresh());
 
     this.registerDomEvent(document, 'click', (evt) => this.lockPreviewVerse(evt));
 
@@ -121,6 +144,7 @@ export default class KingdoneChapelPlugin extends Plugin {
 
   invalidateIndex() {
     this.bibleIndex = null;
+    this.chapterOrders.clear();
   }
 
   /**
@@ -204,6 +228,7 @@ export default class KingdoneChapelPlugin extends Plugin {
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE)) {
       if (leaf.view instanceof KingdoneChapelView) leaf.view.refresh(true);
     }
+    if (this.breadcrumbs) this.breadcrumbs.refresh();
   }
 
   async activateView(reveal = true): Promise<WorkspaceLeaf | null> {
@@ -545,6 +570,89 @@ export default class KingdoneChapelPlugin extends Plugin {
     return (
       chapters.get(chapterKey(bookIndex, chapter)) || chapters.get(chapterKey(bookIndex, 0)) || null
     );
+  }
+
+  /**
+   * Every chapter a version holds, in the order they are read: by book number
+   * first, then by chapter. This is the line the breadcrumb arrows walk, which
+   * is why it is one list and not one per book — the chapter after the last of
+   * Genesis is the first of Exodus, and a flat list says so without anyone
+   * having to know how many chapters a book has.
+   *
+   * The index keys chapters by number alone, so the book's code — the only
+   * thing that can name it — is read back out of the file names here. Kept
+   * until the index is dropped, which is whenever the vault moves under it.
+   */
+  chapterOrder(version: string): ChapterRef[] {
+    const cached = this.chapterOrders.get(version);
+    if (cached) return cached;
+
+    const out: ChapterRef[] = [];
+    const chapters = this.index().get(version);
+    if (chapters) {
+      for (const file of chapters.values()) {
+        const parsed = parseChapterName(file.basename, version);
+        if (parsed) {
+          out.push({ bookIndex: parsed.bookIndex, chapter: parsed.chapter, code: parsed.book });
+        }
+      }
+      out.sort((a, b) => a.bookIndex - b.bookIndex || a.chapter - b.chapter);
+    }
+    this.chapterOrders.set(version, out);
+    return out;
+  }
+
+  /** Books a version has chapters for, in canonical order, named to read. */
+  booksIn(version: string): { index: number; name: string }[] {
+    const lang = nameLang(this.settings.language);
+    const out: { index: number; name: string }[] = [];
+    for (const ref of this.chapterOrder(version)) {
+      if (out.length && out[out.length - 1].index === ref.bookIndex) continue;
+      out.push({ index: ref.bookIndex, name: bookName(ref.code, lang) });
+    }
+    return out;
+  }
+
+  /** Chapter numbers a version has for one book, in order. */
+  chaptersIn(version: string, bookIndex: number): number[] {
+    return this.chapterOrder(version)
+      .filter((ref) => ref.bookIndex === bookIndex)
+      .map((ref) => ref.chapter);
+  }
+
+  /**
+   * The chapter `step` places away, crossing into the next or previous book at
+   * the ends. Null once the version runs out — before its first chapter, after
+   * its last — and for a chapter the index never took, which is what a pair of
+   * files claiming it leaves behind.
+   */
+  stepChapter(version: string, bookIndex: number, chapter: number, step: number): ChapterRef | null {
+    const order = this.chapterOrder(version);
+    const at = order.findIndex((ref) => ref.bookIndex === bookIndex && ref.chapter === chapter);
+    if (at < 0) return null;
+    return order[at + step] || null;
+  }
+
+  /**
+   * Open a chapter of a version, by book number rather than from a location:
+   * the breadcrumbs move between books and chapters, which no location on
+   * screen names. A verse would mean nothing across that move, so this lands
+   * on the chapter itself.
+   */
+  async openChapter(
+    version: string,
+    bookIndex: number,
+    chapter: number | null,
+    from: TFile | null,
+    newLeaf: PaneType | boolean = false
+  ) {
+    const file = this.referenceFile(version, bookIndex, chapter);
+    if (!file) {
+      const book = bookNameAt(bookIndex, nameLang(this.settings.language));
+      new Notice(`${this.label(version)} has no ${book}${chapter === null ? '' : ' ' + chapter}.`);
+      return;
+    }
+    await this.app.workspace.openLinkText(file.path, from ? from.path : '', newLeaf);
   }
 
   /** Block ids of a file (from metadata cache, falling back to reading it). */

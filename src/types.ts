@@ -19,6 +19,8 @@ export interface KingdoneChapelSettings {
   showCurrentVersion: boolean;
   followCursor: boolean;
   openSidebarOnStart: boolean;
+  /** Whether a chapter pane gets the `Version > Book > Chapter` bar. */
+  showBreadcrumbs: boolean;
 }
 
 export const DEFAULT_SETTINGS: KingdoneChapelSettings = {
@@ -31,6 +33,7 @@ export const DEFAULT_SETTINGS: KingdoneChapelSettings = {
   showCurrentVersion: false,
   followCursor: true,
   openSidebarOnStart: false,
+  showBreadcrumbs: true,
 };
 
 /** Where the reader is: a chapter file, plus the verse under the cursor. */
@@ -43,6 +46,14 @@ export interface Location {
   chapter: number;
   verse: number | null;
   file: TFile;
+}
+
+/** One chapter a version holds, as the breadcrumbs walk them. */
+export interface ChapterRef {
+  bookIndex: number;
+  chapter: number;
+  /** Book code from the file name, which is what names the book. */
+  code: string;
 }
 
 export interface Verse {

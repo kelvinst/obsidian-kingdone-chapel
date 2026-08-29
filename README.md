@@ -26,6 +26,27 @@ in your vault, keeping chapter *and* verse alignment.
   finds it and labels the card `v.1`.
 - Alt-click a card to copy that version's verse text.
 
+### Chapter breadcrumbs
+
+Every chapter you open gets a bar above it naming the passage, and each part of it is a way
+out of the chapter:
+
+```
+ARA  ›  João  ›  ‹ 3 ›
+```
+
+- **Version** lists every version in the vault and opens the same chapter — and the same
+  verse, wherever you are in the chapter — in the one you pick. Versions missing that
+  chapter are greyed out, and picking one says what it is missing.
+- **Book** lists every book that version has, and opens the first chapter of the one you pick.
+- **Chapter** lists the book's chapters in a grid, five to a row, so a whole book fits in a
+  glance rather than a scroll.
+- **The arrows** walk the version chapter by chapter, on into the next book when a book runs
+  out — the arrow after Genesis 50 is Exodus 1. They stop at either end of the version.
+
+Any of them opens in the pane you clicked from; hold Ctrl/Cmd to open in a new tab instead.
+Turn the bar off under **Chapter breadcrumbs**.
+
 ### `@` references
 
 Type `@` and a reference anywhere in a note to link to it. The suggestion list shows the
@@ -138,6 +159,7 @@ like two files claiming one chapter.
 | Default version for @ references | Automatic | Version `@` references link to |
 | Open in new tab | off | Off replaces the current tab |
 | Hidden versions | — | Comma-separated version folders to ignore |
+| Chapter breadcrumbs | on | The `Version > Book > Chapter` bar above each chapter |
 | Follow cursor | on | Off updates the sidebar only when you switch notes |
 | Show the version you are reading | off | Include the current version in the list |
 | Open sidebar on startup | off | |
