@@ -86,6 +86,20 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
         })
       );
 
+    new Setting(containerEl)
+      .setName('Group books by category')
+      .setDesc(
+        'Break the testaments down in the book list the way a Bible\'s contents page ' +
+          'does — Pentateuco, Históricos, Poéticos, Profetas, Evangelhos, Cartas — in ' +
+          'the language chosen above. Off: only the two testaments.'
+      )
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.bookCategories).onChange(async (value) => {
+          this.plugin.settings.bookCategories = value;
+          await this.plugin.saveSettings();
+        })
+      );
+
     containerEl.createEl('h3', { text: 'References' });
 
     new Setting(containerEl)

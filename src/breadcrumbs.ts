@@ -1,7 +1,7 @@
 import { MarkdownView, setIcon } from 'obsidian';
 import type { PaneType } from 'obsidian';
 
-import { fold } from './books';
+import { CATEGORIES, TESTAMENTS, fold, nameLang, sectionName } from './books';
 import type { ChapterRef, Location } from './types';
 import type KingdoneChapelPlugin from './main';
 
@@ -161,11 +161,33 @@ export class Breadcrumbs {
     }, evt);
   }
 
-  /** Every book the version has, landing on its first chapter. */
+  /**
+   * Every book the version has, landing on its first chapter, under the
+   * headings a Bible's own contents page would put them under: the testaments
+   * always, and the divisions inside them when they are asked for.
+   *
+   * The books come out in canonical order, so a heading is due whenever the
+   * section a book falls under is not the one before it. Each heading owns the
+   * books under it, which is what lets a search take a heading down with them.
+   */
   bookMenu(anchor: HTMLElement, view: MarkdownView, loc: Location, evt: MouseEvent) {
     this.open(anchor, 'kcp-crumb-list', 'Search books', (body, close) => {
+      const lang = nameLang(this.plugin.settings.language);
+      const divided = this.plugin.settings.bookCategories;
+      let testament: Group | null = null;
+      let category: Group | null = null;
+
       for (const book of this.plugin.booksIn(loc.version)) {
-        const item = this.item(body, book.name, book.index === loc.bookIndex);
+        testament = section(body, testament, 'kcp-crumb-head', sectionName(TESTAMENTS, book.index, lang));
+        if (testament.fresh) category = null;
+
+        let into = testament.el;
+        if (divided) {
+          category = section(into, category, 'kcp-crumb-subhead', sectionName(CATEGORIES, book.index, lang));
+          into = category.el;
+        }
+
+        const item = this.item(into, book.name, book.index === loc.bookIndex);
         item.onclick = (click) => {
           close();
           this.plugin.openChapter(loc.version, book.index, 1, view.file, paneFor(click));
@@ -235,6 +257,25 @@ function paneFor(evt: MouseEvent): PaneType | boolean {
 
 function crumb(into: HTMLElement, text: string, label: string): HTMLElement {
   return into.createEl('button', { cls: 'kcp-crumb', text, attr: { 'aria-label': label } });
+}
+
+/** A heading and the books filed under it, as the book dropdown builds them up. */
+interface Group {
+  el: HTMLElement;
+  name: string;
+  /** Whether this call is what opened it, so the group inside it starts over. */
+  fresh: boolean;
+}
+
+/**
+ * The group `name` belongs in: the one already open when it is still the same
+ * heading, a new one when it is not.
+ */
+function section(into: HTMLElement, open: Group | null, cls: string, name: string): Group {
+  if (open && open.name === name) return { ...open, fresh: false };
+  const el = into.createDiv({ cls: 'kcp-crumb-group' });
+  el.createDiv({ cls, text: name });
+  return { el, name, fresh: true };
 }
 
 function separator(into: HTMLElement) {
@@ -361,6 +402,10 @@ class CrumbMenu {
       const hit = !wanted || row.text.includes(wanted);
       row.el.toggleClass('is-hidden', !hit);
       if (hit) this.shown.push(row.el);
+    }
+    // A heading is only worth showing while something is still filed under it.
+    for (const group of Array.from(this.body.querySelectorAll<HTMLElement>('.kcp-crumb-group'))) {
+      group.toggleClass('is-hidden', !group.querySelector('.kcp-crumb-item:not(.is-hidden)'));
     }
     this.empty.toggleClass('is-hidden', this.shown.length > 0);
 

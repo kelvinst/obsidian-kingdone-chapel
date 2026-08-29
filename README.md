@@ -38,14 +38,19 @@ ARA  ›  João  ›  ‹ 3 ›
 - **Version** lists every version in the vault and opens the same chapter — and the same
   verse, wherever you are in the chapter — in the one you pick. Versions missing that
   chapter are greyed out, and picking one says what it is missing.
-- **Book** lists every book that version has, and opens the first chapter of the one you pick.
+- **Book** lists every book that version has under **Antigo Testamento** and **Novo
+  Testamento** — in the language you chose — and opens the first chapter of the one you pick.
+  Turn on **Group books by category** to break the testaments down the way a Bible's contents
+  page does: Pentateuco, Históricos, Poéticos, Profetas Maiores and Menores, Evangelhos,
+  Cartas Paulinas and Gerais.
 - **Chapter** lists the book's chapters in a grid, five to a row, so a whole book fits in a
   glance rather than a scroll.
+- **The arrows** walk the version chapter by chapter, on into the next book when a book runs
+  out — the arrow after Genesis 50 is Exodus 1. They stop at either end of the version.
 
 A list longer than a handful opens with a search field: type to narrow it (`joao` finds João,
 `sam` finds 1 Samuel), walk what is left with the arrow keys, and press Enter to open it.
-- **The arrows** walk the version chapter by chapter, on into the next book when a book runs
-  out — the arrow after Genesis 50 is Exodus 1. They stop at either end of the version.
+Headings go with the books under them, so a search that leaves one empty takes it down too.
 
 Any of them opens in the pane you clicked from; hold Ctrl/Cmd to open in a new tab instead.
 Turn the bar off under **Chapter breadcrumbs**.
@@ -163,6 +168,7 @@ like two files claiming one chapter.
 | Open in new tab | off | Off replaces the current tab |
 | Hidden versions | — | Comma-separated version folders to ignore |
 | Chapter breadcrumbs | on | The `Version > Book > Chapter` bar above each chapter |
+| Group books by category | off | Sub-headings inside the testaments in the book list |
 | Follow cursor | on | Off updates the sidebar only when you switch notes |
 | Show the version you are reading | off | Include the current version in the list |
 | Open sidebar on startup | off | |

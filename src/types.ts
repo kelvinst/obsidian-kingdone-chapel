@@ -21,6 +21,8 @@ export interface KingdoneChapelSettings {
   openSidebarOnStart: boolean;
   /** Whether a chapter pane gets the `Version > Book > Chapter` bar. */
   showBreadcrumbs: boolean;
+  /** Whether the book dropdown breaks the testaments down into their divisions. */
+  bookCategories: boolean;
 }
 
 export const DEFAULT_SETTINGS: KingdoneChapelSettings = {
@@ -34,6 +36,7 @@ export const DEFAULT_SETTINGS: KingdoneChapelSettings = {
   followCursor: true,
   openSidebarOnStart: false,
   showBreadcrumbs: true,
+  bookCategories: false,
 };
 
 /** Where the reader is: a chapter file, plus the verse under the cursor. */
