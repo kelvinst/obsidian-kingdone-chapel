@@ -41,7 +41,7 @@ ARA  ›  João  ›  ‹ 3 ›
 - **Book** lists every book that version has under **Antigo Testamento** and **Novo
   Testamento** — in the language you chose — and opens the first chapter of the one you pick.
   Turn on **Group books by category** to break the testaments down the way a Bible's contents
-  page does: Lei, Históricos, Sabedoria, Profetas, Evangelhos, Cartas.
+  page does: Lei, Históricos, Sabedoria, Profetas, Evangelhos, Cartas Paulinas and Gerais.
 - **Chapter** lists the book's chapters in a grid, five to a row, so a whole book fits in a
   glance rather than a scroll.
 - **The arrows** walk the version chapter by chapter, on into the next book when a book runs
