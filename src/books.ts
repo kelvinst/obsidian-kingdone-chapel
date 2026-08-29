@@ -249,3 +249,16 @@ export function bookName(code: string, lang: Lang = 'pt'): string {
   const book = BY_CODE.get(code.toUpperCase());
   return book ? book.names[lang] : code;
 }
+
+const BY_INDEX = new Map(BOOKS.map((b) => [b.index, b]));
+
+/**
+ * Name to show for a book number, for the places that only have the number —
+ * the index keys books by it, and the file name is what holds the code. A
+ * vault may hold a book this table never heard of, so fall back to the number
+ * itself rather than to nothing.
+ */
+export function bookNameAt(index: number, lang: Lang = 'pt'): string {
+  const book = BY_INDEX.get(index);
+  return book ? book.names[lang] : String(index);
+}

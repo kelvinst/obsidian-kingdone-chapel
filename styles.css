@@ -129,3 +129,116 @@
   color: var(--text-muted);
   font-style: italic;
 }
+
+/* --- chapter breadcrumbs --- */
+.kcp-crumbs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--size-2-2);
+  padding: var(--size-4-1) var(--size-4-3);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.kcp-crumb {
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  border-radius: var(--radius-s);
+  padding: var(--size-2-2) var(--size-4-2);
+  height: auto;
+  font-size: var(--font-ui-medium);
+  font-weight: var(--font-medium);
+  line-height: var(--line-height-tight);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.kcp-crumb:hover {
+  background-color: var(--background-modifier-hover);
+  box-shadow: none;
+  color: var(--text-normal);
+}
+
+.kcp-crumb-sep {
+  display: flex;
+  color: var(--text-faint);
+}
+
+.kcp-crumb-sep .svg-icon {
+  width: var(--icon-s);
+  height: var(--icon-s);
+}
+
+.kcp-crumb-chapter {
+  display: flex;
+  align-items: center;
+  gap: var(--size-2-2);
+}
+
+.kcp-crumb-arrow {
+  padding: var(--size-2-2);
+  color: var(--text-muted);
+}
+
+.kcp-crumb-arrow .svg-icon {
+  width: var(--icon-m);
+  height: var(--icon-m);
+}
+
+.kcp-crumb-arrow.is-disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+/* --- breadcrumb dropdowns --- */
+.kcp-crumb-menu {
+  position: fixed;
+  z-index: var(--layer-menu);
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: var(--size-2-2);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background-color: var(--background-secondary);
+  box-shadow: var(--shadow-s);
+}
+
+.kcp-crumb-list {
+  min-width: 12em;
+}
+
+.kcp-crumb-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--kcp-crumb-columns, 5), 2.6em);
+  gap: var(--size-2-1);
+}
+
+.kcp-crumb-item {
+  padding: var(--size-2-2) var(--size-4-2);
+  border-radius: var(--radius-s);
+  font-size: var(--font-ui-medium);
+  line-height: var(--line-height-tight);
+  color: var(--text-normal);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.kcp-crumb-grid .kcp-crumb-item {
+  padding: var(--size-2-2) 0;
+  text-align: center;
+}
+
+.kcp-crumb-item:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.kcp-crumb-item.is-current {
+  color: var(--text-accent);
+  font-weight: 600;
+}
+
+.kcp-crumb-item.is-missing {
+  color: var(--text-faint);
+}
