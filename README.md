@@ -44,7 +44,8 @@ so what you pick is what the note ends up saying.
 Put a `!` in front — `!@Joao 1.1` — and the same reference comes back as embeds, showing the
 text in the note instead of pointing at it. An embed carries no label, so a book's
 abbreviation and its full name write the same thing and the popup offers each book once,
-under its name.
+under its name. `!@` reads as one thing wherever it appears, so `Que texto!@Joao 1.1` embeds
+too — put a space between the two to link after an exclamation mark instead.
 
 | You type | You get |
 |---|---|

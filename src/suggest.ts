@@ -13,8 +13,14 @@ import type KingdoneChapelPlugin from './main';
  * popup stays open across them and closes by finding no book rather than by
  * hitting a separator. Capped so a whole paragraph after a stray `@` is not
  * re-parsed on every keystroke.
+ *
+ * A bare `@` has to start a word, or every email address in the vault would
+ * open the popup. `!@` is a pair and reads as one, so it needs nothing in
+ * front of it: `Que texto!@Joao 1.1` embeds, and a space between the two
+ * (`Que texto! @Joao 1.1`) is how a reference right after an exclamation mark
+ * asks to be linked instead.
  */
-const TRIGGER = /(?:^|[^\p{L}\p{N}_@!])(!?)@([\p{L}\p{N} .,:-]{0,40})$/u;
+const TRIGGER = /(?:(!)@|(?:^|[^\p{L}\p{N}_@!])@)([\p{L}\p{N} .,:-]{0,40})$/u;
 
 /** One way the query could be linked: a book the reader may have meant, under
  * one of the names they may want it written as. */
@@ -44,12 +50,14 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
     const line = editor.getLine(cursor.line).slice(0, cursor.ch);
     const m = line.match(TRIGGER);
     if (!m || !m[2].trim()) return null;
+    // Only the `!@` branch captures the `!`; the bare `@` leaves it unset.
+    const bang = m[1] || '';
     return {
-      start: { line: cursor.line, ch: cursor.ch - m[1].length - m[2].length - 1 },
+      start: { line: cursor.line, ch: cursor.ch - bang.length - m[2].length - 1 },
       end: cursor,
       // The `!` rides along in the query so the rows can be read out of it
       // alone, the way the popup hands it back.
-      query: m[1] + m[2],
+      query: bang + m[2],
     };
   }
 
