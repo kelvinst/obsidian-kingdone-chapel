@@ -294,8 +294,7 @@ export const CATEGORIES: Section[] = [
   { from: 23, to: 39, names: { pt: 'Profetas', en: 'Prophets' } },
   { from: 40, to: 43, names: { pt: 'Evangelhos', en: 'Gospels' } },
   { from: 44, to: 44, names: { pt: 'Histórico', en: 'History' } },
-  { from: 45, to: 57, names: { pt: 'Cartas Paulinas', en: 'Pauline Epistles' } },
-  { from: 58, to: 65, names: { pt: 'Cartas Gerais', en: 'General Epistles' } },
+  { from: 45, to: 65, names: { pt: 'Cartas', en: 'Epistles' } },
   { from: 66, to: 66, names: { pt: 'Profecia', en: 'Prophecy' } },
 ];
 
