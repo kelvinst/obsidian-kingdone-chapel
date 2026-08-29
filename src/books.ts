@@ -288,7 +288,7 @@ export const TESTAMENTS: Section[] = [
  * under a heading it does not belong to.
  */
 export const CATEGORIES: Section[] = [
-  { from: 1, to: 5, names: { pt: 'Pentateuco', en: 'Pentateuch' } },
+  { from: 1, to: 5, names: { pt: 'Lei', en: 'Law' } },
   { from: 6, to: 17, names: { pt: 'Históricos', en: 'Historical' } },
   { from: 18, to: 22, names: { pt: 'Poéticos', en: 'Poetic' } },
   { from: 23, to: 27, names: { pt: 'Profetas Maiores', en: 'Major Prophets' } },
