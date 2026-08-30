@@ -83,6 +83,10 @@ describe('parseReference', () => {
       expect(parseReference('Joao 1.1-40,30-70', noVersions)).toBeNull();
     });
 
+    it('counts the verses listed one by one against the cap too', () => {
+      expect(parseReference('Joao 1.1-50,51', noVersions)).toBeNull();
+    });
+
     it('counts a verse once, so repeats never reach the cap', () => {
       expect(parseReference('Joao 1.1-50,1-50', noVersions)?.verses).toHaveLength(50);
     });
