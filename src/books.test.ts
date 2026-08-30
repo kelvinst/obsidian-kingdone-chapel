@@ -1,7 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Lang } from './books';
-import { BOOKS, abbrLabel, bookName, fold, langsFor, matchBooks, nameLang, plain } from './books';
+import {
+  BOOKS,
+  CATEGORIES,
+  TESTAMENTS,
+  abbrLabel,
+  bookName,
+  bookNameAt,
+  fold,
+  langsFor,
+  matchBooks,
+  nameLang,
+  plain,
+  sectionName,
+} from './books';
 
 /** Codes of the books a query matched, best first. */
 const codes = (query: string, limit?: number, langs?: Lang[]) =>
@@ -180,5 +193,65 @@ describe('bookName', () => {
 
   it('falls back to the code for a book it has never heard of', () => {
     expect(bookName('ENO')).toBe('ENO');
+  });
+});
+
+describe('bookNameAt', () => {
+  it('names a book by the number the index keys it under', () => {
+    expect(bookNameAt(43)).toBe('João');
+  });
+
+  it('names it in the language asked for', () => {
+    expect(bookNameAt(43, 'en')).toBe('John');
+  });
+
+  it('falls back to the number for a book it has never heard of', () => {
+    expect(bookNameAt(67)).toBe('67');
+  });
+});
+
+describe('the sections', () => {
+  it('run from the first book to the last with no gap and no overlap', () => {
+    for (const sections of [TESTAMENTS, CATEGORIES]) {
+      expect(sections[0].from).toBe(1);
+      expect(sections[sections.length - 1].to).toBe(66);
+      for (let i = 1; i < sections.length; i++) {
+        expect(sections[i].from, `after ${sections[i - 1].names.en}`).toBe(sections[i - 1].to + 1);
+      }
+    }
+  });
+
+  it('name every division in every language a book is read in', () => {
+    for (const section of [...TESTAMENTS, ...CATEGORIES]) {
+      for (const lang of langsFor('')) {
+        expect(section.names[lang], `${section.from}-${section.to} in ${lang}`).toBeTruthy();
+      }
+    }
+  });
+});
+
+describe('sectionName', () => {
+  it('names the testament a book falls in', () => {
+    expect(sectionName(TESTAMENTS, 39)).toBe('Antigo Testamento');
+    expect(sectionName(TESTAMENTS, 40)).toBe('Novo Testamento');
+  });
+
+  it('names the division a book falls in', () => {
+    expect(sectionName(CATEGORIES, 1)).toBe('Lei');
+    expect(sectionName(CATEGORIES, 43)).toBe('Evangelhos');
+  });
+
+  it('names a division holding a single book, rather than filing it next door', () => {
+    expect(sectionName(CATEGORIES, 44)).toBe('Histórico');
+    expect(sectionName(CATEGORIES, 66)).toBe('Profecia');
+  });
+
+  it('names it in the language asked for', () => {
+    expect(sectionName(CATEGORIES, 1, 'en')).toBe('Law');
+  });
+
+  it('gathers a book outside every section under a heading of its own', () => {
+    expect(sectionName(CATEGORIES, 67)).toBe('Outros');
+    expect(sectionName(CATEGORIES, 67, 'en')).toBe('Other');
   });
 });
