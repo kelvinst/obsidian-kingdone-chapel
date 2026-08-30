@@ -12,6 +12,7 @@ import { abbrLabel, langsFor, matchBooks, plain } from './books';
 import { parseReference, referenceLabels } from './reference';
 import type { BookMatch } from './books';
 import type { ParsedRef } from './reference';
+import type { ChapterTarget } from './types';
 import type KingdoneChapelPlugin from './main';
 
 /**
@@ -125,7 +126,7 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
       for (const match of matchBooks(parsed.book, books, langs)) {
         if (out.length >= MAX_ROWS) return out.slice(0, MAX_ROWS);
 
-        const found = this.chapterFiles(
+        const found = this.chapterTargets(
           version,
           match.book.index,
           parsed.chapters,
@@ -140,17 +141,20 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
           // The anchors and the opening verse are the passage, not the wording,
           // so both forms of the same book share the one read. Verses all sit
           // in the one chapter, and a run of chapters is previewed by where it
-          // opens, so either way the read is of the first file the run found.
-          const anchors = await this.plugin.findAnchors(
-            found[0].file,
-            found[0].chapter,
-            parsed.verses,
-          );
-          const preview = await this.previewOf(
-            found[0].file,
-            found[0].chapter,
-            parsed.verses,
-          );
+          // opens, so either way the read is of the first target the run found.
+          // A chapter with no file yet has nothing to read: no anchors, and
+          // nothing to show.
+          const head = found[0];
+          const anchors = head.file
+            ? await this.plugin.findAnchors(
+                head.file,
+                head.chapter,
+                parsed.verses,
+              )
+            : parsed.verses.map(() => null);
+          const preview = head.file
+            ? await this.previewOf(head.file, head.chapter, parsed.verses)
+            : '';
 
           if (embed) {
             // An embed writes no label, so the version cannot be named in what
@@ -187,8 +191,8 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
             // no anchor to stop at.
             const links = labels.map((label, i) =>
               parsed.verses.length
-                ? this.link(found[0].file, anchors[i] || null, label, ctx.file)
-                : this.link(found[i].file, null, label, ctx.file),
+                ? this.link(found[0], anchors[i] || null, label, ctx.file)
+                : this.link(found[i], null, label, ctx.file),
             );
             out.push({
               ref: labels.join(','),
@@ -229,23 +233,25 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
   }
 
   /**
-   * The file behind each chapter the reference asked for, in the order it asked
-   * for them. A version that is missing one chapter of a run still has the rest,
-   * and the run is worth offering as the part of it that exists rather than
-   * being dropped whole. Asking for no chapter asks for the book, which is a
-   * file of its own.
+   * Where each chapter the reference asked for is linked, in the order it asked
+   * for them. The run stays the length that was typed: a chapter the version
+   * has not written is still a chapter that was asked for, and it links to the
+   * name it would be written under rather than dropping out of the run with
+   * nothing in the finished links to show it was ever there.
+   *
+   * Asking for no chapter asks for the book, which is a file of its own and
+   * never written into being by a link, so it is looked up rather than named.
    */
-  chapterFiles(
+  chapterTargets(
     version: string,
     bookIndex: number,
     chapters: number[],
-  ): { chapter: number | null; file: TFile }[] {
-    const out: { chapter: number | null; file: TFile }[] = [];
-    for (const chapter of chapters.length ? chapters : [null]) {
-      const file = this.plugin.referenceFile(version, bookIndex, chapter);
-      if (file) out.push({ chapter, file });
+  ): ChapterTarget[] {
+    if (chapters.length) {
+      return this.plugin.chapterTargets(version, bookIndex, chapters);
     }
-    return out;
+    const file = this.plugin.referenceFile(version, bookIndex, null);
+    return file ? [{ chapter: null, file, path: file.path }] : [];
   }
 
   /**
@@ -267,14 +273,14 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
    * the page to be worth choosing between.
    */
   async embeds(
-    found: { chapter: number | null; file: TFile }[],
+    found: ChapterTarget[],
     parsed: ParsedRef,
     anchors: (string | null)[],
     from: TFile | null,
   ): Promise<Pick<RefSuggestion, 'note' | 'markdown'>[]> {
     // The verses that were asked for by number, all of them in the one chapter.
     if (parsed.verses.length) {
-      return [{ markdown: this.embedLines(found[0].file, anchors, from) }];
+      return [{ markdown: this.embedLines(found[0], anchors, from) }];
     }
     // A book, or a run of chapters: the whole of every file the run named. A run
     // verse by verse would be a page of embeds for each chapter in it, which is
@@ -282,25 +288,29 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
     if (!parsed.chapters.length || found.length > 1) {
       return [
         {
-          markdown: found.map((f) => this.embed(f.file, null, from)).join('\n'),
+          markdown: found.map((f) => this.embed(f, null, from)).join('\n'),
         },
       ];
     }
 
-    const file = found[0].file;
+    const target = found[0];
     const rows = [
-      { note: 'whole file', markdown: this.embed(file, null, from) },
+      { note: 'whole file', markdown: this.embed(target, null, from) },
     ];
     // A chapter asked for bare can also come in a verse at a time, which needs
-    // the verse numbers the chapter actually carries rather than a count.
-    const verses = (await this.plugin.chapterVerses(file)).map((v) => v.verse);
+    // the verse numbers the chapter actually carries rather than a count — so a
+    // chapter with no file yet has the one row, there being nothing to count.
+    if (!target.file) return rows;
+    const verses = (await this.plugin.chapterVerses(target.file)).map(
+      (v) => v.verse,
+    );
     const ids = (
-      await this.plugin.findAnchors(file, found[0].chapter, verses)
+      await this.plugin.findAnchors(target.file, target.chapter, verses)
     ).filter((id): id is string => id !== null);
     if (ids.length)
       rows.push({
         note: 'verse by verse',
-        markdown: this.embedLines(file, ids, from),
+        markdown: this.embedLines(target, ids, from),
       });
     return rows;
   }
@@ -312,7 +322,7 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
    * embed is written once, not once per verse asked for.
    */
   embedLines(
-    file: TFile,
+    target: ChapterTarget,
     anchors: (string | null)[],
     from: TFile | null,
   ): string {
@@ -321,34 +331,43 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
     for (const anchor of anchors.length ? anchors : [null]) {
       if (seen.has(anchor || '')) continue;
       seen.add(anchor || '');
-      out.push(this.embed(file, anchor, from));
+      out.push(this.embed(target, anchor, from));
     }
     return out.join('\n');
   }
 
   /** `![[NVI-43-JHN-001#^nvi-jhn-1-1]]` — an embed, which needs no label. */
-  embed(file: TFile, anchor: string | null, from: TFile | null): string {
-    const path = this.app.metadataCache.fileToLinktext(
-      file,
-      from ? from.path : '',
-      true,
-    );
-    return `![[${path}${anchor ? '#^' + anchor : ''}]]`;
+  embed(
+    target: ChapterTarget,
+    anchor: string | null,
+    from: TFile | null,
+  ): string {
+    return `![[${this.linktext(target, from)}${anchor ? '#^' + anchor : ''}]]`;
   }
 
   /** `[[NVI-43-JHN-001#^nvi-jhn-1-1|João 1.1]]`, with the link the vault expects. */
   link(
-    file: TFile,
+    target: ChapterTarget,
     anchor: string | null,
     label: string,
     from: TFile | null,
   ): string {
-    const path = this.app.metadataCache.fileToLinktext(
-      file,
+    return `[[${this.linktext(target, from)}${anchor ? '#^' + anchor : ''}|${label}]]`;
+  }
+
+  /**
+   * How the target is written inside the brackets. A file the vault knows is
+   * shortened as far as it can be from where the link is written; a chapter
+   * that has no file yet is written by name, which is the whole of what there
+   * is to say about it.
+   */
+  linktext(target: ChapterTarget, from: TFile | null): string {
+    if (!target.file) return target.path;
+    return this.app.metadataCache.fileToLinktext(
+      target.file,
       from ? from.path : '',
       true,
     );
-    return `[[${path}${anchor ? '#^' + anchor : ''}|${label}]]`;
   }
 
   /** First verse of the passage. A book index file holds none, so it shows bare. */

@@ -11,12 +11,14 @@ import type { PaneType } from 'obsidian';
 import { DEFAULT_SETTINGS, VIEW_TYPE } from './types';
 import type {
   ChapterRef,
+  ChapterTarget,
   KingdoneChapelSettings,
   Location,
   Verse,
   VersionItem,
 } from './types';
 import {
+  chapterFileName,
   chapterKey,
   parseBookName,
   parseChapterName,
@@ -653,6 +655,12 @@ export default class KingdoneChapelPlugin extends Plugin {
    * chapters when no chapter was given. A version that keeps no such note
    * (or a single `-000` file for the whole book) still resolves, to the
    * nearest thing it has.
+   *
+   * That last fallback is for reading — a passage to show in the sidebar, a
+   * file to open — where the nearest thing the version has beats nothing at
+   * all. A link being written wants `chapterTargets` instead, which does not
+   * take it: a link is read later, by someone who was not there to see it
+   * settle for the book.
    */
   referenceFile(
     version: string,
@@ -790,6 +798,49 @@ export default class KingdoneChapelPlugin extends Plugin {
       from ? from.path : '',
       newLeaf,
     );
+  }
+
+  /**
+   * Where a link to each of `chapters` points. A chapter the version wrote is
+   * its file; one it never wrote is only the name that file would carry, and
+   * the link lands unresolved, which is what the version honestly holds. The
+   * whole-book fallback `referenceFile` keeps is no good here: a link to the
+   * book under a chapter's label says the version has a chapter it does not,
+   * and a run of them says it several times over, to the one file.
+   *
+   * The name is the version's to decide, and only a file it already wrote can
+   * say how it decides — so any chapter of the same book stands as the example
+   * to copy, the lone `-000` of a commentary included. A book the version does
+   * not carry has no example, and no answer.
+   */
+  chapterTargets(
+    version: string,
+    bookIndex: number,
+    chapters: number[],
+  ): ChapterTarget[] {
+    const known = this.index().get(version);
+    if (!known) return [];
+
+    let example: string | null = null;
+    for (const [key, file] of known) {
+      if (key.startsWith(`${bookIndex}:`)) {
+        example = file.basename;
+        break;
+      }
+    }
+    if (!example) return [];
+
+    const out: ChapterTarget[] = [];
+    for (const chapter of chapters) {
+      const file = known.get(chapterKey(bookIndex, chapter)) || null;
+      if (file) {
+        out.push({ chapter, file, path: file.path });
+        continue;
+      }
+      const name = chapterFileName(example, chapter);
+      if (name) out.push({ chapter, file: null, path: name });
+    }
+    return out;
   }
 
   /** Block ids of a file (from metadata cache, falling back to reading it). */

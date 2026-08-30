@@ -50,6 +50,23 @@ function splitBook(rest: string): Omit<ChapterName, 'version'> | null {
   };
 }
 
+/**
+ * The name a chapter of the same book would be filed under, read off one the
+ * version already wrote. It is the inverse of `parseChapterName`, and it works
+ * from an example rather than from the parts because the parts do not carry how
+ * the version writes them — whether it cases its prefix `NVI` or `nvi`, how
+ * wide it pads its numbers. Only the chapter changes; everything before it is
+ * copied across untouched, and the new number is padded to the width the
+ * example used.
+ */
+export function chapterFileName(
+  example: string,
+  chapter: number,
+): string | null {
+  const m = example.match(/^(.*-)(\d+)$/);
+  return m ? m[1] + String(chapter).padStart(m[2].length, '0') : null;
+}
+
 /** Key a chapter is indexed and looked up by, across versions. */
 export function chapterKey(bookIndex: number, chapter: number): string {
   return `${bookIndex}:${chapter}`;
