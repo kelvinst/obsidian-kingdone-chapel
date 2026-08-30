@@ -165,7 +165,6 @@ like two files claiming one chapter.
 | Bible folder | `Bibles` | Folder holding the version folders |
 | Default version for @ references | Automatic | Version `@` references link to |
 | Open in new tab | off | Off replaces the current tab |
-| Hidden versions | — | Comma-separated version folders to ignore |
 | Chapter breadcrumbs | on | The `Version > Book > Chapter` bar above each chapter |
 | Group books by category | off | Sub-headings inside the testaments in the book list |
 | Follow cursor | on | Off updates the sidebar only when you switch notes |

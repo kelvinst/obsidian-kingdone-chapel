@@ -298,7 +298,6 @@ export default class KingdoneChapelPlugin extends Plugin {
       .filter((c): c is TFolder => c instanceof TFolder)
       .map((c) => c.name)
       .filter((name) => index.has(name))
-      .filter((name) => !this.settings.hiddenVersions.includes(name))
       .sort();
   }
 

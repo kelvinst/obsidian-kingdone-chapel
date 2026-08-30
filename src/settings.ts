@@ -59,19 +59,6 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('Hidden versions')
-      .setDesc('Comma separated. E.g.: Shedd, Kelvin')
-      .addText((text) =>
-        text.setValue(this.plugin.settings.hiddenVersions.join(', ')).onChange(async (value) => {
-          this.plugin.settings.hiddenVersions = value
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean);
-          await this.plugin.saveSettings();
-        })
-      );
-
-    new Setting(containerEl)
       .setName('Chapter breadcrumbs')
       .setDesc(
         'A `Version > Book > Chapter` bar above every chapter you open. Each part ' +
