@@ -26,6 +26,34 @@ in your vault, keeping chapter *and* verse alignment.
   finds it and labels the card `v.1`.
 - Alt-click a card to copy that version's verse text.
 
+### Chapter breadcrumbs
+
+Every chapter you open gets a bar above it naming the passage, and each part of it is a way
+out of the chapter:
+
+```
+ARA  ›  João  ›  ‹ 3 ›
+```
+
+- **Version** lists every version in the vault and opens the same chapter — and the same
+  verse, wherever you are in the chapter — in the one you pick. Versions missing that
+  chapter are greyed out, and picking one says what it is missing.
+- **Book** lists every book that version has under **Antigo Testamento** and **Novo
+  Testamento** — in the language you chose — and opens the first chapter of the one you pick.
+  Turn on **Group books by category** to break the testaments down the way a Bible's contents
+  page does: Lei, Históricos, Sabedoria, Profetas, Evangelhos, Cartas Paulinas and Gerais.
+- **Chapter** lists the book's chapters in a grid, five to a row, so a whole book fits in a
+  glance rather than a scroll.
+- **The arrows** walk the version chapter by chapter, on into the next book when a book runs
+  out — the arrow after Genesis 50 is Exodus 1. They stop at either end of the version.
+
+A list longer than a handful opens with a search field: type to narrow it (`joao` finds João,
+`sam` finds 1 Samuel), walk what is left with the arrow keys, and press Enter to open it.
+Headings go with the books under them, so a search that leaves one empty takes it down too.
+
+Any of them opens in the pane you clicked from; hold Ctrl/Cmd to open in a new tab instead.
+Turn the bar off under **Chapter breadcrumbs**.
+
 ### `@` references
 
 Type `@` and a reference anywhere in a note to link to it. The suggestion list shows the
@@ -40,6 +68,19 @@ so what you pick is what the note ends up saying.
 | `@Joao 1.1` | `[[NVI-43-JHN-001#^nvi-jhn-1-1\|João 1.1]]` |
 | `@Joao 1.1,2` | `[[NVI-43-JHN-001#^nvi-jhn-1-1\|João 1.1]],[[NVI-43-JHN-001#^nvi-jhn-1-2\|2]]` — one link per verse |
 | `@Joao 1.1-3` | the same as `1.1,2,3` |
+
+Put a `!` in front — `!@Joao 1.1` — and the same reference comes back as embeds, showing the
+text in the note instead of pointing at it. An embed carries no label, so a book's
+abbreviation and its full name write the same thing and the popup offers each book once,
+under its name. `!@` reads as one thing wherever it appears, so `Que texto!@Joao 1.1` embeds
+too — put a space between the two to link after an exclamation mark instead.
+
+| You type | You get |
+|---|---|
+| `!@Joao` | `![[NVI-43-Joao]]` |
+| `!@Joao 1.1` | `![[NVI-43-JHN-001#^nvi-jhn-1-1]]` |
+| `!@Joao 1.1-3` | one embed per verse, a line each |
+| `!@Joao 1` | your pick of *whole file* (`![[NVI-43-JHN-001]]`) or *verse by verse* — one embed per verse of the chapter |
 
 Books are matched in Portuguese and English, by full name, by the two-letter Portuguese
 abbreviations (`Gn`, `Jz`, `Sl`, `Tg`, `Ap`), by the usual English ones (`Ps`, `Rev`,
@@ -124,7 +165,8 @@ like two files claiming one chapter.
 | Bible folder | `Bibles` | Folder holding the version folders |
 | Default version for @ references | Automatic | Version `@` references link to |
 | Open in new tab | off | Off replaces the current tab |
-| Hidden versions | — | Comma-separated version folders to ignore |
+| Chapter breadcrumbs | on | The `Version > Book > Chapter` bar above each chapter |
+| Group books by category | off | Sub-headings inside the testaments in the book list |
 | Follow cursor | on | Off updates the sidebar only when you switch notes |
 | Show the version you are reading | off | Include the current version in the list |
 | Open sidebar on startup | off | |

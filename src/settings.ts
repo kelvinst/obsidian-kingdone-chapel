@@ -59,14 +59,30 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('Hidden versions')
-      .setDesc('Comma separated. E.g.: Shedd, Kelvin')
-      .addText((text) =>
-        text.setValue(this.plugin.settings.hiddenVersions.join(', ')).onChange(async (value) => {
-          this.plugin.settings.hiddenVersions = value
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean);
+      .setName('Chapter breadcrumbs')
+      .setDesc(
+        'A `Version > Book > Chapter` bar above every chapter you open. Each part ' +
+          'opens a list to move by — searchable once it is longer than a handful — ' +
+          'and the arrows walk the version chapter by chapter, on into the next book. ' +
+          'Ctrl/Cmd-click any of them to open in a new tab.'
+      )
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.showBreadcrumbs).onChange(async (value) => {
+          this.plugin.settings.showBreadcrumbs = value;
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName('Group books by category')
+      .setDesc(
+        'Break the testaments down in the book list the way a Bible\'s contents page ' +
+          'does — Lei, Históricos, Sabedoria, Profetas, Evangelhos, Cartas — in ' +
+          'the language chosen above. Off: only the two testaments.'
+      )
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.bookCategories).onChange(async (value) => {
+          this.plugin.settings.bookCategories = value;
           await this.plugin.saveSettings();
         })
       );

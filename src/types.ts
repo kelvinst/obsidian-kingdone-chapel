@@ -14,11 +14,14 @@ export interface KingdoneChapelSettings {
    */
   language: Lang | '';
   openInNewTab: boolean;
-  hiddenVersions: string[];
   labels: Record<string, string>;
   showCurrentVersion: boolean;
   followCursor: boolean;
   openSidebarOnStart: boolean;
+  /** Whether a chapter pane gets the `Version > Book > Chapter` bar. */
+  showBreadcrumbs: boolean;
+  /** Whether the book dropdown breaks the testaments down into their divisions. */
+  bookCategories: boolean;
 }
 
 export const DEFAULT_SETTINGS: KingdoneChapelSettings = {
@@ -26,11 +29,12 @@ export const DEFAULT_SETTINGS: KingdoneChapelSettings = {
   defaultVersion: '',
   language: '',
   openInNewTab: false,
-  hiddenVersions: [],
   labels: {},
   showCurrentVersion: false,
   followCursor: true,
   openSidebarOnStart: false,
+  showBreadcrumbs: true,
+  bookCategories: false,
 };
 
 /** Where the reader is: a chapter file, plus the verse under the cursor. */
@@ -43,6 +47,14 @@ export interface Location {
   chapter: number;
   verse: number | null;
   file: TFile;
+}
+
+/** One chapter a version holds, as the breadcrumbs walk them. */
+export interface ChapterRef {
+  bookIndex: number;
+  chapter: number;
+  /** Book code from the file name, which is what names the book. */
+  code: string;
 }
 
 export interface Verse {
