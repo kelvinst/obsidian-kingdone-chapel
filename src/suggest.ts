@@ -9,7 +9,7 @@ import type {
 } from 'obsidian';
 
 import { abbrLabel, langsFor, matchBooks, plain } from './books';
-import { parseReference, verseLabels } from './reference';
+import { parseReference, referenceLabels } from './reference';
 import type { BookMatch } from './books';
 import type { ParsedRef } from './reference';
 import type KingdoneChapelPlugin from './main';
@@ -125,25 +125,30 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
       for (const match of matchBooks(parsed.book, books, langs)) {
         if (out.length >= MAX_ROWS) return out.slice(0, MAX_ROWS);
 
-        const file = this.plugin.referenceFile(
+        const found = this.chapterFiles(
           version,
           match.book.index,
-          parsed.chapter,
+          parsed.chapters,
         );
-        if (!file) continue;
+        if (!found.length) continue;
 
         const name = match.book.names[match.lang];
+        const chapters = found
+          .map((f) => f.chapter)
+          .filter((c): c is number => c !== null);
         try {
           // The anchors and the opening verse are the passage, not the wording,
-          // so both forms of the same book share the one read.
+          // so both forms of the same book share the one read. Verses all sit
+          // in the one chapter, and a run of chapters is previewed by where it
+          // opens, so either way the read is of the first file the run found.
           const anchors = await this.plugin.findAnchors(
-            file,
-            parsed.chapter,
+            found[0].file,
+            found[0].chapter,
             parsed.verses,
           );
           const preview = await this.previewOf(
-            file,
-            parsed.chapter,
+            found[0].file,
+            found[0].chapter,
             parsed.verses,
           );
 
@@ -151,15 +156,15 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
             // An embed writes no label, so the version cannot be named in what
             // it writes; the row names it, which is what the choice is between
             // when a half-written version matched more than one.
-            const labels = verseLabels(
+            const labels = referenceLabels(
               name,
-              parsed.chapter,
+              chapters,
               parsed.verses,
               named ? version : null,
             );
             const base = { ref: labels.join(','), book: name, preview };
             for (const row of await this.embeds(
-              file,
+              found,
               parsed,
               anchors,
               ctx.file,
@@ -170,14 +175,20 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
           }
 
           for (const form of this.forms(match, name)) {
-            const labels = verseLabels(
+            const labels = referenceLabels(
               form,
-              parsed.chapter,
+              chapters,
               parsed.verses,
               named ? version : null,
             );
+            // A run of verses is the one file over and over, each link stopping
+            // at a different anchor in it. A run of chapters is a file each, and
+            // a chapter link points at the file rather than into it, so it has
+            // no anchor to stop at.
             const links = labels.map((label, i) =>
-              this.link(file, anchors[i] || null, label, ctx.file),
+              parsed.verses.length
+                ? this.link(found[0].file, anchors[i] || null, label, ctx.file)
+                : this.link(found[i].file, null, label, ctx.file),
             );
             out.push({
               ref: labels.join(','),
@@ -218,6 +229,26 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
   }
 
   /**
+   * The file behind each chapter the reference asked for, in the order it asked
+   * for them. A version that is missing one chapter of a run still has the rest,
+   * and the run is worth offering as the part of it that exists rather than
+   * being dropped whole. Asking for no chapter asks for the book, which is a
+   * file of its own.
+   */
+  chapterFiles(
+    version: string,
+    bookIndex: number,
+    chapters: number[],
+  ): { chapter: number | null; file: TFile }[] {
+    const out: { chapter: number | null; file: TFile }[] = [];
+    for (const chapter of chapters.length ? chapters : [null]) {
+      const file = this.plugin.referenceFile(version, bookIndex, chapter);
+      if (file) out.push({ chapter, file });
+    }
+    return out;
+  }
+
+  /**
    * The names to offer one book under. Someone who wrote `@Jn 1.1` wants the
    * note to go on saying `Jn 1.1`, so the abbreviation they typed comes first;
    * the full name follows for when they meant it spelled out. Writing the name
@@ -236,16 +267,27 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
    * the page to be worth choosing between.
    */
   async embeds(
-    file: TFile,
+    found: { chapter: number | null; file: TFile }[],
     parsed: ParsedRef,
     anchors: (string | null)[],
     from: TFile | null,
   ): Promise<Pick<RefSuggestion, 'note' | 'markdown'>[]> {
-    // A book, or the verses that were asked for by number.
-    if (parsed.chapter === null || parsed.verses.length) {
-      return [{ markdown: this.embedLines(file, anchors, from) }];
+    // The verses that were asked for by number, all of them in the one chapter.
+    if (parsed.verses.length) {
+      return [{ markdown: this.embedLines(found[0].file, anchors, from) }];
+    }
+    // A book, or a run of chapters: the whole of every file the run named. A run
+    // verse by verse would be a page of embeds for each chapter in it, which is
+    // not something anyone reaches for by typing a dash.
+    if (!parsed.chapters.length || found.length > 1) {
+      return [
+        {
+          markdown: found.map((f) => this.embed(f.file, null, from)).join('\n'),
+        },
+      ];
     }
 
+    const file = found[0].file;
     const rows = [
       { note: 'whole file', markdown: this.embed(file, null, from) },
     ];
@@ -253,7 +295,7 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
     // the verse numbers the chapter actually carries rather than a count.
     const verses = (await this.plugin.chapterVerses(file)).map((v) => v.verse);
     const ids = (
-      await this.plugin.findAnchors(file, parsed.chapter, verses)
+      await this.plugin.findAnchors(file, found[0].chapter, verses)
     ).filter((id): id is string => id !== null);
     if (ids.length)
       rows.push({

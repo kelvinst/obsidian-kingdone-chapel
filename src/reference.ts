@@ -3,6 +3,8 @@
  *
  *   @Joao            the whole book
  *   @Joao 1          one chapter
+ *   @Joao 1,3        two chapters
+ *   @Joao 1-3        the same as 1,2,3
  *   @Joao 1.1        one verse
  *   @Joao 1.1,2      two verses
  *   @Joao 1.1-3      the same as 1,2,3
@@ -12,20 +14,30 @@
  *                    which may sit anywhere in the reference
  *
  * The text is still being typed, so half-written references (`@Joao 1.`,
- * `@Joao 1.1-`) have to parse into the most complete thing they can be. A bare
+ * `@Joao 1-`, `@Joao 1.1-`) have to parse into the most complete thing they
+ * can be. A bare
  * version name only reads as one once it is written in full — `@Joao 1 n` is
  * still a book name as far as this knows — which is what the dash is for: it
  * says a version is being written before there is enough of it to recognise,
  * and what follows it is read as far as it goes.
  *
- * The dash writes a run of verses too, so the spaces around it are what tell
- * the two apart: a run is written closed up, `1.1-3`, and a dash with a space
- * on either side of it is not one. `@Joao 1.1 - 3` is therefore verse 1 in a
- * version called `3`, and not verses 1 to 3.
+ * The dash writes a run of chapters and a run of verses too, so the spaces
+ * around it are what tell those from a version: a run is written closed up,
+ * `1-3` and `1.1-3`, and a dash with a space on either side of it is not one.
+ * `@Joao 1.1 - 3` is therefore verse 1 in a version called `3`, and not verses
+ * 1 to 3; `@Joao 1 - 3` is chapter 1 in that same version, and not chapters 1
+ * to 3.
  */
 
 /** Verses one reference may expand to, so a typo cannot paste a whole chapter. */
 const MAX_VERSES = 50;
+
+/**
+ * And chapters, so one cannot paste a whole book. The cap sits far below the
+ * 150 of the longest book on purpose: a run that long is asking for the book,
+ * and `@Joao` already says that in fewer keystrokes than it took to mistype.
+ */
+const MAX_CHAPTERS = 25;
 
 export interface ParsedRef {
   /** Version named in the query, as typed, or null to use the default. */
@@ -39,7 +51,9 @@ export interface ParsedRef {
   versionPrefix: boolean;
   /** The book part, still as typed — resolving it needs the book table. */
   book: string;
-  chapter: number | null;
+  /** Chapters asked for, in the order written, without duplicates. None of
+   *  them is the whole book. */
+  chapters: number[];
   /** Verses asked for, in the order written, without duplicates. */
   verses: number[];
 }
@@ -87,11 +101,23 @@ export function parseReference(
   }
 
   // The chapter is the last bare number, so `1 Joao 1.1` splits after `Joao`.
-  const m = text.match(/^\s*(.*?)\s+(\d+)\s*(?:[.:]\s*([\d,\s-]*))?\s*$/);
+  // A run of them is still that one number, with commas and dashes hanging off
+  // it and written closed up the way a run of verses is — which is what leaves
+  // a dash with room around it free to go on marking a version, and what keeps
+  // `Joao 1 2` the book `Joao 1`, chapter 2.
+  const m = text.match(
+    /^\s*(.*?)\s+(\d+(?:[,-]\d*)*)\s*(?:[.:]\s*([\d,\s-]*))?\s*$/,
+  );
   let book = (m ? m[1] : text).trim();
-  const chapter = m ? parseInt(m[2], 10) : null;
-  const verses = m && m[3] !== undefined ? expandVerses(m[3]) : [];
-  if (verses === null) return null; // more verses than a reference may carry
+  const chapters = m ? expandRun(m[2], MAX_CHAPTERS) : [];
+  const verses = m && m[3] !== undefined ? expandRun(m[3], MAX_VERSES) : [];
+  // longer than a reference may carry
+  if (chapters === null || verses === null) return null;
+  // A verse belongs to one chapter, and `Joao 1-3.2` hands it three. Reading
+  // it as the three whole chapters would quietly drop the verse that was
+  // typed, and picking a chapter for it would be a guess, so read nothing —
+  // the run alone was there a keystroke ago and is there again on backspace.
+  if (chapters.length > 1 && verses.length) return null;
 
   // Or before it (`NVI Joao 1`), which is the only way to tell a version from
   // the first word of a two-word book name.
@@ -102,7 +128,7 @@ export function parseReference(
     book = named[2];
   }
 
-  return book ? { version, versionPrefix, book, chapter, verses } : null;
+  return book ? { version, versionPrefix, book, chapters, verses } : null;
 }
 
 /**
@@ -110,14 +136,15 @@ export function parseReference(
  * it has been read as a version by now and never reaches here; one with a
  * space after it is not a run either, so that the two are told apart by the
  * same rule read from either side. An unfinished range (`3-`) is just its
- * start, and so is one written backwards (`5-1`) — a reference reaching for no
- * verse at all would be read below as a reference to the whole chapter.
+ * start, and so is one written backwards (`5-1`) — a run reaching for nothing
+ * at all is read as the wider thing it sits in: no verse is the whole chapter,
+ * and no chapter the whole book.
  *
- * A reference asking for more than `MAX_VERSES` comes back as null rather than
- * as its first fifty: a passage quietly cut short says something other than
- * what was typed, and there is nothing in the finished links to show it was.
+ * A reference asking for more than `max` comes back as null rather than as its
+ * first `max`: a passage quietly cut short says something other than what was
+ * typed, and there is nothing in the finished links to show it was.
  */
-function expandVerses(spec: string): number[] | null {
+function expandRun(spec: string, max: number): number[] | null {
   const out: number[] = [];
   const seen = new Set<number>();
   /** False once the reference has outgrown the cap. */
@@ -125,7 +152,7 @@ function expandVerses(spec: string): number[] | null {
     if (v <= 0 || seen.has(v)) return true;
     seen.add(v);
     out.push(v);
-    return out.length <= MAX_VERSES;
+    return out.length <= max;
   };
 
   for (const part of spec.split(',')) {
@@ -143,28 +170,30 @@ function expandVerses(spec: string): number[] | null {
 }
 
 /**
- * How a reference reads in a note. The first link carries the whole reference
- * and the rest only their verse number, joined the way they were typed and the
- * way they are written by hand: `João 1.1,2,3`.
+ * How a reference reads in a note, one label per link. The first carries the
+ * whole reference and the rest only their own number, joined the way they were
+ * typed and the way they are written by hand: `João 1.1,2,3` for a run of
+ * verses, `João 1,2,3` for a run of chapters.
  *
- * A `version` is named at the very end, after the last verse, which is where
+ * A `version` is named at the very end, after the last of them, which is where
  * it is said and where it reads as belonging to the whole reference rather
- * than to the verse it happens to sit against: `João 1.1,2,3 - NVI`.
+ * than to the one it happens to sit against: `João 1.1,2,3 - NVI`.
  */
-export function verseLabels(
+export function referenceLabels(
   book: string,
-  chapter: number | null,
+  chapters: number[],
   verses: number[],
   version: string | null = null,
 ): string[] {
-  const labels =
-    chapter === null
-      ? [book]
-      : !verses.length
-        ? [`${book} ${chapter}`]
-        : verses.map((v, i) =>
-            i === 0 ? `${book} ${chapter}.${v}` : String(v),
-          );
+  const labels = !chapters.length
+    ? [book]
+    : !verses.length
+      ? chapters.map((c, i) => (i === 0 ? `${book} ${c}` : String(c)))
+      : // Verses never span chapters, so there is one chapter number to say
+        // and it rides along with the book on the first of them.
+        verses.map((v, i) =>
+          i === 0 ? `${book} ${chapters[0]}.${v}` : String(v),
+        );
 
   if (version) labels[labels.length - 1] += ` - ${version}`;
   return labels;
