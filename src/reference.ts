@@ -11,6 +11,9 @@
  *   @Joao 1.1 -ara   the same, written the way the finished link reads it,
  *                    which may sit anywhere in the reference
  *   @1               numbers alone, read against the passage the note is about
+ *   @1.1             a chapter and verse of the book that passage is in
+ *   @ARA 1           the same passage in a named version, as do `@1 ARA`,
+ *                    `@1 -ara`, and `@ARA` on its own
  *
  * The text is still being typed, so half-written references (`@Joao 1.`,
  * `@Joao 1.1-`) have to parse into the most complete thing they can be. A bare
@@ -46,16 +49,14 @@ export interface ParsedRef {
 }
 
 /**
- * Split `query` (everything after the `@`) into its parts. `isVersion` says
- * whether an outer word names a version, which is the only way to tell
- * `@ARA Joao` from a two-word book name, or `@Joao ARA` from one whose name
- * carries on. A marked version says so itself, and is not asked.
+ * Take the version out of `query`, wherever it was written, and hand back what
+ * is left to be read as the reference. Shared by both parses, since a version
+ * is written the same way whether or not a book was written with it.
  */
-export function parseReference(query: string, isVersion: (word: string) => boolean): ParsedRef | null {
-  let text = query;
-  let version: string | null = null;
-  let versionPrefix = false;
-
+function takeVersion(
+  query: string,
+  isVersion: (word: string) => boolean
+): { version: string | null; versionPrefix: boolean; text: string } {
   // A marked version is taken out wherever it sits, before anything else reads
   // the query, so the rest is a plain reference again. Nothing marks its end,
   // so it is read as a beginning: as much of a version name as is there yet.
@@ -64,22 +65,34 @@ export function parseReference(query: string, isVersion: (word: string) => boole
   // separates the two: a run is written closed up (`1.1-3`), so a dash with a
   // space before it is a version every time — including the dash that has no
   // name after it yet, which is the beginning of every version there is.
-  const marked = text.match(/(?:^|\s)-\s?([\p{L}\p{N}]*)(?=\s|$)/u);
+  const marked = query.match(/(?:^|\s)-\s?([\p{L}\p{N}]*)(?=\s|$)/u);
   if (marked) {
     const at = marked.index ?? 0;
-    version = marked[1];
-    versionPrefix = true;
-    text = text.slice(0, at) + ' ' + text.slice(at + marked[0].length);
+    const text = query.slice(0, at) + ' ' + query.slice(at + marked[0].length);
+    return { version: marked[1], versionPrefix: true, text };
   }
 
   // An unmarked version may come after the reference, the way it is said out
   // loud (`Joao 1 NVI`). It comes off first, so the chapter is still the last
   // number of what is left.
-  const trailing = marked ? null : text.match(/^\s*(.*\S)\s+(\S+)\s*$/);
+  const trailing = query.match(/^\s*(.*\S)\s+(\S+)\s*$/);
   if (trailing && isVersion(trailing[2])) {
-    version = trailing[2];
-    text = trailing[1];
+    return { version: trailing[2], versionPrefix: false, text: trailing[1] };
   }
+
+  return { version: null, versionPrefix: false, text: query };
+}
+
+/**
+ * Split `query` (everything after the `@`) into its parts. `isVersion` says
+ * whether an outer word names a version, which is the only way to tell
+ * `@ARA Joao` from a two-word book name, or `@Joao ARA` from one whose name
+ * carries on. A marked version says so itself, and is not asked.
+ */
+export function parseReference(query: string, isVersion: (word: string) => boolean): ParsedRef | null {
+  const taken = takeVersion(query, isVersion);
+  const { versionPrefix, text } = taken;
+  let version = taken.version;
 
   // The chapter is the last bare number, so `1 Joao 1.1` splits after `Joao`.
   const m = text.match(/^\s*(.*?)\s+(\d+)\s*(?:[.:]\s*([\d,\s-]*))?\s*$/);
@@ -90,7 +103,7 @@ export function parseReference(query: string, isVersion: (word: string) => boole
 
   // Or before it (`NVI Joao 1`), which is the only way to tell a version from
   // the first word of a two-word book name.
-  const named = marked || version !== null ? null : book.match(/^(\S+)\s+(.+)$/);
+  const named = version !== null ? null : book.match(/^(\S+)\s+(.+)$/);
   if (named && isVersion(named[1])) {
     version = named[1];
     book = named[2];
@@ -141,13 +154,64 @@ function expandVerses(spec: string): number[] | null {
  * already says which passage it is about. There is no book in it to read, only
  * the numbers, which the caller reads against that passage.
  *
- * Anything carrying a letter is not one of these and comes back null, to be
- * read by `parseReference` the way it always was. A spec asking for more than a
- * reference may carry comes back null as well, for the reason given above.
+ * Anything carrying a letter is not one of these and comes back null, leaving
+ * the query to be read as a book. A spec asking for more than a reference may
+ * carry comes back null as well, for the reason given above.
  */
-export function parseNumbers(query: string): number[] | null {
+function parseNumbers(query: string): number[] | null {
   if (!/^[\d\s,-]+$/.test(query)) return null;
   return expandVerses(query);
+}
+
+/** A reference written with no book in it, for the note's own passage to fill. */
+export interface ParsedBookless {
+  /** Version named in the query, as typed, or null to keep the note's own. */
+  version: string | null;
+  /** Whether `version` is only as much of a name as has been typed, as above. */
+  versionPrefix: boolean;
+  /** Chapter written in front of the numbers (`1.1`), or null when none was. */
+  chapter: number | null;
+  /** Verses of that chapter; with no chapter, verses or chapters alike. */
+  numbers: number[];
+}
+
+/**
+ * Read `query` as a reference the note's own passage completes: `1`, `1.1`,
+ * `ARA 1`, `1 ARA`, `1 -ara`, or a version on its own. Everything a reference
+ * needs and does not say here is taken from that passage by the caller.
+ *
+ * Anything else — a book, named or half-typed — comes back null and is read in
+ * full by `parseReference` instead, as does a spec asking for more verses than
+ * a reference may carry.
+ */
+export function parseBookless(
+  query: string,
+  isVersion: (word: string) => boolean
+): ParsedBookless | null {
+  const taken = takeVersion(query, isVersion);
+  let rest = taken.text.trim();
+  let version = taken.version;
+
+  // A version leads a reference too (`ARA Joao 1`), and with no book behind it
+  // to be the rest of a name, a lone word that names a version is only ever
+  // that: `@ARA` asks for the note's own passage in ARA.
+  const lead = version === null ? rest.match(/^(\S+)(?:\s+([\s\S]*))?$/) : null;
+  if (lead && isVersion(lead[1])) {
+    version = lead[1];
+    rest = (lead[2] || '').trim();
+  }
+
+  // A chapter written in front of the numbers says they are its verses; with
+  // none there they are verses or chapters both, and stay numbers for the
+  // caller to read either way.
+  const spec = rest.match(/^(\d+)\s*[.:]\s*([\d,\s-]*)$/);
+  const chapter = spec ? parseInt(spec[1], 10) : null;
+  const numbers = spec ? expandVerses(spec[2]) : rest ? parseNumbers(rest) : [];
+  if (numbers === null) return null;
+
+  // Nothing was written that the note's passage does not already say.
+  if (version === null && chapter === null && !numbers.length) return null;
+  return { version, versionPrefix: taken.versionPrefix, chapter, numbers };
 }
 
 /**
@@ -172,6 +236,16 @@ export function verseLabels(
         ? [`${book} ${chapter}`]
         : verses.map((v, i) => (i === 0 ? `${book} ${chapter}.${v}` : String(v)));
 
-  if (version) labels[labels.length - 1] += ` - ${version}`;
+  return nameVersion(labels, version);
+}
+
+/**
+ * Say `version` at the end of a reference already labelled, for the rows that
+ * write their labels themselves. It goes after the last of them, where it
+ * reads as belonging to the whole reference; with no labels to end there is
+ * nowhere to say it, and nothing is said.
+ */
+export function nameVersion(labels: string[], version: string | null): string[] {
+  if (version && labels.length) labels[labels.length - 1] += ` - ${version}`;
   return labels;
 }

@@ -2,9 +2,9 @@ import { EditorSuggest } from 'obsidian';
 import type { Editor, EditorPosition, EditorSuggestContext, EditorSuggestTriggerInfo, Instruction, TFile } from 'obsidian';
 
 import { abbrLabel, langsFor, matchBooks, plain } from './books';
-import { parseNumbers, parseReference, verseLabels } from './reference';
+import { nameVersion, parseBookless, parseReference, verseLabels } from './reference';
 import type { BookMatch } from './books';
-import type { ParsedRef } from './reference';
+import type { ParsedBookless, ParsedRef } from './reference';
 import type { Location } from './types';
 import type KingdoneChapelPlugin from './main';
 
@@ -83,10 +83,10 @@ interface ContextRows {
 const NO_ROWS: ContextRows = { bare: null, full: null };
 
 /**
- * Said when numbers were written on their own in a note holding no passage to
- * read them against. The books still answer below it, but nothing there
- * explains why the number alone found nothing, and a row that only closes
- * reads as a plugin that broke.
+ * Said when a reference was written with no book in it, in a note holding no
+ * passage to read it against. The books still answer below it, but nothing
+ * there explains why the number alone found nothing, and a row that only
+ * closes reads as a plugin that broke.
  */
 const NO_CONTEXT: HintSuggestion = {
   hint: 'No link in this note to read a book from — write one',
@@ -120,20 +120,20 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
   }
 
   /**
-   * Numbers on their own are read against the passage the note is about, and
-   * the books answer under them either way: `@1` is a chapter of the book at
-   * hand as much as it is the start of `1 Samuel`, and one suggestion costs
-   * nothing to show next to the other.
+   * A reference with no book in it (`@1`, `@1.1`, `@ARA 1`) is read against the
+   * passage the note is about, and the books answer under it either way: `@1`
+   * is a chapter of the book at hand as much as it is the start of `1 Samuel`,
+   * and one suggestion costs nothing to show next to the other.
    */
   async getSuggestions(ctx: EditorSuggestContext): Promise<Row[]> {
     const embed = ctx.query.startsWith('!');
     const query = embed ? ctx.query.slice(1) : ctx.query;
 
     const out: Row[] = [];
-    const numbers = parseNumbers(query);
-    if (numbers && numbers.length) {
+    const bookless = parseBookless(query, (word) => this.plugin.findVersion(word) !== null);
+    if (bookless) {
       const here = this.plugin.linkContext(ctx.file);
-      const rows = here ? await this.contextSuggestions(here, numbers, embed, ctx.file) : [NO_CONTEXT];
+      const rows = here ? await this.contextSuggestions(here, bookless, embed, ctx.file) : [NO_CONTEXT];
       out.push(...rows);
     }
     out.push(...(await this.bookSuggestions(query, embed, ctx.file)));
@@ -145,7 +145,7 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
     const parsed = parseReference(query, (word) => this.plugin.findVersion(word) !== null);
     if (!parsed) return [];
 
-    const versions = this.versionsFor(parsed, from);
+    const versions = this.versionsFor(parsed, this.plugin.defaultVersion(from));
     if (!versions.length) return [];
     // A version nobody asked for is the one already in force, and naming it in
     // the label would only be the setting read back. One that was asked for is
@@ -205,22 +205,28 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
    * for every version that begins with it, and the rows finish the word —
    * `@Gn 1 -n` offers Genesis 1 in NTLH and in NVI, and picking one writes the
    * whole reference rather than only the version name. Anything else names at
-   * most one version, or leaves it to the default.
+   * most one version, or falls back to `unasked`: the setting for a reference
+   * written out, the note's own version for one read against its passage.
    */
-  versionsFor(parsed: ParsedRef, from: TFile | null): string[] {
+  versionsFor(parsed: { version: string | null; versionPrefix: boolean }, unasked: string | null): string[] {
     if (parsed.versionPrefix) {
       const wanted = (parsed.version || '').toLowerCase();
       return this.plugin.listVersions().filter((v) => v.toLowerCase().startsWith(wanted));
     }
-    const named = parsed.version ? this.plugin.findVersion(parsed.version) : this.plugin.defaultVersion(from);
+    const named = parsed.version ? this.plugin.findVersion(parsed.version) : unasked;
     return named ? [named] : [];
   }
 
   /**
-   * The two things numbers can mean against the passage a note is about: those
-   * verses of its chapter, or those chapters of its book. Verses come first —
-   * a note about a chapter cites verses of it far more often than it moves on
-   * to another chapter.
+   * The passage a bookless reference points at, with everything it left unsaid
+   * taken from the one the note is about. What it does say wins: a chapter
+   * written in front of the numbers stands in for the note's chapter, and a
+   * version written anywhere in it for the note's version.
+   *
+   * Numbers on their own can mean two things — those verses of its chapter, or
+   * those chapters of its book — so both answer. Verses come first: a note
+   * about a chapter cites verses of it far more often than it moves on to
+   * another chapter.
    *
    * Both come twice over, under the label the reader typed and under the one
    * spelling the reference out, and the typed one leads: someone who wrote
@@ -232,31 +238,60 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
    */
   async contextSuggestions(
     here: Location,
-    numbers: number[],
+    parsed: ParsedBookless,
     embed: boolean,
     from: TFile | null
   ): Promise<RefSuggestion[]> {
-    const [verses, chapters] = await Promise.all([
-      this.verseRows(here, numbers, embed, from).catch(() => NO_ROWS),
-      this.chapterRows(here, numbers, embed, from).catch(() => NO_ROWS),
-    ]);
-    const rows = [verses.bare, chapters.bare, verses.full, chapters.full];
-    return rows.filter((row): row is RefSuggestion => row !== null);
+    const out: RefSuggestion[] = [];
+    // The version the note was already linking is the one nobody asked for, so
+    // it goes unnamed in the label for the same reason the default version does
+    // when a book is written out: it would only be reading the note back to
+    // itself. One that was asked for is named, where it has to be read to be of
+    // any use — and a half-written one asks for every version it begins.
+    const named = parsed.versionPrefix || parsed.version !== null;
+
+    for (const version of this.versionsFor(parsed, here.version)) {
+      if (out.length >= MAX_ROWS) break;
+
+      const at: Location = {
+        ...here,
+        version,
+        chapter: parsed.chapter === null ? here.chapter : parsed.chapter,
+      };
+      const label = named ? version : null;
+
+      const verses = await this.verseRows(at, parsed, label, embed, from).catch(() => NO_ROWS);
+      // Only bare numbers are open to being chapters as well: a chapter written
+      // in front of them has already said they are verses, and a reference with
+      // no numbers at all (`@ARA`) is the note's own chapter, which the verse
+      // rows already offer.
+      const chapters =
+        parsed.chapter === null && parsed.numbers.length
+          ? await this.chapterRows(at, parsed.numbers, label, embed, from).catch(() => NO_ROWS)
+          : NO_ROWS;
+
+      const rows = [verses.bare, chapters.bare, verses.full, chapters.full];
+      out.push(...rows.filter((row): row is RefSuggestion => row !== null));
+    }
+    return out.slice(0, MAX_ROWS);
   }
 
   /**
-   * `João 1.1,2,3`, and the same links under the numbers alone.
+   * `João 1.1,2,3`, and the same links under the numbers as they were typed —
+   * with a chapter written in front of them, the way it was written (`1.1,2`).
    *
-   * The version is the one the note was already linking, which nobody asked
-   * for here, so it goes unnamed in the label for the same reason the default
-   * version does: it would only be reading the note back to itself.
+   * With no numbers to place there the passage is the chapter whole (`João 1`),
+   * which is what a reference naming only a version asks for. There is nothing
+   * the reader typed to label that one with, so it comes spelled out alone.
    */
   async verseRows(
     here: Location,
-    verses: number[],
+    parsed: ParsedBookless,
+    name: string | null,
     embed: boolean,
     from: TFile | null
   ): Promise<ContextRows> {
+    const verses = parsed.numbers;
     const file = this.plugin.referenceFile(here.version, here.bookIndex, here.chapter);
     if (!file) return NO_ROWS;
 
@@ -273,9 +308,13 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
         : labels.map((label, i) => this.link(file, anchors[i] || null, label, from)).join(','),
     });
 
+    const typed = verses.map((v, i) =>
+      i === 0 && parsed.chapter !== null ? `${parsed.chapter}.${v}` : String(v)
+    );
+
     return {
-      bare: embed ? null : row(verses.map(String)),
-      full: row(verseLabels(here.book, here.chapter, verses)),
+      bare: embed || !verses.length ? null : row(nameVersion(typed, name)),
+      full: row(verseLabels(here.book, here.chapter, verses, name)),
     };
   }
 
@@ -293,6 +332,7 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
   async chapterRows(
     here: Location,
     chapters: number[],
+    name: string | null,
     embed: boolean,
     from: TFile | null
   ): Promise<ContextRows> {
@@ -318,8 +358,8 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
     });
 
     return {
-      bare: embed ? null : row(chapters.map(String), ',', 'chapter'),
-      full: row(chapters.map((chapter) => `${here.book} ${chapter}`), ', '),
+      bare: embed ? null : row(nameVersion(chapters.map(String), name), ',', 'chapter'),
+      full: row(nameVersion(chapters.map((chapter) => `${here.book} ${chapter}`), name), ', '),
     };
   }
 
