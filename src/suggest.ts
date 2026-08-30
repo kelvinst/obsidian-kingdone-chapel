@@ -144,6 +144,20 @@ export interface HintSuggestion {
 type Row = RefSuggestion | HintSuggestion;
 
 /**
+ * One passage read against the note's own, offered under both labels it could
+ * be written with: the numbers as they were typed, and the reference spelled
+ * out. Either may be missing — an embed carries no label to choose, and a
+ * passage the vault has no file for has no row at all.
+ */
+interface ContextRows {
+  bare: RefSuggestion | null;
+  full: RefSuggestion | null;
+}
+
+/** A passage the vault could not answer for. */
+const NO_ROWS: ContextRows = { bare: null, full: null };
+
+/**
  * Said when numbers were written on their own in a note holding no passage to
  * read them against. The books still answer below it, but nothing there
  * explains why the number alone found nothing, and a row that only closes
@@ -571,6 +585,11 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
    * a note about a chapter cites verses of it far more often than it moves on
    * to another chapter.
    *
+   * Both come twice over, under the label the reader typed and under the one
+   * spelling the reference out, and the typed one leads: someone who wrote
+   * `@1` was writing a sentence with a `1` in it, the same way someone who
+   * wrote `@Jn` meant the note to go on saying `Jn`.
+   *
    * Either reading walks files the index named, which may have gone away
    * since; one that fails is left out, the same way a book is above.
    */
@@ -580,34 +599,38 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
     embed: boolean,
     from: TFile | null,
   ): Promise<RefSuggestion[]> {
-    const rows = await Promise.all([
-      this.passageRow(here, [here.chapter], numbers, embed, from).catch(
-        () => null,
+    const [verses, chapters] = await Promise.all([
+      this.passageRows(here, [here.chapter], numbers, embed, from).catch(
+        () => NO_ROWS,
       ),
       // The same numbers as chapters, so long as there are not more of them
       // than a run of chapters may carry.
       fitsChapters(numbers)
-        ? this.passageRow(here, numbers, [], embed, from).catch(() => null)
-        : null,
+        ? this.passageRows(here, numbers, [], embed, from).catch(() => NO_ROWS)
+        : NO_ROWS,
     ]);
+    const rows = [verses.bare, chapters.bare, verses.full, chapters.full];
     return rows.filter((row): row is RefSuggestion => row !== null);
   }
 
   /**
-   * One row for a passage of the book the note is about, in the version it was
-   * already linking — which nobody asked for here, so it goes unnamed in the
-   * label for the same reason the default version does: it would only be
-   * reading the note back to itself.
+   * A passage of the book the note is about, in the version it was already
+   * linking — which nobody asked for here, so it goes unnamed in the label for
+   * the same reason the default version does: it would only be reading the
+   * note back to itself.
+   *
+   * The links are the same either way, so the two labellings share the one
+   * read of the file behind them.
    */
-  async passageRow(
+  async passageRows(
     here: Location,
     chapters: number[],
     verses: number[],
     embed: boolean,
     from: TFile | null,
-  ): Promise<RefSuggestion | null> {
+  ): Promise<ContextRows> {
     const found = this.chapterTargets(here.version, here.bookIndex, chapters);
-    if (!found.length) return null;
+    if (!found.length) return NO_ROWS;
 
     const head = found[0];
     const anchors = head.file
@@ -616,38 +639,49 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
     const preview = head.file
       ? await this.previewOf(head.file, head.chapter, verses)
       : '';
-    const labels = referenceLabels(
-      here.book,
-      found.map((f) => f.chapter).filter((c): c is number => c !== null),
-      verses,
-    );
+    const asked = found
+      .map((f) => f.chapter)
+      .filter((c): c is number => c !== null);
+    const spelled = referenceLabels(here.book, asked, verses);
+    // An embed writes no label at all, so there is nothing to choose between
+    // and the one row stands for both.
+    const written = embed
+      ? (
+          await this.embeds(
+            found,
+            {
+              version: null,
+              versionPrefix: false,
+              book: here.book,
+              chapters,
+              verses,
+            },
+            anchors,
+            from,
+          )
+        )[0].markdown
+      : null;
 
-    return {
+    const row = (labels: string[]): RefSuggestion => ({
       ref: labels.join(','),
       book: here.book,
       preview,
-      markdown: embed
-        ? (
-            await this.embeds(
-              found,
-              {
-                version: null,
-                versionPrefix: false,
-                book: here.book,
-                chapters,
-                verses,
-              },
-              anchors,
-              from,
-            )
-          )[0].markdown
-        : labels
-            .map((label, i) =>
-              verses.length
-                ? this.link(found[0], anchors[i] || null, label, from)
-                : this.link(found[i], null, label, from),
-            )
-            .join(','),
+      markdown:
+        written ??
+        labels
+          .map((label, i) =>
+            verses.length
+              ? this.link(found[0], anchors[i] || null, label, from)
+              : this.link(found[i], null, label, from),
+          )
+          .join(','),
+    });
+
+    return {
+      // The numbers as they were typed, which is how the sentence around them
+      // reads: `as verse 2 says`, not `as João 1.2 says`.
+      bare: embed ? null : row((verses.length ? verses : asked).map(String)),
+      full: row(spelled),
     };
   }
 
