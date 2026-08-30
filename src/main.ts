@@ -59,6 +59,8 @@ export default class KingdoneChapelPlugin extends Plugin {
   chapterOrders: Map<string, ChapterRef[]> = new Map();
   /** The `Version > Book > Chapter` bar of every pane reading a chapter. */
   breadcrumbs: Breadcrumbs;
+  /** A breadcrumb refresh waiting out a run of vault changes, if one is. */
+  queuedRefresh: number | null = null;
   /** "version/book:chapter" -> the files fighting over it. Filled by index(). */
   chapterConflicts: Map<string, TFile[]> = new Map();
   /** The conflicts the user was last warned about, so each is only said once. */
@@ -117,9 +119,10 @@ export default class KingdoneChapelPlugin extends Plugin {
     this.registerEvent(
       this.app.vault.on('rename', () => {
         this.invalidateIndex();
-        this.breadcrumbs.refresh();
+        this.queueBreadcrumbs();
       })
     );
+    this.register(() => this.cancelQueuedRefresh());
 
     // A pane picks up the bar when it opens a chapter, and loses it when it
     // moves on. Reading and editing look the same to it, but switching between
@@ -145,6 +148,29 @@ export default class KingdoneChapelPlugin extends Plugin {
   invalidateIndex() {
     this.bibleIndex = null;
     this.chapterOrders.clear();
+  }
+
+  /**
+   * Redraw the bars once the vault has stopped moving.
+   *
+   * Dropping the index is cheap and redrawing is not: a bar names its
+   * neighbouring chapters, which asks for the index, which walks every file in
+   * the vault. One rename never arrives alone — a folder moved, a sync
+   * reconciling, a version renamed file by file — and rebuilding on each of
+   * them is the whole vault read once per file. Waiting out the run reads it
+   * once for all of them.
+   */
+  queueBreadcrumbs() {
+    this.cancelQueuedRefresh();
+    this.queuedRefresh = window.setTimeout(() => {
+      this.queuedRefresh = null;
+      this.breadcrumbs.refresh();
+    }, 200);
+  }
+
+  cancelQueuedRefresh() {
+    if (this.queuedRefresh !== null) window.clearTimeout(this.queuedRefresh);
+    this.queuedRefresh = null;
   }
 
   /**
