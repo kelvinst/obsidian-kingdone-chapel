@@ -14,7 +14,6 @@ export interface KingdoneChapelSettings {
    */
   language: Lang | '';
   openInNewTab: boolean;
-  hiddenVersions: string[];
   labels: Record<string, string>;
   showCurrentVersion: boolean;
   followCursor: boolean;
@@ -30,7 +29,6 @@ export const DEFAULT_SETTINGS: KingdoneChapelSettings = {
   defaultVersion: '',
   language: '',
   openInNewTab: false,
-  hiddenVersions: [],
   labels: {},
   showCurrentVersion: false,
   followCursor: true,
