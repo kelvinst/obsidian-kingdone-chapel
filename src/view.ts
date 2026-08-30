@@ -35,10 +35,16 @@ export class KingdoneChapelView extends ItemView {
     this.headerEl = this.contentEl.createDiv({ cls: 'kcp-header' });
     this.listEl = this.contentEl.createDiv({ cls: 'kcp-list' });
 
-    this.registerEvent(this.app.workspace.on('active-leaf-change', () => this.refresh()));
-    this.registerEvent(this.app.workspace.on('file-open', () => this.refresh()));
+    this.registerEvent(
+      this.app.workspace.on('active-leaf-change', () => this.refresh()),
+    );
+    this.registerEvent(
+      this.app.workspace.on('file-open', () => this.refresh()),
+    );
     // Switching between editing and reading swaps where the verse comes from.
-    this.registerEvent(this.app.workspace.on('layout-change', () => this.refresh()));
+    this.registerEvent(
+      this.app.workspace.on('layout-change', () => this.refresh()),
+    );
     // Obsidian emits no cursor event, so poll the active editor for verse changes.
     this.registerInterval(window.setInterval(() => this.refresh(), 400));
 
@@ -54,10 +60,12 @@ export class KingdoneChapelView extends ItemView {
   async refresh(force = false) {
     if (this.pinned && !force) return;
 
-    const loc = this.plugin.settings.followCursor || force || !this.loc
-      ? this.plugin.currentLocation()
-      : this.loc;
-    const key = this.locKey(loc) + (this.plugin.settings.followCursor ? '' : ':static');
+    const loc =
+      this.plugin.settings.followCursor || force || !this.loc
+        ? this.plugin.currentLocation()
+        : this.loc;
+    const key =
+      this.locKey(loc) + (this.plugin.settings.followCursor ? '' : ':static');
     if (!force && key === this.key) return;
     this.key = key;
     this.loc = loc;
@@ -66,13 +74,22 @@ export class KingdoneChapelView extends ItemView {
     this.listEl.empty();
 
     if (!loc) {
-      this.listEl.createDiv({ cls: 'kcp-empty', text: 'Open a Bible chapter to compare versions.' });
+      this.listEl.createDiv({
+        cls: 'kcp-empty',
+        text: 'Open a Bible chapter to compare versions.',
+      });
       return;
     }
 
-    const items = await this.plugin.versionsFor(loc, this.plugin.settings.showCurrentVersion);
+    const items = await this.plugin.versionsFor(
+      loc,
+      this.plugin.settings.showCurrentVersion,
+    );
     if (!items.length) {
-      this.listEl.createDiv({ cls: 'kcp-empty', text: 'No other version has this passage.' });
+      this.listEl.createDiv({
+        cls: 'kcp-empty',
+        text: 'No other version has this passage.',
+      });
       return;
     }
     for (const item of items) this.renderCard(item, loc);
@@ -87,7 +104,11 @@ export class KingdoneChapelView extends ItemView {
 
     const pin = this.headerEl.createEl('button', {
       cls: 'kcp-pin clickable-icon' + (this.pinned ? ' is-active' : ''),
-      attr: { 'aria-label': this.pinned ? 'Unpin (follow cursor again)' : 'Pin this verse' },
+      attr: {
+        'aria-label': this.pinned
+          ? 'Unpin (follow cursor again)'
+          : 'Pin this verse',
+      },
     });
     setIcon(pin, this.pinned ? 'pin' : 'pin-off');
     pin.onclick = () => {
@@ -97,7 +118,9 @@ export class KingdoneChapelView extends ItemView {
   }
 
   renderCard(item: VersionItem, loc: Location) {
-    const card = this.listEl.createDiv({ cls: 'kcp-card' + (item.isCurrent ? ' kcp-card-current' : '') });
+    const card = this.listEl.createDiv({
+      cls: 'kcp-card' + (item.isCurrent ? ' kcp-card-current' : ''),
+    });
 
     const head = card.createDiv({ cls: 'kcp-card-head' });
     head.createSpan({ cls: 'kcp-version', text: item.label });
@@ -119,7 +142,11 @@ export class KingdoneChapelView extends ItemView {
         new Notice(`Copied ${item.label}`);
         return;
       }
-      this.plugin.jumpTo(item.version, loc, evt.ctrlKey || evt.metaKey ? 'tab' : false);
+      this.plugin.jumpTo(
+        item.version,
+        loc,
+        evt.ctrlKey || evt.metaKey ? 'tab' : false,
+      );
     };
   }
 

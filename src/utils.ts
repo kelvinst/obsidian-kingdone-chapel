@@ -18,7 +18,10 @@ export interface ChapterName {
  * chapter files always carry their version, so anything else is an ordinary
  * note that happens to live under a version folder, and is not a chapter.
  */
-export function parseChapterName(basename: string, version?: string): ChapterName | null {
+export function parseChapterName(
+  basename: string,
+  version?: string,
+): ChapterName | null {
   if (version) {
     const prefix = version.toLowerCase() + '-';
     if (!basename.toLowerCase().startsWith(prefix)) return null;
@@ -40,7 +43,11 @@ export function parseChapterName(basename: string, version?: string): ChapterNam
 function splitBook(rest: string): Omit<ChapterName, 'version'> | null {
   const m = rest.match(/^(\d+)-(.+)-(\d+)$/);
   if (!m) return null;
-  return { bookIndex: parseInt(m[1], 10), book: m[2], chapter: parseInt(m[3], 10) };
+  return {
+    bookIndex: parseInt(m[1], 10),
+    book: m[2],
+    chapter: parseInt(m[3], 10),
+  };
 }
 
 /** Key a chapter is indexed and looked up by, across versions. */
@@ -54,7 +61,10 @@ export function chapterKey(bookIndex: number, chapter: number): string {
  * code, and carries no chapter, which is what tells it apart from a chapter
  * file; try `parseChapterName` first.
  */
-export function parseBookName(basename: string, version: string): number | null {
+export function parseBookName(
+  basename: string,
+  version: string,
+): number | null {
   const prefix = version.toLowerCase() + '-';
   if (!basename.toLowerCase().startsWith(prefix)) return null;
   const m = basename.slice(prefix.length).match(/^(\d+)-(.+)$/);
@@ -94,7 +104,11 @@ export function parseVerseLine(line: string): VerseLine | null {
   // on the dash itself, names nothing at all — both fall back to what the line
   // writes rather than being read as a number.
   const named = id && VERSE_ID.exec(id[1]);
-  const verse = named ? Number(named[1]) : marker ? Number(marker[1] || marker[2]) : NaN;
+  const verse = named
+    ? Number(named[1])
+    : marker
+      ? Number(marker[1] || marker[2])
+      : NaN;
   if (!Number.isInteger(verse)) return null;
 
   // The id sits at the end of the line, so drop it before the opening marker

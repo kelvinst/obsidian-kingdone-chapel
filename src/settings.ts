@@ -23,7 +23,7 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
           'everywhere a book is named. No preference reads every language at once, ' +
           'which is how `@Jn` offers both Jonas and John — the same abbreviation ' +
           'stands for one book in Portuguese and another in English — and writes ' +
-          'the names in Portuguese. Naming a language leaves the rest out.'
+          'the names in Portuguese. Naming a language leaves the rest out.',
       )
       .addDropdown((drop) => {
         drop.addOption('', 'No preference');
@@ -37,7 +37,9 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Bible folder')
-      .setDesc('Folder holding the version folders (ARA, NVI, ...). Inside each version, folders are ignored — only file names matter.')
+      .setDesc(
+        'Folder holding the version folders (ARA, NVI, ...). Inside each version, folders are ignored — only file names matter.',
+      )
       .addText((text) =>
         text
           .setPlaceholder('Bibles')
@@ -45,17 +47,19 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.bibleFolder = value.replace(/\/+$/, '');
             await this.plugin.saveSettings();
-          })
+          }),
       );
 
     new Setting(containerEl)
       .setName('Open in new tab')
       .setDesc('Off: replace the current tab.')
       .addToggle((t) =>
-        t.setValue(this.plugin.settings.openInNewTab).onChange(async (value) => {
-          this.plugin.settings.openInNewTab = value;
-          await this.plugin.saveSettings();
-        })
+        t
+          .setValue(this.plugin.settings.openInNewTab)
+          .onChange(async (value) => {
+            this.plugin.settings.openInNewTab = value;
+            await this.plugin.saveSettings();
+          }),
       );
 
     new Setting(containerEl)
@@ -64,27 +68,31 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
         'A `Version > Book > Chapter` bar above every chapter you open. Each part ' +
           'opens a list to move by — searchable once it is longer than a handful — ' +
           'and the arrows walk the version chapter by chapter, on into the next book. ' +
-          'Ctrl/Cmd-click any of them to open in a new tab.'
+          'Ctrl/Cmd-click any of them to open in a new tab.',
       )
       .addToggle((t) =>
-        t.setValue(this.plugin.settings.showBreadcrumbs).onChange(async (value) => {
-          this.plugin.settings.showBreadcrumbs = value;
-          await this.plugin.saveSettings();
-        })
+        t
+          .setValue(this.plugin.settings.showBreadcrumbs)
+          .onChange(async (value) => {
+            this.plugin.settings.showBreadcrumbs = value;
+            await this.plugin.saveSettings();
+          }),
       );
 
     new Setting(containerEl)
       .setName('Group books by category')
       .setDesc(
-        'Break the testaments down in the book list the way a Bible\'s contents page ' +
+        "Break the testaments down in the book list the way a Bible's contents page " +
           'does — Lei, Históricos, Sabedoria, Profetas, Evangelhos, Cartas — in ' +
-          'the language chosen above. Off: only the two testaments.'
+          'the language chosen above. Off: only the two testaments.',
       )
       .addToggle((t) =>
-        t.setValue(this.plugin.settings.bookCategories).onChange(async (value) => {
-          this.plugin.settings.bookCategories = value;
-          await this.plugin.saveSettings();
-        })
+        t
+          .setValue(this.plugin.settings.bookCategories)
+          .onChange(async (value) => {
+            this.plugin.settings.bookCategories = value;
+            await this.plugin.saveSettings();
+          }),
       );
 
     containerEl.createEl('h3', { text: 'References' });
@@ -94,17 +102,19 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
       .setDesc(
         'Version `@Joao 1.1` links to. Name one in the reference itself (`@ARA Joao 1.1`) ' +
           'to override it. Automatic uses the version of the note you are writing in, ' +
-          'falling back to the first one in the vault.'
+          'falling back to the first one in the vault.',
       )
       .addDropdown((drop) => {
         drop.addOption('', 'Automatic');
         for (const version of this.plugin.listVersions()) {
           drop.addOption(version, this.plugin.label(version));
         }
-        drop.setValue(this.plugin.settings.defaultVersion).onChange(async (value) => {
-          this.plugin.settings.defaultVersion = value;
-          await this.plugin.saveSettings();
-        });
+        drop
+          .setValue(this.plugin.settings.defaultVersion)
+          .onChange(async (value) => {
+            this.plugin.settings.defaultVersion = value;
+            await this.plugin.saveSettings();
+          });
       });
 
     containerEl.createEl('h3', { text: 'Sidebar' });
@@ -113,33 +123,37 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
       .setName('Follow cursor')
       .setDesc(
         'Follows the cursor while editing and the scroll position (or a clicked verse) ' +
-          'while reading. Off: the sidebar only updates when you switch notes.'
+          'while reading. Off: the sidebar only updates when you switch notes.',
       )
       .addToggle((t) =>
-        t.setValue(this.plugin.settings.followCursor).onChange(async (value) => {
-          this.plugin.settings.followCursor = value;
-          await this.plugin.saveSettings();
-        })
+        t
+          .setValue(this.plugin.settings.followCursor)
+          .onChange(async (value) => {
+            this.plugin.settings.followCursor = value;
+            await this.plugin.saveSettings();
+          }),
       );
 
     new Setting(containerEl)
       .setName('Show the version you are reading')
       .setDesc('Include the current version in the list.')
       .addToggle((t) =>
-        t.setValue(this.plugin.settings.showCurrentVersion).onChange(async (value) => {
-          this.plugin.settings.showCurrentVersion = value;
-          await this.plugin.saveSettings();
-        })
+        t
+          .setValue(this.plugin.settings.showCurrentVersion)
+          .onChange(async (value) => {
+            this.plugin.settings.showCurrentVersion = value;
+            await this.plugin.saveSettings();
+          }),
       );
 
-    new Setting(containerEl)
-      .setName('Open sidebar on startup')
-      .addToggle((t) =>
-        t.setValue(this.plugin.settings.openSidebarOnStart).onChange(async (value) => {
+    new Setting(containerEl).setName('Open sidebar on startup').addToggle((t) =>
+      t
+        .setValue(this.plugin.settings.openSidebarOnStart)
+        .onChange(async (value) => {
           this.plugin.settings.openSidebarOnStart = value;
           await this.plugin.saveSettings();
-        })
-      );
+        }),
+    );
 
     new Setting(containerEl)
       .setName('Detected versions')
@@ -150,7 +164,7 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
           this.plugin.registerVersionCommands();
           this.plugin.chapterCache.clear();
           this.display();
-        })
+        }),
       );
 
     // listVersions() above builds the index, so the conflicts are known by now.
@@ -160,7 +174,7 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
         .setName('Duplicate files')
         .setDesc(
           'Same chapter, or same book, claimed by more than one file, so it is skipped. ' +
-            'Keep one of each.'
+            'Keep one of each.',
         );
       const list = setting.descEl.createEl('ul', { cls: 'kcp-conflicts' });
       for (const files of conflicts.values()) {

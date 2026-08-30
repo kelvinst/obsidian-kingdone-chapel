@@ -18,27 +18,43 @@ describe('parseReference', () => {
   });
 
   it('reads a chapter', () => {
-    expect(parseReference('Joao 1', noVersions)).toMatchObject({ book: 'Joao', chapter: 1, verses: [] });
+    expect(parseReference('Joao 1', noVersions)).toMatchObject({
+      book: 'Joao',
+      chapter: 1,
+      verses: [],
+    });
   });
 
   it('reads a verse', () => {
-    expect(parseReference('Joao 1.1', noVersions)).toMatchObject({ chapter: 1, verses: [1] });
+    expect(parseReference('Joao 1.1', noVersions)).toMatchObject({
+      chapter: 1,
+      verses: [1],
+    });
   });
 
   it('accepts a colon as well as a dot', () => {
-    expect(parseReference('Joao 1:1', noVersions)).toMatchObject({ chapter: 1, verses: [1] });
+    expect(parseReference('Joao 1:1', noVersions)).toMatchObject({
+      chapter: 1,
+      verses: [1],
+    });
   });
 
   it('keeps listed verses in the order they were written, without duplicates', () => {
-    expect(parseReference('Joao 1.3,1,3', noVersions)).toMatchObject({ verses: [3, 1] });
+    expect(parseReference('Joao 1.3,1,3', noVersions)).toMatchObject({
+      verses: [3, 1],
+    });
   });
 
   it('expands a range', () => {
-    expect(parseReference('Joao 1.1-3', noVersions)).toMatchObject({ verses: [1, 2, 3] });
+    expect(parseReference('Joao 1.1-3', noVersions)).toMatchObject({
+      verses: [1, 2, 3],
+    });
   });
 
   it('mixes ranges and single verses', () => {
-    expect(parseReference('Joao 1.1,3-5', noVersions)).toMatchObject({ verses: [1, 3, 4, 5] });
+    expect(parseReference('Joao 1.1,3-5', noVersions)).toMatchObject({
+      verses: [1, 3, 4, 5],
+    });
   });
 
   it('splits a numbered book after its name, not before it', () => {
@@ -51,8 +67,14 @@ describe('parseReference', () => {
   });
 
   it('takes a leading word as a version only when it names one', () => {
-    expect(parseReference('ARA Joao 1.1', isAra)).toMatchObject({ version: 'ARA', book: 'Joao' });
-    expect(parseReference('ARA Joao 1.1', noVersions)).toMatchObject({ version: null, book: 'ARA Joao' });
+    expect(parseReference('ARA Joao 1.1', isAra)).toMatchObject({
+      version: 'ARA',
+      book: 'Joao',
+    });
+    expect(parseReference('ARA Joao 1.1', noVersions)).toMatchObject({
+      version: null,
+      book: 'ARA Joao',
+    });
   });
 
   describe('a version said after the reference', () => {
@@ -67,7 +89,11 @@ describe('parseReference', () => {
     });
 
     it('comes off before the chapter is looked for, so the chapter is still the last number', () => {
-      expect(parseReference('1 Joao 1.1 ARA', isAra)).toMatchObject({ book: '1 Joao', chapter: 1, verses: [1] });
+      expect(parseReference('1 Joao 1.1 ARA', isAra)).toMatchObject({
+        book: '1 Joao',
+        chapter: 1,
+        verses: [1],
+      });
     });
 
     it('is only a version once it names one — a word that does not stays part of the book', () => {
@@ -92,7 +118,10 @@ describe('parseReference', () => {
 
     it('says so itself, and is never put to the version table', () => {
       const isVersion = vi.fn(() => false);
-      expect(parseReference('Joao 1.1 -ara', isVersion)).toMatchObject({ version: 'ara', versionPrefix: true });
+      expect(parseReference('Joao 1.1 -ara', isVersion)).toMatchObject({
+        version: 'ara',
+        versionPrefix: true,
+      });
       expect(isVersion).not.toHaveBeenCalled();
     });
 
@@ -151,21 +180,30 @@ describe('parseReference', () => {
 
   describe('half-written references', () => {
     it('reads a dangling separator as the whole chapter', () => {
-      expect(parseReference('Joao 1.', noVersions)).toMatchObject({ chapter: 1, verses: [] });
+      expect(parseReference('Joao 1.', noVersions)).toMatchObject({
+        chapter: 1,
+        verses: [],
+      });
     });
 
     it('reads an unfinished range as its start', () => {
-      expect(parseReference('Joao 1.3-', noVersions)).toMatchObject({ verses: [3] });
+      expect(parseReference('Joao 1.3-', noVersions)).toMatchObject({
+        verses: [3],
+      });
     });
 
     it('reads a range written backwards as its start', () => {
-      expect(parseReference('Joao 1.5-1', noVersions)).toMatchObject({ verses: [5] });
+      expect(parseReference('Joao 1.5-1', noVersions)).toMatchObject({
+        verses: [5],
+      });
     });
   });
 
   describe('the verse cap', () => {
     it('carries fifty verses', () => {
-      expect(parseReference('Joao 1.1-50', noVersions)?.verses).toHaveLength(50);
+      expect(parseReference('Joao 1.1-50', noVersions)?.verses).toHaveLength(
+        50,
+      );
     });
 
     it('refuses a reference reaching past fifty rather than cutting it short', () => {
@@ -178,7 +216,9 @@ describe('parseReference', () => {
     });
 
     it('counts a verse once, so repeats never reach the cap', () => {
-      expect(parseReference('Joao 1.1-50,1-50', noVersions)?.verses).toHaveLength(50);
+      expect(
+        parseReference('Joao 1.1-50,1-50', noVersions)?.verses,
+      ).toHaveLength(50);
     });
   });
 });
@@ -202,7 +242,11 @@ describe('verseLabels', () => {
 
   describe('a version', () => {
     it('is named after the last verse, where it reads as the whole reference’s', () => {
-      expect(verseLabels('João', 1, [1, 2, 3], 'NVI')).toEqual(['João 1.1', '2', '3 - NVI']);
+      expect(verseLabels('João', 1, [1, 2, 3], 'NVI')).toEqual([
+        'João 1.1',
+        '2',
+        '3 - NVI',
+      ]);
     });
 
     it('is named after a whole chapter, and after a whole book', () => {

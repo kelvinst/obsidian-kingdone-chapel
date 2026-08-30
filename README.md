@@ -13,7 +13,7 @@ journaling are planned (see [Roadmap](#roadmap)).
 
 Read the same passage across several translations without losing your place. Put the cursor on
 a verse and the plugin will show you — or jump you to — that exact verse in every other version
-in your vault, keeping chapter *and* verse alignment.
+in your vault, keeping chapter _and_ verse alignment.
 
 - **Sidebar** listing the current verse in every other version at once, following your cursor
   while editing and your scroll position while reading — click a verse in reading mode to hold
@@ -61,13 +61,13 @@ books you could have meant with the opening verse of the passage, and picking on
 what you typed with ordinary internal links. Each row reads as the reference it will write,
 so what you pick is what the note ends up saying.
 
-| You type | You get |
-|---|---|
-| `@Joao` | `[[NVI-43-Joao\|João]]` — the note listing the book's chapters |
-| `@Joao 1` | `[[NVI-43-JHN-001\|João 1]]` |
-| `@Joao 1.1` | `[[NVI-43-JHN-001#^nvi-jhn-1-1\|João 1.1]]` |
+| You type      | You get                                                                                             |
+| ------------- | --------------------------------------------------------------------------------------------------- |
+| `@Joao`       | `[[NVI-43-Joao\|João]]` — the note listing the book's chapters                                      |
+| `@Joao 1`     | `[[NVI-43-JHN-001\|João 1]]`                                                                        |
+| `@Joao 1.1`   | `[[NVI-43-JHN-001#^nvi-jhn-1-1\|João 1.1]]`                                                         |
 | `@Joao 1.1,2` | `[[NVI-43-JHN-001#^nvi-jhn-1-1\|João 1.1]],[[NVI-43-JHN-001#^nvi-jhn-1-2\|2]]` — one link per verse |
-| `@Joao 1.1-3` | the same as `1.1,2,3` |
+| `@Joao 1.1-3` | the same as `1.1,2,3`                                                                               |
 
 Put a `!` in front — `!@Joao 1.1` — and the same reference comes back as embeds, showing the
 text in the note instead of pointing at it. An embed carries no label, so a book's
@@ -75,12 +75,12 @@ abbreviation and its full name write the same thing and the popup offers each bo
 under its name. `!@` reads as one thing wherever it appears, so `Que texto!@Joao 1.1` embeds
 too — put a space between the two to link after an exclamation mark instead.
 
-| You type | You get |
-|---|---|
-| `!@Joao` | `![[NVI-43-Joao]]` |
-| `!@Joao 1.1` | `![[NVI-43-JHN-001#^nvi-jhn-1-1]]` |
-| `!@Joao 1.1-3` | one embed per verse, a line each |
-| `!@Joao 1` | your pick of *whole file* (`![[NVI-43-JHN-001]]`) or *verse by verse* — one embed per verse of the chapter |
+| You type       | You get                                                                                                    |
+| -------------- | ---------------------------------------------------------------------------------------------------------- |
+| `!@Joao`       | `![[NVI-43-Joao]]`                                                                                         |
+| `!@Joao 1.1`   | `![[NVI-43-JHN-001#^nvi-jhn-1-1]]`                                                                         |
+| `!@Joao 1.1-3` | one embed per verse, a line each                                                                           |
+| `!@Joao 1`     | your pick of _whole file_ (`![[NVI-43-JHN-001]]`) or _verse by verse_ — one embed per verse of the chapter |
 
 Books are matched in Portuguese and English, by full name, by the two-letter Portuguese
 abbreviations (`Gn`, `Jz`, `Sl`, `Tg`, `Ap`), by the usual English ones (`Ps`, `Rev`,
@@ -94,8 +94,8 @@ is Jonas in Portuguese and John in English, and the name is written in the langu
 abbreviation belongs to — so the rows carrying an abbreviation name the book they point at.
 
 **Language** cuts that down to the language you write in: set to Portuguese, `@Jn` only
-offers Jonas, and English book names stop matching altogether. It starts on *No
-preference*, where every language answers. USFM codes are named the same everywhere, so
+offers Jonas, and English book names stop matching altogether. It starts on _No
+preference_, where every language answers. USFM codes are named the same everywhere, so
 `@JHN` keeps working either way, labelled in the language you chose.
 
 The same setting names books everywhere else the plugin does — the sidebar header, the
@@ -103,7 +103,7 @@ version picker, the notices — which have only the one name to write and so use
 language, falling back to Portuguese when none is set.
 
 References link to the version set in **Default version for @ references**, which starts on
-*Automatic*: the version of the note you are writing in when that note is itself a chapter,
+_Automatic_: the version of the note you are writing in when that note is itself a chapter,
 otherwise the first version in the vault. Name a version in the reference itself to override
 it for one link — `@ARA Joao 1.1`. Where a version merges verses, the link lands on the
 anchor covering the verse asked for, the same way the sidebar does.
@@ -159,17 +159,17 @@ like two files claiming one chapter.
 
 ## Settings
 
-| Setting | Default | What it does |
-|---|---|---|
-| Language | No preference | Language book names are read and written in |
-| Bible folder | `Bibles` | Folder holding the version folders |
-| Default version for @ references | Automatic | Version `@` references link to |
-| Open in new tab | off | Off replaces the current tab |
-| Chapter breadcrumbs | on | The `Version > Book > Chapter` bar above each chapter |
-| Group books by category | off | Sub-headings inside the testaments in the book list |
-| Follow cursor | on | Off updates the sidebar only when you switch notes |
-| Show the version you are reading | off | Include the current version in the list |
-| Open sidebar on startup | off | |
+| Setting                          | Default       | What it does                                          |
+| -------------------------------- | ------------- | ----------------------------------------------------- |
+| Language                         | No preference | Language book names are read and written in           |
+| Bible folder                     | `Bibles`      | Folder holding the version folders                    |
+| Default version for @ references | Automatic     | Version `@` references link to                        |
+| Open in new tab                  | off           | Off replaces the current tab                          |
+| Chapter breadcrumbs              | on            | The `Version > Book > Chapter` bar above each chapter |
+| Group books by category          | off           | Sub-headings inside the testaments in the book list   |
+| Follow cursor                    | on            | Off updates the sidebar only when you switch notes    |
+| Show the version you are reading | off           | Include the current version in the list               |
+| Open sidebar on startup          | off           |                                                       |
 
 Versions are the subfolders of the Bible folder that hold chapter files. Use **Reload version
 list** after adding one.

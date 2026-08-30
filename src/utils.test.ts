@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { chapterKey, parseBookName, parseChapterName, parseVerseLine } from './utils';
+import {
+  chapterKey,
+  parseBookName,
+  parseChapterName,
+  parseVerseLine,
+} from './utils';
 
 describe('parseChapterName', () => {
   it('splits a chapter file name', () => {
@@ -13,7 +18,10 @@ describe('parseChapterName', () => {
   });
 
   it('drops the leading zeros of the book number and the chapter', () => {
-    expect(parseChapterName('ACF-09-1SA-017')).toMatchObject({ bookIndex: 9, chapter: 17 });
+    expect(parseChapterName('ACF-09-1SA-017')).toMatchObject({
+      bookIndex: 9,
+      chapter: 17,
+    });
   });
 
   it('keeps a book code that starts with a number whole', () => {
@@ -36,7 +44,9 @@ describe('parseChapterName', () => {
     });
 
     it('matches the version whatever case it was written in', () => {
-      expect(parseChapterName('nvi-43-JHN-001', 'NVI')).toMatchObject({ chapter: 1 });
+      expect(parseChapterName('nvi-43-JHN-001', 'NVI')).toMatchObject({
+        chapter: 1,
+      });
     });
 
     it('reads a note that does not carry the version as an ordinary note', () => {
@@ -85,24 +95,38 @@ describe('chapterKey', () => {
 
 describe('parseVerseLine', () => {
   it('reads a verse written as a list item', () => {
-    expect(parseVerseLine('1. No princípio ^nvi-gen-1-1')).toEqual({ verse: 1, text: 'No princípio' });
+    expect(parseVerseLine('1. No princípio ^nvi-gen-1-1')).toEqual({
+      verse: 1,
+      text: 'No princípio',
+    });
   });
 
   it('reads a verse written with a bolded number', () => {
-    expect(parseVerseLine('**5** Disse Deus ^nvi-gen-1-5')).toEqual({ verse: 5, text: 'Disse Deus' });
+    expect(parseVerseLine('**5** Disse Deus ^nvi-gen-1-5')).toEqual({
+      verse: 5,
+      text: 'Disse Deus',
+    });
   });
 
   it('believes the block id over the number the line writes', () => {
-    expect(parseVerseLine('3. Um bloco de versículos ^nvi-gen-1-5')).toMatchObject({ verse: 5 });
+    expect(
+      parseVerseLine('3. Um bloco de versículos ^nvi-gen-1-5'),
+    ).toMatchObject({ verse: 5 });
   });
 
   it('falls back to the written number when the line carries no id', () => {
     expect(parseVerseLine('3. Sem id')).toEqual({ verse: 3, text: 'Sem id' });
-    expect(parseVerseLine('**3** Sem id')).toEqual({ verse: 3, text: 'Sem id' });
+    expect(parseVerseLine('**3** Sem id')).toEqual({
+      verse: 3,
+      text: 'Sem id',
+    });
   });
 
   it('falls back to the written number when the id names no verse', () => {
-    expect(parseVerseLine('1. Meio da edição ^nvi-gen-1-')).toEqual({ verse: 1, text: 'Meio da edição' });
+    expect(parseVerseLine('1. Meio da edição ^nvi-gen-1-')).toEqual({
+      verse: 1,
+      text: 'Meio da edição',
+    });
   });
 
   it('reads a line that is not a verse as none', () => {
@@ -112,7 +136,9 @@ describe('parseVerseLine', () => {
   });
 
   it('leaves the text alone apart from the marker and the id', () => {
-    expect(parseVerseLine('1. **Deus** disse: «faça-se» ^nvi-gen-1-1')).toMatchObject({
+    expect(
+      parseVerseLine('1. **Deus** disse: «faça-se» ^nvi-gen-1-1'),
+    ).toMatchObject({
       text: '**Deus** disse: «faça-se»',
     });
   });

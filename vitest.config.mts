@@ -14,7 +14,10 @@ export default defineConfig({
       // run by an AI agent, which reads the same as a file with no tests at
       // all. Both belong in it. The option has to be the reporter's own: the
       // one on `coverage` is the loser of that override.
-      reporter: [['text', { skipFull: false }], ['html', {}]],
+      reporter: [
+        ['text', { skipFull: false }],
+        ['html', {}],
+      ],
     },
   },
 });

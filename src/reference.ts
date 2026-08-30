@@ -50,7 +50,10 @@ export interface ParsedRef {
  * `@ARA Joao` from a two-word book name, or `@Joao ARA` from one whose name
  * carries on. A marked version says so itself, and is not asked.
  */
-export function parseReference(query: string, isVersion: (word: string) => boolean): ParsedRef | null {
+export function parseReference(
+  query: string,
+  isVersion: (word: string) => boolean,
+): ParsedRef | null {
   let text = query;
   let version: string | null = null;
   let versionPrefix = false;
@@ -89,7 +92,8 @@ export function parseReference(query: string, isVersion: (word: string) => boole
 
   // Or before it (`NVI Joao 1`), which is the only way to tell a version from
   // the first word of a two-word book name.
-  const named = marked || version !== null ? null : book.match(/^(\S+)\s+(.+)$/);
+  const named =
+    marked || version !== null ? null : book.match(/^(\S+)\s+(.+)$/);
   if (named && isVersion(named[1])) {
     version = named[1];
     book = named[2];
@@ -155,7 +159,9 @@ export function verseLabels(
       ? [book]
       : !verses.length
         ? [`${book} ${chapter}`]
-        : verses.map((v, i) => (i === 0 ? `${book} ${chapter}.${v}` : String(v)));
+        : verses.map((v, i) =>
+            i === 0 ? `${book} ${chapter}.${v}` : String(v),
+          );
 
   if (version) labels[labels.length - 1] += ` - ${version}`;
   return labels;
