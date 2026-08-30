@@ -1,0 +1,4 @@
+# Build output, and the lock file npm writes for itself.
+main.js
+package-lock.json
+coverage/

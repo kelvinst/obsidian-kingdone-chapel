@@ -216,7 +216,9 @@ describe('the sections', () => {
       expect(sections[0].from).toBe(1);
       expect(sections[sections.length - 1].to).toBe(66);
       for (let i = 1; i < sections.length; i++) {
-        expect(sections[i].from, `after ${sections[i - 1].names.en}`).toBe(sections[i - 1].to + 1);
+        expect(sections[i].from, `after ${sections[i - 1].names.en}`).toBe(
+          sections[i - 1].to + 1,
+        );
       }
     }
   });
@@ -224,7 +226,10 @@ describe('the sections', () => {
   it('name every division in every language a book is read in', () => {
     for (const section of [...TESTAMENTS, ...CATEGORIES]) {
       for (const lang of langsFor('')) {
-        expect(section.names[lang], `${section.from}-${section.to} in ${lang}`).toBeTruthy();
+        expect(
+          section.names[lang],
+          `${section.from}-${section.to} in ${lang}`,
+        ).toBeTruthy();
       }
     }
   });

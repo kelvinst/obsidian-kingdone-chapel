@@ -1,5 +1,12 @@
 import { EditorSuggest } from 'obsidian';
-import type { Editor, EditorPosition, EditorSuggestContext, EditorSuggestTriggerInfo, Instruction, TFile } from 'obsidian';
+import type {
+  Editor,
+  EditorPosition,
+  EditorSuggestContext,
+  EditorSuggestTriggerInfo,
+  Instruction,
+  TFile,
+} from 'obsidian';
 
 import { abbrLabel, langsFor, matchBooks, plain } from './books';
 import { parseReference, verseLabels } from './reference';
@@ -71,14 +78,20 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
     this.setInstructions(INSTRUCTIONS);
   }
 
-  onTrigger(cursor: EditorPosition, editor: Editor): EditorSuggestTriggerInfo | null {
+  onTrigger(
+    cursor: EditorPosition,
+    editor: Editor,
+  ): EditorSuggestTriggerInfo | null {
     const line = editor.getLine(cursor.line).slice(0, cursor.ch);
     const m = line.match(TRIGGER);
     if (!m || !m[2].trim()) return null;
     // Only the `!@` branch captures the `!`; the bare `@` leaves it unset.
     const bang = m[1] || '';
     return {
-      start: { line: cursor.line, ch: cursor.ch - bang.length - m[2].length - 1 },
+      start: {
+        line: cursor.line,
+        ch: cursor.ch - bang.length - m[2].length - 1,
+      },
       end: cursor,
       // The `!` rides along in the query so the rows can be read out of it
       // alone, the way the popup hands it back.
@@ -89,7 +102,10 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
   async getSuggestions(ctx: EditorSuggestContext): Promise<RefSuggestion[]> {
     const embed = ctx.query.startsWith('!');
     const query = embed ? ctx.query.slice(1) : ctx.query;
-    const parsed = parseReference(query, (word) => this.plugin.findVersion(word) !== null);
+    const parsed = parseReference(
+      query,
+      (word) => this.plugin.findVersion(word) !== null,
+    );
     if (!parsed) return [];
 
     const versions = this.versionsFor(parsed, ctx.file);
@@ -109,32 +125,66 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
       for (const match of matchBooks(parsed.book, books, langs)) {
         if (out.length >= MAX_ROWS) return out.slice(0, MAX_ROWS);
 
-        const file = this.plugin.referenceFile(version, match.book.index, parsed.chapter);
+        const file = this.plugin.referenceFile(
+          version,
+          match.book.index,
+          parsed.chapter,
+        );
         if (!file) continue;
 
         const name = match.book.names[match.lang];
         try {
           // The anchors and the opening verse are the passage, not the wording,
           // so both forms of the same book share the one read.
-          const anchors = await this.plugin.findAnchors(file, parsed.chapter, parsed.verses);
-          const preview = await this.previewOf(file, parsed.chapter, parsed.verses);
+          const anchors = await this.plugin.findAnchors(
+            file,
+            parsed.chapter,
+            parsed.verses,
+          );
+          const preview = await this.previewOf(
+            file,
+            parsed.chapter,
+            parsed.verses,
+          );
 
           if (embed) {
             // An embed writes no label, so the version cannot be named in what
             // it writes; the row names it, which is what the choice is between
             // when a half-written version matched more than one.
-            const labels = verseLabels(name, parsed.chapter, parsed.verses, named ? version : null);
+            const labels = verseLabels(
+              name,
+              parsed.chapter,
+              parsed.verses,
+              named ? version : null,
+            );
             const base = { ref: labels.join(','), book: name, preview };
-            for (const row of await this.embeds(file, parsed, anchors, ctx.file)) {
+            for (const row of await this.embeds(
+              file,
+              parsed,
+              anchors,
+              ctx.file,
+            )) {
               out.push({ ...base, ...row });
             }
             continue;
           }
 
           for (const form of this.forms(match, name)) {
-            const labels = verseLabels(form, parsed.chapter, parsed.verses, named ? version : null);
-            const links = labels.map((label, i) => this.link(file, anchors[i] || null, label, ctx.file));
-            out.push({ ref: labels.join(','), book: name, preview, markdown: links.join(',') });
+            const labels = verseLabels(
+              form,
+              parsed.chapter,
+              parsed.verses,
+              named ? version : null,
+            );
+            const links = labels.map((label, i) =>
+              this.link(file, anchors[i] || null, label, ctx.file),
+            );
+            out.push({
+              ref: labels.join(','),
+              book: name,
+              preview,
+              markdown: links.join(','),
+            });
           }
         } catch (e) {
           // Both reads go to the file the index named, which may have gone away
@@ -157,9 +207,13 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
   versionsFor(parsed: ParsedRef, from: TFile | null): string[] {
     if (parsed.versionPrefix) {
       const wanted = (parsed.version || '').toLowerCase();
-      return this.plugin.listVersions().filter((v) => v.toLowerCase().startsWith(wanted));
+      return this.plugin
+        .listVersions()
+        .filter((v) => v.toLowerCase().startsWith(wanted));
     }
-    const named = parsed.version ? this.plugin.findVersion(parsed.version) : this.plugin.defaultVersion(from);
+    const named = parsed.version
+      ? this.plugin.findVersion(parsed.version)
+      : this.plugin.defaultVersion(from);
     return named ? [named] : [];
   }
 
@@ -185,21 +239,27 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
     file: TFile,
     parsed: ParsedRef,
     anchors: (string | null)[],
-    from: TFile | null
+    from: TFile | null,
   ): Promise<Pick<RefSuggestion, 'note' | 'markdown'>[]> {
     // A book, or the verses that were asked for by number.
     if (parsed.chapter === null || parsed.verses.length) {
       return [{ markdown: this.embedLines(file, anchors, from) }];
     }
 
-    const rows = [{ note: 'whole file', markdown: this.embed(file, null, from) }];
+    const rows = [
+      { note: 'whole file', markdown: this.embed(file, null, from) },
+    ];
     // A chapter asked for bare can also come in a verse at a time, which needs
     // the verse numbers the chapter actually carries rather than a count.
     const verses = (await this.plugin.chapterVerses(file)).map((v) => v.verse);
-    const ids = (await this.plugin.findAnchors(file, parsed.chapter, verses)).filter(
-      (id): id is string => id !== null
-    );
-    if (ids.length) rows.push({ note: 'verse by verse', markdown: this.embedLines(file, ids, from) });
+    const ids = (
+      await this.plugin.findAnchors(file, parsed.chapter, verses)
+    ).filter((id): id is string => id !== null);
+    if (ids.length)
+      rows.push({
+        note: 'verse by verse',
+        markdown: this.embedLines(file, ids, from),
+      });
     return rows;
   }
 
@@ -209,7 +269,11 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
    * anchors at all answers every one of them with none; either way the same
    * embed is written once, not once per verse asked for.
    */
-  embedLines(file: TFile, anchors: (string | null)[], from: TFile | null): string {
+  embedLines(
+    file: TFile,
+    anchors: (string | null)[],
+    from: TFile | null,
+  ): string {
     const seen = new Set<string>();
     const out: string[] = [];
     for (const anchor of anchors.length ? anchors : [null]) {
@@ -222,20 +286,40 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
 
   /** `![[NVI-43-JHN-001#^nvi-jhn-1-1]]` — an embed, which needs no label. */
   embed(file: TFile, anchor: string | null, from: TFile | null): string {
-    const path = this.app.metadataCache.fileToLinktext(file, from ? from.path : '', true);
+    const path = this.app.metadataCache.fileToLinktext(
+      file,
+      from ? from.path : '',
+      true,
+    );
     return `![[${path}${anchor ? '#^' + anchor : ''}]]`;
   }
 
   /** `[[NVI-43-JHN-001#^nvi-jhn-1-1|João 1.1]]`, with the link the vault expects. */
-  link(file: TFile, anchor: string | null, label: string, from: TFile | null): string {
-    const path = this.app.metadataCache.fileToLinktext(file, from ? from.path : '', true);
+  link(
+    file: TFile,
+    anchor: string | null,
+    label: string,
+    from: TFile | null,
+  ): string {
+    const path = this.app.metadataCache.fileToLinktext(
+      file,
+      from ? from.path : '',
+      true,
+    );
     return `[[${path}${anchor ? '#^' + anchor : ''}|${label}]]`;
   }
 
   /** First verse of the passage. A book index file holds none, so it shows bare. */
-  async previewOf(file: TFile, chapter: number | null, verses: number[]): Promise<string> {
+  async previewOf(
+    file: TFile,
+    chapter: number | null,
+    verses: number[],
+  ): Promise<string> {
     if (chapter === null) return '';
-    const match = await this.plugin.verseIn(file, verses.length ? verses[0] : null);
+    const match = await this.plugin.verseIn(
+      file,
+      verses.length ? verses[0] : null,
+    );
     return match ? match.text : '';
   }
 
@@ -251,8 +335,10 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
       head.createSpan({ cls: 'kcp-suggest-book', text: item.book });
     }
     // Two rows writing the same chapter differently are told apart by this.
-    if (item.note) head.createSpan({ cls: 'kcp-suggest-note', text: item.note });
-    if (item.preview) el.createEl('small', { text: item.preview, cls: 'kcp-preview' });
+    if (item.note)
+      head.createSpan({ cls: 'kcp-suggest-note', text: item.note });
+    if (item.preview)
+      el.createEl('small', { text: item.preview, cls: 'kcp-preview' });
   }
 
   selectSuggestion(item: RefSuggestion) {

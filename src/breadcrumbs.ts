@@ -61,8 +61,18 @@ export class Breadcrumbs {
         continue;
       }
 
-      const prev = this.plugin.stepChapter(loc.version, loc.bookIndex, loc.chapter, -1);
-      const next = this.plugin.stepChapter(loc.version, loc.bookIndex, loc.chapter, 1);
+      const prev = this.plugin.stepChapter(
+        loc.version,
+        loc.bookIndex,
+        loc.chapter,
+        -1,
+      );
+      const next = this.plugin.stepChapter(
+        loc.version,
+        loc.bookIndex,
+        loc.chapter,
+        1,
+      );
       const key = [
         loc.file.path,
         this.plugin.label(loc.version),
@@ -88,12 +98,16 @@ export class Breadcrumbs {
     loc: Location,
     key: string,
     prev: ChapterRef | null,
-    next: ChapterRef | null
+    next: ChapterRef | null,
   ) {
     const bar = createDiv({ cls: 'kcp-crumbs' });
     bar.dataset.kcpKey = key;
 
-    const version = crumb(bar, this.plugin.label(loc.version), 'Open this chapter in another version');
+    const version = crumb(
+      bar,
+      this.plugin.label(loc.version),
+      'Open this chapter in another version',
+    );
     version.onclick = (evt) => this.versionMenu(version, view, loc, evt);
 
     separator(bar);
@@ -127,7 +141,7 @@ export class Breadcrumbs {
     label: string,
     view: MarkdownView,
     loc: Location,
-    to: ChapterRef | null
+    to: ChapterRef | null,
   ) {
     const el = into.createEl('button', {
       cls: 'kcp-crumb-arrow clickable-icon' + (to ? '' : ' is-disabled'),
@@ -137,28 +151,50 @@ export class Breadcrumbs {
     if (!to) return;
     el.onclick = (evt) => {
       this.close();
-      this.plugin.openChapter(loc.version, to.bookIndex, to.chapter, view.file, paneFor(evt));
+      this.plugin.openChapter(
+        loc.version,
+        to.bookIndex,
+        to.chapter,
+        view.file,
+        paneFor(evt),
+      );
     };
   }
 
   /** Every version, jumping to the verse being read rather than the chapter's top. */
-  versionMenu(anchor: HTMLElement, view: MarkdownView, loc: Location, evt: MouseEvent) {
-    this.open(anchor, 'kcp-crumb-list', 'Search versions', (body, close) => {
-      for (const version of this.plugin.listVersions()) {
-        // A version that skips this chapter still shows, greyed: what it is
-        // missing is worth seeing, and choosing it says why.
-        const missing = !this.plugin.targetFile(version, loc);
-        const item = this.item(body, this.plugin.label(version), version === loc.version);
-        if (missing) item.addClass('is-missing');
-        item.onclick = (click) => {
-          close();
-          // The verse is read now, not when the bar was drawn: the reader may
-          // have moved down the chapter since.
-          const at = (view.file && this.plugin.locationOf(view.file, view)) || loc;
-          this.plugin.jumpTo(version, at, paneFor(click));
-        };
-      }
-    }, evt);
+  versionMenu(
+    anchor: HTMLElement,
+    view: MarkdownView,
+    loc: Location,
+    evt: MouseEvent,
+  ) {
+    this.open(
+      anchor,
+      'kcp-crumb-list',
+      'Search versions',
+      (body, close) => {
+        for (const version of this.plugin.listVersions()) {
+          // A version that skips this chapter still shows, greyed: what it is
+          // missing is worth seeing, and choosing it says why.
+          const missing = !this.plugin.targetFile(version, loc);
+          const item = this.item(
+            body,
+            this.plugin.label(version),
+            version === loc.version,
+          );
+          if (missing) item.addClass('is-missing');
+          item.onclick = (click) => {
+            close();
+            // The verse is read now, not when the bar was drawn: the reader may
+            // have moved down the chapter since.
+            const at =
+              (view.file && this.plugin.locationOf(view.file, view)) || loc;
+            this.plugin.jumpTo(version, at, paneFor(click));
+          };
+        }
+      },
+      evt,
+    );
   }
 
   /**
@@ -170,47 +206,101 @@ export class Breadcrumbs {
    * section a book falls under is not the one before it. Each heading owns the
    * books under it, which is what lets a search take a heading down with them.
    */
-  bookMenu(anchor: HTMLElement, view: MarkdownView, loc: Location, evt: MouseEvent) {
-    this.open(anchor, 'kcp-crumb-list', 'Search books', (body, close) => {
-      const lang = nameLang(this.plugin.settings.language);
-      const divided = this.plugin.settings.bookCategories;
-      let testament: Group | null = null;
-      let category: Group | null = null;
+  bookMenu(
+    anchor: HTMLElement,
+    view: MarkdownView,
+    loc: Location,
+    evt: MouseEvent,
+  ) {
+    this.open(
+      anchor,
+      'kcp-crumb-list',
+      'Search books',
+      (body, close) => {
+        const lang = nameLang(this.plugin.settings.language);
+        const divided = this.plugin.settings.bookCategories;
+        let testament: Group | null = null;
+        let category: Group | null = null;
 
-      for (const book of this.plugin.booksIn(loc.version)) {
-        testament = section(body, testament, 'kcp-crumb-head', sectionName(TESTAMENTS, book.index, lang));
-        if (testament.fresh) category = null;
+        for (const book of this.plugin.booksIn(loc.version)) {
+          testament = section(
+            body,
+            testament,
+            'kcp-crumb-head',
+            sectionName(TESTAMENTS, book.index, lang),
+          );
+          if (testament.fresh) category = null;
 
-        let into = testament.el;
-        if (divided) {
-          category = section(into, category, 'kcp-crumb-subhead', sectionName(CATEGORIES, book.index, lang));
-          into = category.el;
+          let into = testament.el;
+          if (divided) {
+            category = section(
+              into,
+              category,
+              'kcp-crumb-subhead',
+              sectionName(CATEGORIES, book.index, lang),
+            );
+            into = category.el;
+          }
+
+          const item = this.item(into, book.name, book.index === loc.bookIndex);
+          item.onclick = (click) => {
+            close();
+            this.plugin.openChapter(
+              loc.version,
+              book.index,
+              book.chapter,
+              view.file,
+              paneFor(click),
+            );
+          };
         }
-
-        const item = this.item(into, book.name, book.index === loc.bookIndex);
-        item.onclick = (click) => {
-          close();
-          this.plugin.openChapter(loc.version, book.index, book.chapter, view.file, paneFor(click));
-        };
-      }
-    }, evt);
+      },
+      evt,
+    );
   }
 
   /** Every chapter of the book, laid out in rows rather than in one long column. */
-  chapterMenu(anchor: HTMLElement, view: MarkdownView, loc: Location, evt: MouseEvent) {
-    this.open(anchor, 'kcp-crumb-grid', 'Search chapters', (body, close) => {
-      for (const chapter of this.plugin.chaptersIn(loc.version, loc.bookIndex)) {
-        const item = this.item(body, String(chapter), chapter === loc.chapter);
-        item.onclick = (click) => {
-          close();
-          this.plugin.openChapter(loc.version, loc.bookIndex, chapter, view.file, paneFor(click));
-        };
-      }
-    }, evt);
+  chapterMenu(
+    anchor: HTMLElement,
+    view: MarkdownView,
+    loc: Location,
+    evt: MouseEvent,
+  ) {
+    this.open(
+      anchor,
+      'kcp-crumb-grid',
+      'Search chapters',
+      (body, close) => {
+        for (const chapter of this.plugin.chaptersIn(
+          loc.version,
+          loc.bookIndex,
+        )) {
+          const item = this.item(
+            body,
+            String(chapter),
+            chapter === loc.chapter,
+          );
+          item.onclick = (click) => {
+            close();
+            this.plugin.openChapter(
+              loc.version,
+              loc.bookIndex,
+              chapter,
+              view.file,
+              paneFor(click),
+            );
+          };
+        }
+      },
+      evt,
+    );
   }
 
   item(into: HTMLElement, text: string, current: boolean): HTMLElement {
-    return into.createDiv({ cls: 'kcp-crumb-item' + (current ? ' is-current' : ''), text });
+    return into.createDiv({
+      cls: 'kcp-crumb-item' + (current ? ' is-current' : ''),
+      text,
+    });
   }
 
   /**
@@ -222,7 +312,7 @@ export class Breadcrumbs {
     cls: string,
     placeholder: string,
     build: (body: HTMLElement, close: () => void) => void,
-    evt: MouseEvent
+    evt: MouseEvent,
   ) {
     evt.preventDefault();
     if (this.dismissed === anchor) {
@@ -256,7 +346,11 @@ function paneFor(evt: MouseEvent): PaneType | boolean {
 }
 
 function crumb(into: HTMLElement, text: string, label: string): HTMLElement {
-  return into.createEl('button', { cls: 'kcp-crumb', text, attr: { 'aria-label': label } });
+  return into.createEl('button', {
+    cls: 'kcp-crumb',
+    text,
+    attr: { 'aria-label': label },
+  });
 }
 
 /** A heading and the books filed under it, as the book dropdown builds them up. */
@@ -271,7 +365,12 @@ interface Group {
  * The group `name` belongs in: the one already open when it is still the same
  * heading, a new one when it is not.
  */
-function section(into: HTMLElement, open: Group | null, cls: string, name: string): Group {
+function section(
+  into: HTMLElement,
+  open: Group | null,
+  cls: string,
+  name: string,
+): Group {
   if (open && open.name === name) return { ...open, fresh: false };
   const el = into.createDiv({ cls: 'kcp-crumb-group' });
   el.createDiv({ cls, text: name });
@@ -314,14 +413,24 @@ class CrumbMenu {
   private at = 0;
   private detach: (() => void)[] = [];
 
-  constructor(anchor: HTMLElement, cls: string, onClose: (from: HTMLElement | null) => void) {
+  constructor(
+    anchor: HTMLElement,
+    cls: string,
+    onClose: (from: HTMLElement | null) => void,
+  ) {
     this.anchor = anchor;
     this.onClose = onClose;
     this.el = document.body.createDiv({ cls: 'kcp-crumb-menu' });
     this.search = this.el.createDiv({ cls: 'kcp-crumb-search' });
     this.body = this.el.createDiv({ cls: cls });
-    this.body.style.setProperty('--kcp-crumb-columns', String(CHAPTERS_PER_ROW));
-    this.empty = this.el.createDiv({ cls: 'kcp-crumb-empty is-hidden', text: 'Nothing matches.' });
+    this.body.style.setProperty(
+      '--kcp-crumb-columns',
+      String(CHAPTERS_PER_ROW),
+    );
+    this.empty = this.el.createDiv({
+      cls: 'kcp-crumb-empty is-hidden',
+      text: 'Nothing matches.',
+    });
 
     // Capture, so a click reaches this before whatever it landed on: a link in
     // the note behind the dropdown should navigate and close it, not one or
@@ -345,16 +454,20 @@ class CrumbMenu {
     });
   }
 
-  private listen(on: Document | Window, type: string, run: (evt: Event) => void) {
+  private listen(
+    on: Document | Window,
+    type: string,
+    run: (evt: Event) => void,
+  ) {
     on.addEventListener(type, run, true);
     this.detach.push(() => on.removeEventListener(type, run, true));
   }
 
   /** Take stock of what was built, put a field over it if it earns one, and show it. */
   finish(placeholder: string) {
-    this.rows = Array.from(this.body.querySelectorAll<HTMLElement>('.kcp-crumb-item')).map(
-      (el) => ({ el, text: fold(el.textContent || '') })
-    );
+    this.rows = Array.from(
+      this.body.querySelectorAll<HTMLElement>('.kcp-crumb-item'),
+    ).map((el) => ({ el, text: fold(el.textContent || '') }));
     if (this.rows.length > SEARCH_FROM) this.field(placeholder);
     else this.search.remove();
 
@@ -404,8 +517,13 @@ class CrumbMenu {
       if (hit) this.shown.push(row.el);
     }
     // A heading is only worth showing while something is still filed under it.
-    for (const group of Array.from(this.body.querySelectorAll<HTMLElement>('.kcp-crumb-group'))) {
-      group.toggleClass('is-hidden', !group.querySelector('.kcp-crumb-item:not(.is-hidden)'));
+    for (const group of Array.from(
+      this.body.querySelectorAll<HTMLElement>('.kcp-crumb-group'),
+    )) {
+      group.toggleClass(
+        'is-hidden',
+        !group.querySelector('.kcp-crumb-item:not(.is-hidden)'),
+      );
     }
     this.empty.toggleClass('is-hidden', this.shown.length > 0);
 
@@ -432,11 +550,17 @@ class CrumbMenu {
     const height = this.el.offsetHeight;
     const margin = 8;
 
-    const left = Math.max(margin, Math.min(rect.left, window.innerWidth - width - margin));
+    const left = Math.max(
+      margin,
+      Math.min(rect.left, window.innerWidth - width - margin),
+    );
     let top = rect.bottom + 4;
     if (top + height > window.innerHeight - margin) {
       const above = rect.top - 4 - height;
-      top = above >= margin ? above : Math.max(margin, window.innerHeight - height - margin);
+      top =
+        above >= margin
+          ? above
+          : Math.max(margin, window.innerHeight - height - margin);
     }
     this.el.style.left = `${left}px`;
     this.el.style.top = `${top}px`;

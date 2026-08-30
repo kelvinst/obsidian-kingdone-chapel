@@ -1,9 +1,27 @@
-import { MarkdownView, Notice, Plugin, TFile, TFolder, WorkspaceLeaf } from 'obsidian';
+import {
+  MarkdownView,
+  Notice,
+  Plugin,
+  TFile,
+  TFolder,
+  WorkspaceLeaf,
+} from 'obsidian';
 import type { PaneType } from 'obsidian';
 
 import { DEFAULT_SETTINGS, VIEW_TYPE } from './types';
-import type { ChapterRef, KingdoneChapelSettings, Location, Verse, VersionItem } from './types';
-import { chapterKey, parseBookName, parseChapterName, parseVerseLine } from './utils';
+import type {
+  ChapterRef,
+  KingdoneChapelSettings,
+  Location,
+  Verse,
+  VersionItem,
+} from './types';
+import {
+  chapterKey,
+  parseBookName,
+  parseChapterName,
+  parseVerseLine,
+} from './utils';
 import { bookName, bookNameAt, nameLang } from './books';
 import { VersionSuggestModal } from './modal';
 import { ReferenceSuggest } from './suggest';
@@ -31,7 +49,7 @@ function claim<K>(
   key: K,
   conflicts: Map<string, TFile[]>,
   conflictKey: string,
-  file: TFile
+  file: TFile,
 ) {
   const clash = conflicts.get(conflictKey);
   if (clash) {
@@ -93,7 +111,9 @@ export default class KingdoneChapelPlugin extends Plugin {
       callback: () => this.activateView(),
     });
 
-    this.addRibbonIcon('church', 'Kingdone Chapel sidebar', () => this.activateView());
+    this.addRibbonIcon('church', 'Kingdone Chapel sidebar', () =>
+      this.activateView(),
+    );
 
     this.registerEditorSuggest(new ReferenceSuggest(this));
 
@@ -107,11 +127,17 @@ export default class KingdoneChapelPlugin extends Plugin {
         this.invalidateIndex();
         this.registerVersionCommands();
         this.chapterCache.clear();
-        new Notice(`Versions found: ${this.listVersions().join(', ') || 'none'}`);
+        new Notice(
+          `Versions found: ${this.listVersions().join(', ') || 'none'}`,
+        );
       },
     });
 
-    this.registerEvent(this.app.vault.on('modify', (file) => this.chapterCache.delete(file.path)));
+    this.registerEvent(
+      this.app.vault.on('modify', (file) =>
+        this.chapterCache.delete(file.path),
+      ),
+    );
     // Any of the three can be the chapter on screen, or the one an arrow points
     // at, and nothing else says the bar above a note now names another passage —
     // another chapter either side of it, or none at all.
@@ -127,12 +153,22 @@ export default class KingdoneChapelPlugin extends Plugin {
     // A pane picks up the bar when it opens a chapter, and loses it when it
     // moves on. Reading and editing look the same to it, but switching between
     // them replaces the pane's contents, so `layout-change` has to put it back.
-    this.registerEvent(this.app.workspace.on('file-open', () => this.breadcrumbs.refresh()));
-    this.registerEvent(this.app.workspace.on('layout-change', () => this.breadcrumbs.refresh()));
-    this.registerEvent(this.app.workspace.on('active-leaf-change', () => this.breadcrumbs.refresh()));
+    this.registerEvent(
+      this.app.workspace.on('file-open', () => this.breadcrumbs.refresh()),
+    );
+    this.registerEvent(
+      this.app.workspace.on('layout-change', () => this.breadcrumbs.refresh()),
+    );
+    this.registerEvent(
+      this.app.workspace.on('active-leaf-change', () =>
+        this.breadcrumbs.refresh(),
+      ),
+    );
     this.app.workspace.onLayoutReady(() => this.breadcrumbs.refresh());
 
-    this.registerDomEvent(document, 'click', (evt) => this.lockPreviewVerse(evt));
+    this.registerDomEvent(document, 'click', (evt) =>
+      this.lockPreviewVerse(evt),
+    );
 
     if (this.settings.openSidebarOnStart) {
       this.app.workspace.onLayoutReady(() => this.activateView(false));
@@ -204,7 +240,13 @@ export default class KingdoneChapelPlugin extends Plugin {
         if (bookNumber === null) continue;
         let known = books.get(version);
         if (!known) books.set(version, (known = new Map()));
-        claim(known, bookNumber, conflicts, `${version}/book:${bookNumber}`, file);
+        claim(
+          known,
+          bookNumber,
+          conflicts,
+          `${version}/book:${bookNumber}`,
+          file,
+        );
         continue;
       }
 
@@ -225,7 +267,9 @@ export default class KingdoneChapelPlugin extends Plugin {
   conflictFor(version: string, loc: Location): TFile[] | null {
     this.index(); // conflicts are a by-product of building it
     for (const chapter of [loc.chapter, 0]) {
-      const clash = this.chapterConflicts.get(`${version}/${chapterKey(loc.bookIndex, chapter)}`);
+      const clash = this.chapterConflicts.get(
+        `${version}/${chapterKey(loc.bookIndex, chapter)}`,
+      );
       if (clash) return clash;
     }
     return null;
@@ -239,14 +283,14 @@ export default class KingdoneChapelPlugin extends Plugin {
     if (!this.chapterConflicts.size) return;
 
     const names = Array.from(this.chapterConflicts.values(), (files) =>
-      files.map((f) => f.basename).join(' / ')
+      files.map((f) => f.basename).join(' / '),
     );
     const shown = names.slice(0, 3).join('\n');
     const rest = names.length > 3 ? `\n...and ${names.length - 3} more` : '';
     new Notice(
       `Kingdone Chapel: more than one file for the same chapter or book. ` +
         `Rename or remove one of each:\n${shown}${rest}`,
-      10000
+      10000,
     );
   }
 
@@ -291,7 +335,9 @@ export default class KingdoneChapelPlugin extends Plugin {
 
   /** Versions = direct subfolders of the Bible folder holding chapter files. */
   listVersions(): string[] {
-    const root = this.app.vault.getAbstractFileByPath(this.settings.bibleFolder);
+    const root = this.app.vault.getAbstractFileByPath(
+      this.settings.bibleFolder,
+    );
     if (!(root instanceof TFolder)) return [];
     const index = this.index();
     return root.children
@@ -310,7 +356,9 @@ export default class KingdoneChapelPlugin extends Plugin {
     if (view) {
       const loc = this.locationOf(view.file, view);
       // Only reading mode needs the guard below; a cursor above verse 1 really has no verse.
-      return this.remember(view.getMode() === 'preview' ? this.keepVerse(loc) : loc);
+      return this.remember(
+        view.getMode() === 'preview' ? this.keepVerse(loc) : loc,
+      );
     }
 
     // Focus is on something that is not an editor (the sidebar itself, a modal,
@@ -318,7 +366,11 @@ export default class KingdoneChapelPlugin extends Plugin {
     // verse would come back null and the sidebar would snap to verse 1. Reuse
     // the last location instead, as long as it is still the active file.
     const file = this.app.workspace.getActiveFile();
-    if (this.lastLocation && file && this.lastLocation.file.path === file.path) {
+    if (
+      this.lastLocation &&
+      file &&
+      this.lastLocation.file.path === file.path
+    ) {
       return this.lastLocation;
     }
     return this.remember(this.locationOf(file, null));
@@ -330,7 +382,13 @@ export default class KingdoneChapelPlugin extends Plugin {
    */
   keepVerse(loc: Location | null): Location | null {
     const last = this.lastLocation;
-    if (loc && loc.verse === null && last && last.verse && last.file.path === loc.file.path) {
+    if (
+      loc &&
+      loc.verse === null &&
+      last &&
+      last.verse &&
+      last.file.path === loc.file.path
+    ) {
       loc.verse = last.verse;
     }
     return loc;
@@ -379,7 +437,9 @@ export default class KingdoneChapelPlugin extends Plugin {
     try {
       // A selection spanning verses belongs to the one it starts on, not the one
       // the drag ended on (`getCursor()` alone returns the head of the selection).
-      line = editor.getCursor(editor.somethingSelected() ? 'from' : 'head').line;
+      line = editor.getCursor(
+        editor.somethingSelected() ? 'from' : 'head',
+      ).line;
     } catch (e) {
       return null;
     }
@@ -450,7 +510,9 @@ export default class KingdoneChapelPlugin extends Plugin {
     const para = target.closest<HTMLElement>(VERSE_SELECTOR);
     const verse = para ? this.verseAt(view, scroller, para) : null;
     this.previewLock =
-      verse === null ? null : { path: view.file.path, verse, scrollTop: scroller.scrollTop };
+      verse === null
+        ? null
+        : { path: view.file.path, verse, scrollTop: scroller.scrollTop };
   }
 
   /** Verse paragraph the selection starts in, when text is selected in this pane. */
@@ -470,7 +532,10 @@ export default class KingdoneChapelPlugin extends Plugin {
   previewScroller(view: MarkdownView): HTMLElement | null {
     const container = view.previewMode && view.previewMode.containerEl;
     if (!container) return null;
-    return container.querySelector<HTMLElement>('.markdown-preview-view') || container;
+    return (
+      container.querySelector<HTMLElement>('.markdown-preview-view') ||
+      container
+    );
   }
 
   /**
@@ -485,14 +550,18 @@ export default class KingdoneChapelPlugin extends Plugin {
    * disagrees means something on the page is not a verse, which leaves nothing
    * to pair against: fall back to the numbers the page writes for itself.
    */
-  verseParagraphs(view: MarkdownView, scroller: HTMLElement): { verse: number; el: HTMLElement }[] {
-    const els = Array.from(scroller.querySelectorAll<HTMLElement>(VERSE_SELECTOR)).filter(
-      (el) => el.tagName === 'LI' || this.isVerseParagraph(el)
-    );
+  verseParagraphs(
+    view: MarkdownView,
+    scroller: HTMLElement,
+  ): { verse: number; el: HTMLElement }[] {
+    const els = Array.from(
+      scroller.querySelectorAll<HTMLElement>(VERSE_SELECTOR),
+    ).filter((el) => el.tagName === 'LI' || this.isVerseParagraph(el));
 
     const verses = this.cachedVerses(view.file);
     if (!verses) return []; // the file has not been read yet; the next poll has it
-    if (verses.length === els.length) return els.map((el, i) => ({ verse: verses[i].verse, el }));
+    if (verses.length === els.length)
+      return els.map((el, i) => ({ verse: verses[i].verse, el }));
 
     const out: { verse: number; el: HTMLElement }[] = [];
     for (const el of els) {
@@ -527,8 +596,14 @@ export default class KingdoneChapelPlugin extends Plugin {
    * lands on that rather than on the item holding it, so take whichever verse
    * the element sits in — `contains` counts the element itself.
    */
-  verseAt(view: MarkdownView, scroller: HTMLElement, el: HTMLElement): number | null {
-    const found = this.verseParagraphs(view, scroller).find((item) => item.el.contains(el));
+  verseAt(
+    view: MarkdownView,
+    scroller: HTMLElement,
+    el: HTMLElement,
+  ): number | null {
+    const found = this.verseParagraphs(view, scroller).find((item) =>
+      item.el.contains(el),
+    );
     return found ? found.verse : null;
   }
 
@@ -579,21 +654,28 @@ export default class KingdoneChapelPlugin extends Plugin {
    * (or a single `-000` file for the whole book) still resolves, to the
    * nearest thing it has.
    */
-  referenceFile(version: string, bookIndex: number, chapter: number | null): TFile | null {
+  referenceFile(
+    version: string,
+    bookIndex: number,
+    chapter: number | null,
+  ): TFile | null {
     const chapters = this.index().get(version);
     if (chapter === null) {
       const note = this.bookNotes.get(version);
       return (
         (note && note.get(bookIndex)) ||
         (chapters &&
-          (chapters.get(chapterKey(bookIndex, 0)) || chapters.get(chapterKey(bookIndex, 1)))) ||
+          (chapters.get(chapterKey(bookIndex, 0)) ||
+            chapters.get(chapterKey(bookIndex, 1)))) ||
         null
       );
     }
     if (!chapters) return null;
     // Commentaries keep a single -000 file per book.
     return (
-      chapters.get(chapterKey(bookIndex, chapter)) || chapters.get(chapterKey(bookIndex, 0)) || null
+      chapters.get(chapterKey(bookIndex, chapter)) ||
+      chapters.get(chapterKey(bookIndex, 0)) ||
+      null
     );
   }
 
@@ -618,7 +700,11 @@ export default class KingdoneChapelPlugin extends Plugin {
       for (const file of chapters.values()) {
         const parsed = parseChapterName(file.basename, version);
         if (parsed) {
-          out.push({ bookIndex: parsed.bookIndex, chapter: parsed.chapter, code: parsed.book });
+          out.push({
+            bookIndex: parsed.bookIndex,
+            chapter: parsed.chapter,
+            code: parsed.book,
+          });
         }
       }
       out.sort((a, b) => a.bookIndex - b.bookIndex || a.chapter - b.chapter);
@@ -642,7 +728,11 @@ export default class KingdoneChapelPlugin extends Plugin {
     const out: { index: number; name: string; chapter: number }[] = [];
     for (const ref of this.chapterOrder(version)) {
       if (out.length && out[out.length - 1].index === ref.bookIndex) continue;
-      out.push({ index: ref.bookIndex, name: bookName(ref.code, lang), chapter: ref.chapter });
+      out.push({
+        index: ref.bookIndex,
+        name: bookName(ref.code, lang),
+        chapter: ref.chapter,
+      });
     }
     return out;
   }
@@ -660,9 +750,16 @@ export default class KingdoneChapelPlugin extends Plugin {
    * its last — and for a chapter the index never took, which is what a pair of
    * files claiming it leaves behind.
    */
-  stepChapter(version: string, bookIndex: number, chapter: number, step: number): ChapterRef | null {
+  stepChapter(
+    version: string,
+    bookIndex: number,
+    chapter: number,
+    step: number,
+  ): ChapterRef | null {
     const order = this.chapterOrder(version);
-    const at = order.findIndex((ref) => ref.bookIndex === bookIndex && ref.chapter === chapter);
+    const at = order.findIndex(
+      (ref) => ref.bookIndex === bookIndex && ref.chapter === chapter,
+    );
     if (at < 0) return null;
     return order[at + step] || null;
   }
@@ -678,15 +775,21 @@ export default class KingdoneChapelPlugin extends Plugin {
     bookIndex: number,
     chapter: number | null,
     from: TFile | null,
-    newLeaf: PaneType | boolean = false
+    newLeaf: PaneType | boolean = false,
   ) {
     const file = this.referenceFile(version, bookIndex, chapter);
     if (!file) {
       const book = bookNameAt(bookIndex, nameLang(this.settings.language));
-      new Notice(`${this.label(version)} has no ${book}${chapter === null ? '' : ' ' + chapter}.`);
+      new Notice(
+        `${this.label(version)} has no ${book}${chapter === null ? '' : ' ' + chapter}.`,
+      );
       return;
     }
-    await this.app.workspace.openLinkText(file.path, from ? from.path : '', newLeaf);
+    await this.app.workspace.openLinkText(
+      file.path,
+      from ? from.path : '',
+      newLeaf,
+    );
   }
 
   /** Block ids of a file (from metadata cache, falling back to reading it). */
@@ -697,14 +800,20 @@ export default class KingdoneChapelPlugin extends Plugin {
       if (ids.length) return ids;
     }
     const content = await this.app.vault.cachedRead(file);
-    return (content.match(/\^[A-Za-z0-9-]+\s*$/gm) || []).map((s) => s.trim().slice(1));
+    return (content.match(/\^[A-Za-z0-9-]+\s*$/gm) || []).map((s) =>
+      s.trim().slice(1),
+    );
   }
 
   /**
    * Block id in `file` for chapter/verse. Versions like MENS merge verses
    * (1-2 under verse 1), so fall back to the closest anchor before the verse.
    */
-  async findAnchor(file: TFile, chapter: number, verse: number | null): Promise<string | null> {
+  async findAnchor(
+    file: TFile,
+    chapter: number,
+    verse: number | null,
+  ): Promise<string | null> {
     const found = await this.findAnchors(file, chapter, verse ? [verse] : []);
     return found.length ? found[0] : null;
   }
@@ -716,7 +825,7 @@ export default class KingdoneChapelPlugin extends Plugin {
   async findAnchors(
     file: TFile,
     chapter: number | null,
-    verses: number[]
+    verses: number[],
   ): Promise<(string | null)[]> {
     if (chapter === null || !verses.length) return verses.map(() => null);
 
@@ -788,7 +897,10 @@ export default class KingdoneChapelPlugin extends Plugin {
   }
 
   /** One entry per available version for `loc`, for the sidebar and the picker. */
-  async versionsFor(loc: Location, includeCurrent: boolean): Promise<VersionItem[]> {
+  async versionsFor(
+    loc: Location,
+    includeCurrent: boolean,
+  ): Promise<VersionItem[]> {
     const out: VersionItem[] = [];
     for (const version of this.listVersions()) {
       if (!includeCurrent && version === loc.version) continue;
@@ -814,15 +926,19 @@ export default class KingdoneChapelPlugin extends Plugin {
       new Notice(
         clash
           ? `${this.label(version)} has ${clash.length} files for ${loc.book} ${loc.chapter}: ` +
-            `${clash.map((f) => f.basename).join(', ')}. Rename or remove one.`
-          : `${this.label(version)} has no ${loc.book} ${loc.chapter}.`
+              `${clash.map((f) => f.basename).join(', ')}. Rename or remove one.`
+          : `${this.label(version)} has no ${loc.book} ${loc.chapter}.`,
       );
       return;
     }
     const anchor = await this.findAnchor(file, loc.chapter, loc.verse);
     const link = anchor ? `${file.path}#^${anchor}` : file.path;
     const leaf = newLeaf === undefined ? this.settings.openInNewTab : newLeaf;
-    await this.app.workspace.openLinkText(link, loc.file ? loc.file.path : '', leaf);
+    await this.app.workspace.openLinkText(
+      link,
+      loc.file ? loc.file.path : '',
+      leaf,
+    );
   }
 
   async promptVersion() {
