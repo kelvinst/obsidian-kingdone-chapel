@@ -11,6 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "check": "npm run format:check && npm run build && vitest run --coverage --coverage.thresholds.autoUpdate=false",
+    "precommit": "npm run format && npm run build && npm run test:coverage",
     "version": "node version-bump.mjs && git add manifest.json versions.json",
     "vault": "scripts/obsidian-link.sh"
   },

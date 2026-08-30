@@ -68,6 +68,9 @@ export function parseReference(
   // name after it yet, which is the beginning of every version there is.
   const marked = text.match(/(?:^|\s)-\s?([\p{L}\p{N}]*)(?=\s|$)/u);
   if (marked) {
+    // A match always says where it was found. The fallback is for the type,
+    // which allows for the `exec` of a sticky regexp that this never is.
+    /* v8 ignore next */
     const at = marked.index ?? 0;
     version = marked[1];
     versionPrefix = true;

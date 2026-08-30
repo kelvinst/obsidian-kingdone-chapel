@@ -186,11 +186,16 @@ Not in the community plugin store. Install with [BRAT](https://github.com/TfTHac
 
 ```bash
 npm install
+make install-git-hooks # see below — do this once per clone
+
 npm run dev        # watch build, writes main.js
 npm run build      # type-check then production build
 npm test           # run the test suite once
 npm run test:watch # re-run tests as files change
 npm run test:coverage
+npm run format     # write the formatting
+npm run check      # everything CI runs, writing nothing
+npm run precommit  # the same, allowed to fix what it can
 ```
 
 Tests are [Vitest](https://vitest.dev) files sitting next to what they cover
@@ -198,16 +203,65 @@ Tests are [Vitest](https://vitest.dev) files sitting next to what they cover
 references, chapter and verse file names, and the book table. `npm run build`
 type-checks them along with the rest of `src`.
 
+Formatting is [Prettier](https://prettier.io) at 80 columns, over everything
+but the bundle and the lock file.
+
+### Coverage
+
 `npm run test:coverage` prints a table and writes a browsable report to
 `coverage/index.html`. It counts every file under `src`, so the modules that
 have no tests yet — `main.ts` and the views — show up as the zeroes they are
 rather than going unmentioned.
+
+Two floors have to hold, and both are in `vitest.config.mts`:
+
+- **The modules under test** — `books.ts`, `reference.ts` and `utils.ts` — are
+  at 100% of statements, branches, functions and lines, and have to stay there.
+  A line that genuinely cannot run is marked `/* v8 ignore next */` with a
+  comment saying why, rather than being left to erode the number.
+- **The project as a whole** has a floor too, which is low today because most
+  of it has no tests. It is not meant to stay low: `autoUpdate` raises it to
+  whatever a run reaches whenever a run reaches higher, writing the new
+  numbers back into the config. When `npm run precommit` bumps them, commit
+  that along with the tests that earned it. CI never writes them.
+
+### Git hooks
+
+`.git-hooks/` holds hooks that run the checks before a commit is made. A clone
+does not install them, so install them once:
+
+```sh
+make install-git-hooks
+```
+
+#### `pre-commit`
+
+Rejects a commit that has unstaged or untracked changes, so the checks always
+run against exactly what is being committed. To commit a subset deliberately,
+set the rest aside first:
+
+```sh
+git stash push --keep-index --include-untracked -m pre-commit
+git commit
+git stash apply && git stash drop
+```
+
+Then it runs `make precommit`, which formats, type-checks, builds and runs the
+suite with both coverage floors. Because the tree was staged whole a moment
+earlier, anything the formatter rewrote — or any coverage floor that went up —
+is staged into the same commit.
 
 To test against a real vault, symlink this repo into it:
 
 ```bash
 ln -s /path/to/obsidian-kingdone-chapel /path/to/vault/.obsidian/plugins/kingdone-chapel
 ```
+
+### CI
+
+`Check` runs `npm run check` — the same list as the hook, minus the writing —
+on every pull request that is not a draft. Marking a draft ready for review
+starts it.
 
 Releases are cut by pushing a tag matching the `manifest.json` version (e.g. `1.0.0`); CI
 attaches `main.js`, `manifest.json` and `styles.css` to the GitHub release.

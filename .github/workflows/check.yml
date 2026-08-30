@@ -1,0 +1,36 @@
+name: Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: check-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Formatting, then the type check and the production bundle, then the
+      # suite and its coverage floors. `npm run check` is the same list the
+      # pre-commit hook runs, minus the writing: CI reads and reports, it does
+      # not reformat a branch on its author's behalf.
+      - name: Check
+        run: npm run check
