@@ -1,0 +1,21 @@
+#!/bin/sh
+
+if ! git diff --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]; then
+  echo "Commit rejected: there are unstaged or untracked changes."
+  echo "Stage everything or stash before committing."
+  echo ""
+  echo "For stashing:"
+  echo ""
+  echo "  git stash push --keep-index --include-untracked -m pre-commit"
+  echo "  git commit"
+  echo "  git stash apply && git stash drop"
+  exit 1
+fi
+
+make precommit || exit 1
+
+# The checks rewrite what they can fix: Prettier formats, and a run that raises
+# coverage writes the new floor back to the Vitest config. Everything was
+# staged a moment ago, so whatever differs now was written by them, and belongs
+# in the commit they were run for.
+git add -A
