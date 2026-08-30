@@ -112,16 +112,16 @@ export default class KingdoneChapelPlugin extends Plugin {
     });
 
     this.registerEvent(this.app.vault.on('modify', (file) => this.chapterCache.delete(file.path)));
-    this.registerEvent(this.app.vault.on('create', () => this.invalidateIndex()));
-    this.registerEvent(this.app.vault.on('delete', () => this.invalidateIndex()));
-    // A renamed file may be the one on screen, and nothing else says the bar
-    // above it now names another passage — or none.
-    this.registerEvent(
-      this.app.vault.on('rename', () => {
-        this.invalidateIndex();
-        this.queueBreadcrumbs();
-      })
-    );
+    // Any of the three can be the chapter on screen, or the one an arrow points
+    // at, and nothing else says the bar above a note now names another passage —
+    // another chapter either side of it, or none at all.
+    const moved = () => {
+      this.invalidateIndex();
+      this.queueBreadcrumbs();
+    };
+    this.registerEvent(this.app.vault.on('create', moved));
+    this.registerEvent(this.app.vault.on('delete', moved));
+    this.registerEvent(this.app.vault.on('rename', moved));
     this.register(() => this.cancelQueuedRefresh());
 
     // A pane picks up the bar when it opens a chapter, and loses it when it
