@@ -1,5 +1,5 @@
 import { EditorSuggest } from 'obsidian';
-import type { Editor, EditorPosition, EditorSuggestContext, EditorSuggestTriggerInfo, TFile } from 'obsidian';
+import type { Editor, EditorPosition, EditorSuggestContext, EditorSuggestTriggerInfo, Instruction, TFile } from 'obsidian';
 
 import { abbrLabel, langsFor, matchBooks, plain } from './books';
 import { parseReference, verseLabels } from './reference';
@@ -22,11 +22,32 @@ import type KingdoneChapelPlugin from './main';
  */
 const TRIGGER = /(?:(!)@|(?:^|[^\p{L}\p{N}_@!])@)([\p{L}\p{N} .,:-]{0,40})$/u;
 
-/** One way the query could be linked: a book the reader may have meant, under
- * one of the names they may want it written as. */
+/** The line under the rows, saying what else a reference may carry. */
+const INSTRUCTIONS: Instruction[] = [
+  { command: 'Jo 1', purpose: 'book and chapter' },
+  { command: '.1', purpose: 'verse' },
+  { command: ',2-4', purpose: 'more verses' },
+  { command: '-nvi', purpose: 'version' },
+  { command: '!@', purpose: 'to embed' },
+  { command: '↵', purpose: 'to insert' },
+];
+
+/** Rows a whole popup may hold, so a query naming no version and matching
+ * every book cannot read the vault for a page nobody will scroll to. */
+const MAX_ROWS = 12;
+
+/** Books one version is offered under. A query reaching for several versions
+ * splits this between them rather than growing the popup. */
+const MAX_BOOKS = 6;
+
+/** One way the query could be linked: a book the reader may have meant, in one
+ * version, under one of the names they may want it written as. */
 export interface RefSuggestion {
-  version: string;
-  /** `João 1.1-3` — the reference as the note will read it, and the popup row. */
+  /**
+   * `João 1.1-3 - NVI` — the reference as the note will read it once the links
+   * are rendered, so a row that links is a sample of the line it writes. An
+   * embed writes no label of its own, and the row names the passage instead.
+   */
   ref: string;
   /** Book `ref` points at, for the rows where an abbreviation hides it. */
   book: string;
@@ -44,6 +65,10 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
   constructor(plugin: KingdoneChapelPlugin) {
     super(plugin.app);
     this.plugin = plugin;
+    // Everything the popup understands, written the way it is typed. None of
+    // it is discoverable from the rows themselves — a reader who never learns
+    // the dash simply never asks for another version.
+    this.setInstructions(INSTRUCTIONS);
   }
 
   onTrigger(cursor: EditorPosition, editor: Editor): EditorSuggestTriggerInfo | null {
@@ -67,46 +92,75 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
     const parsed = parseReference(query, (word) => this.plugin.findVersion(word) !== null);
     if (!parsed) return [];
 
-    const version =
-      (parsed.version && this.plugin.findVersion(parsed.version)) ||
-      this.plugin.defaultVersion(ctx.file);
-    if (!version) return [];
+    const versions = this.versionsFor(parsed, ctx.file);
+    if (!versions.length) return [];
+    // A version nobody asked for is the one already in force, and naming it in
+    // the label would only be the setting read back. One that was asked for is
+    // named there, where it has to be read to be of any use.
+    const named = parsed.versionPrefix || parsed.version !== null;
 
     const out: RefSuggestion[] = [];
     const langs = langsFor(this.plugin.settings.language);
-    for (const match of matchBooks(parsed.book, 6, langs)) {
-      const file = this.plugin.referenceFile(version, match.book.index, parsed.chapter);
-      if (!file) continue;
+    // A half-written `-n` matches several versions, and each of them wants to
+    // show the books the query matched. Every version gets a share of the
+    // popup rather than the first one filling it.
+    const books = Math.max(1, Math.ceil(MAX_BOOKS / versions.length));
+    for (const version of versions) {
+      for (const match of matchBooks(parsed.book, books, langs)) {
+        if (out.length >= MAX_ROWS) return out.slice(0, MAX_ROWS);
 
-      const name = match.book.names[match.lang];
-      try {
-        // The anchors and the opening verse are the passage, not the wording,
-        // so both forms of the same book share the one read.
-        const anchors = await this.plugin.findAnchors(file, parsed.chapter, parsed.verses);
-        const preview = await this.previewOf(file, parsed.chapter, parsed.verses);
+        const file = this.plugin.referenceFile(version, match.book.index, parsed.chapter);
+        if (!file) continue;
 
-        if (embed) {
-          const ref = verseLabels(name, parsed.chapter, parsed.verses).join(',');
-          const base = { version, ref, book: name, preview };
-          for (const row of await this.embeds(file, parsed, anchors, ctx.file)) {
-            out.push({ ...base, ...row });
+        const name = match.book.names[match.lang];
+        try {
+          // The anchors and the opening verse are the passage, not the wording,
+          // so both forms of the same book share the one read.
+          const anchors = await this.plugin.findAnchors(file, parsed.chapter, parsed.verses);
+          const preview = await this.previewOf(file, parsed.chapter, parsed.verses);
+
+          if (embed) {
+            // An embed writes no label, so the version cannot be named in what
+            // it writes; the row names it, which is what the choice is between
+            // when a half-written version matched more than one.
+            const labels = verseLabels(name, parsed.chapter, parsed.verses, named ? version : null);
+            const base = { ref: labels.join(','), book: name, preview };
+            for (const row of await this.embeds(file, parsed, anchors, ctx.file)) {
+              out.push({ ...base, ...row });
+            }
+            continue;
           }
+
+          for (const form of this.forms(match, name)) {
+            const labels = verseLabels(form, parsed.chapter, parsed.verses, named ? version : null);
+            const links = labels.map((label, i) => this.link(file, anchors[i] || null, label, ctx.file));
+            out.push({ ref: labels.join(','), book: name, preview, markdown: links.join(',') });
+          }
+        } catch (e) {
+          // Both reads go to the file the index named, which may have gone away
+          // since it was indexed. Leave that book out rather than taking the
+          // whole popup down with it.
           continue;
         }
-
-        for (const form of this.forms(match, name)) {
-          const labels = verseLabels(form, parsed.chapter, parsed.verses);
-          const links = labels.map((label, i) => this.link(file, anchors[i] || null, label, ctx.file));
-          out.push({ version, ref: labels.join(','), book: name, preview, markdown: links.join(',') });
-        }
-      } catch (e) {
-        // Both reads go to the file the index named, which may have gone away
-        // since it was indexed. Leave that book out rather than taking the
-        // whole popup down with it.
-        continue;
       }
     }
-    return out;
+    return out.slice(0, MAX_ROWS);
+  }
+
+  /**
+   * Versions to offer the reference in. A version still being written stands
+   * for every version that begins with it, and the rows finish the word —
+   * `@Gn 1 -n` offers Genesis 1 in NTLH and in NVI, and picking one writes the
+   * whole reference rather than only the version name. Anything else names at
+   * most one version, or leaves it to the default.
+   */
+  versionsFor(parsed: ParsedRef, from: TFile | null): string[] {
+    if (parsed.versionPrefix) {
+      const wanted = (parsed.version || '').toLowerCase();
+      return this.plugin.listVersions().filter((v) => v.toLowerCase().startsWith(wanted));
+    }
+    const named = parsed.version ? this.plugin.findVersion(parsed.version) : this.plugin.defaultVersion(from);
+    return named ? [named] : [];
   }
 
   /**
@@ -187,6 +241,8 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
 
   renderSuggestion(item: RefSuggestion, el: HTMLElement) {
     const head = el.createDiv({ cls: 'kcp-suggest-head' });
+    // The row is the finished line, so it is dressed as one: what it says and
+    // how it will look are both answered by reading it.
     head.createSpan({ cls: 'kcp-suggest-ref', text: item.ref });
     // The row reads as the reference it will write. An abbreviation does not
     // say which book that is — `Jn` is Jonas in Portuguese and John in English —
@@ -196,7 +252,6 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
     }
     // Two rows writing the same chapter differently are told apart by this.
     if (item.note) head.createSpan({ cls: 'kcp-suggest-note', text: item.note });
-    head.createSpan({ cls: 'kcp-version', text: item.version });
     if (item.preview) el.createEl('small', { text: item.preview, cls: 'kcp-preview' });
   }
 

@@ -108,20 +108,17 @@
   gap: var(--size-4-2);
 }
 
+/* The row is the line the note will hold, so it is dressed as that line: the
+   link's own colour and underline, rather than a heading's weight. */
 .kcp-suggest-ref {
-  font-weight: 600;
+  color: var(--link-color);
+  text-decoration: var(--link-decoration);
+  text-decoration-color: var(--link-decoration-color, currentColor);
 }
 
 .kcp-suggest-book {
   font-size: var(--font-ui-smaller);
   color: var(--text-muted);
-}
-
-.kcp-suggest-head .kcp-version {
-  font-size: var(--font-ui-smaller);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--text-accent);
 }
 
 .kcp-suggest-note {
