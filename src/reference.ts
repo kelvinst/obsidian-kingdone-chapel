@@ -12,6 +12,7 @@
  *   @Joao 1.1 ARA    the same, with the version said last
  *   @Joao 1.1 -ara   the same, written the way the finished link reads it,
  *                    which may sit anywhere in the reference
+ *   @1               numbers alone, read against the passage the note is about
  *
  * The text is still being typed, so half-written references (`@Joao 1.`,
  * `@Joao 1-`, `@Joao 1.1-`) have to parse into the most complete thing they
@@ -233,6 +234,28 @@ export function booklessPassageLabel(
 ): string {
   const spec = verseSpec(bookless.verses);
   return bookless.chapter === null ? spec : `${chapter}.${spec}`;
+}
+
+/**
+ * A reference written as numbers alone (`1`, `1,2,3`, `1-3`), for a note that
+ * already says which passage it is about. There is no book in it to read, only
+ * the numbers, which the caller reads against that passage — as verses of the
+ * chapter it names, or as chapters of its book.
+ *
+ * Anything carrying a letter is not one of these and comes back null, to be
+ * read by `parseReference` the way it always was. A run asking for more than a
+ * reference may carry comes back null as well, for the reason `expandRun`
+ * gives. It is measured against the verse cap, the wider of the two; read as
+ * chapters the same numbers have `fitsChapters` to answer to.
+ */
+export function parseNumbers(query: string): number[] | null {
+  if (!/^[\d\s,-]+$/.test(query)) return null;
+  return expandRun(query, MAX_VERSES);
+}
+
+/** Whether a run is short enough to be read as chapters as well as verses. */
+export function fitsChapters(numbers: number[]): boolean {
+  return numbers.length <= MAX_CHAPTERS;
 }
 
 /**
