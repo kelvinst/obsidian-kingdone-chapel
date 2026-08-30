@@ -57,6 +57,20 @@ export interface ChapterRef {
   code: string;
 }
 
+/**
+ * Where a link to one chapter points: the file the version wrote it in, or, for
+ * a chapter it never wrote, only the name that file would carry. A link may be
+ * written to either — the second lands unresolved, which the reader may click
+ * to write the chapter into being.
+ */
+export interface ChapterTarget {
+  /** Null for the book itself, which is asked for by naming no chapter. */
+  chapter: number | null;
+  file: TFile | null;
+  /** What the link is written against, whether or not a file answers to it. */
+  path: string;
+}
+
 export interface Verse {
   verse: number;
   text: string;

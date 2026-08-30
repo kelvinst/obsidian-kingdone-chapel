@@ -37,8 +37,8 @@ export default defineConfig({
         // And what the project as a whole has to hold, which is low because
         // most of it has no tests yet. It is here to be climbed.
         statements: 14.31,
-        branches: 19.2,
-        functions: 13.24,
+        branches: 19.65,
+        functions: 13.59,
         lines: 13.47,
       },
     },

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  chapterFileName,
   chapterKey,
   parseBookName,
   parseChapterName,
@@ -80,6 +81,35 @@ describe('parseBookName', () => {
   it('also answers for a chapter file, which is why chapters are read first', () => {
     expect(parseChapterName('NVI-43-JHN-001', 'NVI')).not.toBeNull();
     expect(parseBookName('NVI-43-JHN-001', 'NVI')).toBe(43);
+  });
+});
+
+describe('chapterFileName', () => {
+  it('names another chapter of the same book, padded as the example is', () => {
+    expect(chapterFileName('NVI-43-JHN-001', 2)).toBe('NVI-43-JHN-002');
+    expect(chapterFileName('NVI-43-JHN-001', 21)).toBe('NVI-43-JHN-021');
+  });
+
+  it('keeps the version exactly as the version writes it', () => {
+    expect(chapterFileName('nvi-43-JHN-001', 2)).toBe('nvi-43-JHN-002');
+  });
+
+  it('splits at the last dash, so a numbered book keeps its number', () => {
+    expect(chapterFileName('NVI-09-1SA-001', 2)).toBe('NVI-09-1SA-002');
+  });
+
+  it('pads to the width the example used, and no further', () => {
+    expect(chapterFileName('NVI-19-PSA-1', 12)).toBe('NVI-19-PSA-12');
+    expect(chapterFileName('NVI-19-PSA-001', 150)).toBe('NVI-19-PSA-150');
+  });
+
+  it('reads the whole-book file a commentary keeps as an example like any other', () => {
+    expect(chapterFileName('COM-01-GEN-000', 1)).toBe('COM-01-GEN-001');
+  });
+
+  it('has no answer where the example ends in no chapter number', () => {
+    expect(chapterFileName('NVI-43-Joao', 1)).toBeNull();
+    expect(chapterFileName('', 1)).toBeNull();
   });
 });
 
