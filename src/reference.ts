@@ -7,6 +7,7 @@
  *   @Joao 1.1,2      two verses
  *   @Joao 1.1-3      the same as 1,2,3
  *   @ARA Joao 1.1    the same verse in a named version
+ *   @1               numbers alone, read against the passage the note is about
  *
  * The text is still being typed, so half-written references (`@Joao 1.`,
  * `@Joao 1.1-`) have to parse into the most complete thing they can be.
@@ -80,6 +81,20 @@ function expandVerses(spec: string): number[] | null {
     if (single && !add(parseInt(single[0], 10))) return null;
   }
   return out;
+}
+
+/**
+ * A reference written as numbers alone (`1`, `1,2,3`, `1-3`), for a note that
+ * already says which passage it is about. There is no book in it to read, only
+ * the numbers, which the caller reads against that passage.
+ *
+ * Anything carrying a letter is not one of these and comes back null, to be
+ * read by `parseReference` the way it always was. A spec asking for more than a
+ * reference may carry comes back null as well, for the reason given above.
+ */
+export function parseNumbers(query: string): number[] | null {
+  if (!/^[\d\s,-]+$/.test(query)) return null;
+  return expandVerses(query);
 }
 
 /**

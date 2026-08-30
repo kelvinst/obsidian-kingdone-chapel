@@ -1,4 +1,4 @@
-import { MarkdownView, Notice, Plugin, TFile, TFolder, WorkspaceLeaf } from 'obsidian';
+import { MarkdownView, Notice, Plugin, TFile, TFolder, WorkspaceLeaf, getLinkpath } from 'obsidian';
 import type { PaneType } from 'obsidian';
 
 import { DEFAULT_SETTINGS, VIEW_TYPE } from './types';
@@ -311,6 +311,24 @@ export default class KingdoneChapelPlugin extends Plugin {
       verse: this.currentVerse(view),
       file,
     };
+  }
+
+  /**
+   * The passage a note is already about, read from the first link in it that
+   * lands in the Bible. A note names its passage once and then goes on writing
+   * about it, so that first link is what a reference written as a bare number
+   * is written against. Links are always to a chapter, so it is one.
+   */
+  linkContext(from: TFile | null): Location | null {
+    if (!from) return null;
+    const cache = this.app.metadataCache.getFileCache(from);
+    for (const link of (cache && cache.links) || []) {
+      const dest = this.app.metadataCache.getFirstLinkpathDest(getLinkpath(link.link), from.path);
+      // Only a chapter file answers; everything else the note links is skipped.
+      const loc = dest ? this.locationOf(dest, null) : null;
+      if (loc) return loc;
+    }
+    return null;
   }
 
   /** Verse being read: the cursor while editing, the rendered page while reading. */
