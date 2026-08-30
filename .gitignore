@@ -5,3 +5,4 @@ data.json
 .DS_Store
 .hotreload
 data.json.bak
+coverage/

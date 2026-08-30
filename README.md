@@ -190,12 +190,18 @@ npm run dev        # watch build, writes main.js
 npm run build      # type-check then production build
 npm test           # run the test suite once
 npm run test:watch # re-run tests as files change
+npm run test:coverage
 ```
 
 Tests are [Vitest](https://vitest.dev) files sitting next to what they cover
 (`src/reference.test.ts`), and cover the parsing the plugin is built on: `@`
 references, chapter and verse file names, and the book table. `npm run build`
 type-checks them along with the rest of `src`.
+
+`npm run test:coverage` prints a table and writes a browsable report to
+`coverage/index.html`. It counts every file under `src`, so the modules that
+have no tests yet — `main.ts` and the views — show up as the zeroes they are
+rather than going unmentioned.
 
 To test against a real vault, symlink this repo into it:
 
