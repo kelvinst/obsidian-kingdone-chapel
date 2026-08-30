@@ -20,7 +20,9 @@ import {
 import {
   booklessLabels,
   booklessPassageLabel,
+  fitsChapters,
   parseBookless,
+  parseNumbers,
   parseReference,
   passageId,
   passageLabel,
@@ -29,7 +31,7 @@ import {
 import { hasBlockId, parseChapterName, quotePlacement } from './utils';
 import type { BookMatch } from './books';
 import type { BooklessRef, ParsedRef } from './reference';
-import type { ChapterTarget } from './types';
+import type { ChapterTarget, Location } from './types';
 import type { ChapterName } from './utils';
 import type KingdoneChapelPlugin from './main';
 
@@ -133,7 +135,25 @@ export interface RefSuggestion {
   passage?: Passage;
 }
 
-export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
+/** A row saying why a query could not be read, rather than one that links. */
+export interface HintSuggestion {
+  hint: string;
+}
+
+/** What the popup lists: something to link, or a word about why there is not. */
+type Row = RefSuggestion | HintSuggestion;
+
+/**
+ * Said when numbers were written on their own in a note holding no passage to
+ * read them against. The books still answer below it, but nothing there
+ * explains why the number alone found nothing, and a row that only closes
+ * reads as a plugin that broke.
+ */
+const NO_CONTEXT: HintSuggestion = {
+  hint: 'No link in this note to read a book from — write one',
+};
+
+export class ReferenceSuggest extends EditorSuggest<Row> {
   plugin: KingdoneChapelPlugin;
 
   constructor(plugin: KingdoneChapelPlugin) {
@@ -179,21 +199,33 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
   /**
    * A reference written after a semicolon may leave its book out and carry it
    * on from the one before, the way the second of a pair is written by hand.
-   * The books still answer under those rows: `;@3` is verse 3 of the chapter
-   * being carried as much as it is the start of `3 João`, and one costs
-   * nothing to show beside the other.
+   * With no semicolon in front of them, numbers on their own are read against
+   * the passage the note is about instead — the same reference, counted from
+   * what the note already says rather than from what the line already wrote.
+   *
+   * The books answer under either of them: `@1` is a chapter of the book at
+   * hand as much as it is the start of `1 Samuel`, and one suggestion costs
+   * nothing to show next to the other.
    */
-  async getSuggestions(ctx: EditorSuggestContext): Promise<RefSuggestion[]> {
+  async getSuggestions(ctx: EditorSuggestContext): Promise<Row[]> {
     const embed = ctx.query.startsWith('!');
     const query = embed ? ctx.query.slice(1) : ctx.query;
 
-    const out: RefSuggestion[] = [];
+    const out: Row[] = [];
     const bookless = parseBookless(query);
-    if (bookless) {
-      const here = this.carriedFrom(ctx);
-      if (here) {
+    const carried = bookless ? this.carriedFrom(ctx) : null;
+    if (bookless && carried) {
+      out.push(
+        ...(await this.carriedSuggestions(carried, bookless, embed, ctx.file)),
+      );
+    } else {
+      const numbers = parseNumbers(query);
+      if (numbers && numbers.length) {
+        const here = this.plugin.linkContext(ctx.file);
         out.push(
-          ...(await this.carriedSuggestions(here, bookless, embed, ctx.file)),
+          ...(here
+            ? await this.contextSuggestions(here, numbers, embed, ctx.file)
+            : [NO_CONTEXT]),
         );
       }
     }
@@ -534,6 +566,92 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
   }
 
   /**
+   * The two things numbers can mean against the passage a note is about: those
+   * verses of its chapter, or those chapters of its book. Verses come first —
+   * a note about a chapter cites verses of it far more often than it moves on
+   * to another chapter.
+   *
+   * Either reading walks files the index named, which may have gone away
+   * since; one that fails is left out, the same way a book is above.
+   */
+  async contextSuggestions(
+    here: Location,
+    numbers: number[],
+    embed: boolean,
+    from: TFile | null,
+  ): Promise<RefSuggestion[]> {
+    const rows = await Promise.all([
+      this.passageRow(here, [here.chapter], numbers, embed, from).catch(
+        () => null,
+      ),
+      // The same numbers as chapters, so long as there are not more of them
+      // than a run of chapters may carry.
+      fitsChapters(numbers)
+        ? this.passageRow(here, numbers, [], embed, from).catch(() => null)
+        : null,
+    ]);
+    return rows.filter((row): row is RefSuggestion => row !== null);
+  }
+
+  /**
+   * One row for a passage of the book the note is about, in the version it was
+   * already linking — which nobody asked for here, so it goes unnamed in the
+   * label for the same reason the default version does: it would only be
+   * reading the note back to itself.
+   */
+  async passageRow(
+    here: Location,
+    chapters: number[],
+    verses: number[],
+    embed: boolean,
+    from: TFile | null,
+  ): Promise<RefSuggestion | null> {
+    const found = this.chapterTargets(here.version, here.bookIndex, chapters);
+    if (!found.length) return null;
+
+    const head = found[0];
+    const anchors = head.file
+      ? await this.plugin.findAnchors(head.file, head.chapter, verses)
+      : verses.map(() => null);
+    const preview = head.file
+      ? await this.previewOf(head.file, head.chapter, verses)
+      : '';
+    const labels = referenceLabels(
+      here.book,
+      found.map((f) => f.chapter).filter((c): c is number => c !== null),
+      verses,
+    );
+
+    return {
+      ref: labels.join(','),
+      book: here.book,
+      preview,
+      markdown: embed
+        ? (
+            await this.embeds(
+              found,
+              {
+                version: null,
+                versionPrefix: false,
+                book: here.book,
+                chapters,
+                verses,
+              },
+              anchors,
+              from,
+            )
+          )[0].markdown
+        : labels
+            .map((label, i) =>
+              verses.length
+                ? this.link(found[0], anchors[i] || null, label, from)
+                : this.link(found[i], null, label, from),
+            )
+            .join(','),
+    };
+  }
+
+  /**
    * The names to offer one book under. Someone who wrote `@Jn 1.1` wants the
    * note to go on saying `Jn 1.1`, so the abbreviation they typed comes first;
    * the full name follows for when they meant it spelled out. Writing the name
@@ -678,7 +796,12 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
     return match ? match.text : '';
   }
 
-  renderSuggestion(item: RefSuggestion, el: HTMLElement) {
+  renderSuggestion(item: Row, el: HTMLElement) {
+    if ('hint' in item) {
+      el.createSpan({ cls: 'kcp-suggest-hint', text: item.hint });
+      return;
+    }
+
     const head = el.createDiv({ cls: 'kcp-suggest-head' });
     // The row is the finished line, so it is dressed as one: what it says and
     // how it will look are both answered by reading it.
@@ -696,9 +819,10 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
       el.createEl('small', { text: item.preview, cls: 'kcp-preview' });
   }
 
-  selectSuggestion(item: RefSuggestion, evt: MouseEvent | KeyboardEvent) {
+  selectSuggestion(item: Row, evt: MouseEvent | KeyboardEvent) {
     const ctx = this.context;
-    if (!ctx) return;
+    // A hint has nothing to insert. Picking it leaves the line as it was typed.
+    if (!ctx || 'hint' in item) return;
     ctx.editor.replaceRange(item.markdown, ctx.start, ctx.end);
     // A passage link points at a quote, which is written into the note as
     // well. A note whose quotes are not the last thing in it takes that quote
