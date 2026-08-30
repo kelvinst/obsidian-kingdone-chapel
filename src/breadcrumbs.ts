@@ -190,7 +190,7 @@ export class Breadcrumbs {
         const item = this.item(into, book.name, book.index === loc.bookIndex);
         item.onclick = (click) => {
           close();
-          this.plugin.openChapter(loc.version, book.index, 1, view.file, paneFor(click));
+          this.plugin.openChapter(loc.version, book.index, book.chapter, view.file, paneFor(click));
         };
       }
     }, evt);

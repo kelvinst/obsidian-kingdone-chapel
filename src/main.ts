@@ -602,13 +602,22 @@ export default class KingdoneChapelPlugin extends Plugin {
     return out;
   }
 
-  /** Books a version has chapters for, in canonical order, named to read. */
-  booksIn(version: string): { index: number; name: string }[] {
+  /**
+   * Books a version has chapters for, in canonical order, named to read, each
+   * with the first chapter it actually holds.
+   *
+   * Which is not always chapter 1: a version part way through being imported
+   * may start at any chapter, and one whose chapter 1 is claimed by two files
+   * has it left out of the index. Opening a book on the first chapter the
+   * order names is the same answer as chapter 1 wherever chapter 1 is there,
+   * and an answer at all where it is not.
+   */
+  booksIn(version: string): { index: number; name: string; chapter: number }[] {
     const lang = nameLang(this.settings.language);
-    const out: { index: number; name: string }[] = [];
+    const out: { index: number; name: string; chapter: number }[] = [];
     for (const ref of this.chapterOrder(version)) {
       if (out.length && out[out.length - 1].index === ref.bookIndex) continue;
-      out.push({ index: ref.bookIndex, name: bookName(ref.code, lang) });
+      out.push({ index: ref.bookIndex, name: bookName(ref.code, lang), chapter: ref.chapter });
     }
     return out;
   }
