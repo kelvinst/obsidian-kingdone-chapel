@@ -186,9 +186,16 @@ Not in the community plugin store. Install with [BRAT](https://github.com/TfTHac
 
 ```bash
 npm install
-npm run dev     # watch build, writes main.js
-npm run build   # type-check then production build
+npm run dev        # watch build, writes main.js
+npm run build      # type-check then production build
+npm test           # run the test suite once
+npm run test:watch # re-run tests as files change
 ```
+
+Tests are [Vitest](https://vitest.dev) files sitting next to what they cover
+(`src/reference.test.ts`), and cover the parsing the plugin is built on: `@`
+references, chapter and verse file names, and the book table. `npm run build`
+type-checks them along with the rest of `src`.
 
 To test against a real vault, symlink this repo into it:
 
