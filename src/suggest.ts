@@ -69,6 +69,20 @@ export interface HintSuggestion {
 type Row = RefSuggestion | HintSuggestion;
 
 /**
+ * One passage read against the note's own, offered under both labels it could
+ * be written with: the numbers as they were typed, and the reference spelled
+ * out. Either may be missing — an embed carries no label to choose, and a
+ * passage the vault has no file for has no row at all.
+ */
+interface ContextRows {
+  bare: RefSuggestion | null;
+  full: RefSuggestion | null;
+}
+
+/** A passage the vault could not answer for. */
+const NO_ROWS: ContextRows = { bare: null, full: null };
+
+/**
  * Said when numbers were written on their own in a note holding no passage to
  * read them against. The books still answer below it, but nothing there
  * explains why the number alone found nothing, and a row that only closes
@@ -208,8 +222,13 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
    * a note about a chapter cites verses of it far more often than it moves on
    * to another chapter.
    *
-   * Either row reads a file the index named, which may have gone away since;
-   * one that fails is left out, the same way a book is above.
+   * Both come twice over, under the label the reader typed and under the one
+   * spelling the reference out, and the typed one leads: someone who wrote
+   * `@1` was writing a sentence with a `1` in it, the same way someone who
+   * wrote `@Jn` meant the note to go on saying `Jn`.
+   *
+   * Either passage reads a file the index named, which may have gone away
+   * since; one that fails is left out, the same way a book is above.
    */
   async contextSuggestions(
     here: Location,
@@ -217,72 +236,90 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
     embed: boolean,
     from: TFile | null
   ): Promise<RefSuggestion[]> {
-    const rows = await Promise.all([
-      this.verseRow(here, numbers, embed, from).catch(() => null),
-      this.chapterRow(here, numbers, embed, from).catch(() => null),
+    const [verses, chapters] = await Promise.all([
+      this.verseRows(here, numbers, embed, from).catch(() => NO_ROWS),
+      this.chapterRows(here, numbers, embed, from).catch(() => NO_ROWS),
     ]);
+    const rows = [verses.bare, chapters.bare, verses.full, chapters.full];
     return rows.filter((row): row is RefSuggestion => row !== null);
   }
 
   /**
-   * `João 1.1,2,3` — the numbers as verses of the chapter the note is about.
+   * `João 1.1,2,3`, and the same links under the numbers alone.
    *
    * The version is the one the note was already linking, which nobody asked
    * for here, so it goes unnamed in the label for the same reason the default
    * version does: it would only be reading the note back to itself.
    */
-  async verseRow(
+  async verseRows(
     here: Location,
     verses: number[],
     embed: boolean,
     from: TFile | null
-  ): Promise<RefSuggestion | null> {
+  ): Promise<ContextRows> {
     const file = this.plugin.referenceFile(here.version, here.bookIndex, here.chapter);
-    if (!file) return null;
+    if (!file) return NO_ROWS;
 
+    // The anchors and the opening verse are the passage, not the wording, so
+    // both labellings share the one read.
     const anchors = await this.plugin.findAnchors(file, here.chapter, verses);
-    const labels = verseLabels(here.book, here.chapter, verses);
-    return {
+    const preview = await this.previewOf(file, here.chapter, verses);
+    const row = (labels: string[]): RefSuggestion => ({
       ref: labels.join(','),
       book: here.book,
-      preview: await this.previewOf(file, here.chapter, verses),
+      preview,
       markdown: embed
         ? this.embedLines(file, anchors, from)
         : labels.map((label, i) => this.link(file, anchors[i] || null, label, from)).join(','),
+    });
+
+    return {
+      bare: embed ? null : row(verses.map(String)),
+      full: row(verseLabels(here.book, here.chapter, verses)),
     };
   }
 
   /**
-   * `João 1, João 2` — the same numbers read as chapters of the book instead.
-   * Every one of them has to be there: a run quietly cut short points at
-   * something other than what was typed, which is why a reference reaching too
-   * far is refused rather than trimmed. Each link says its whole reference,
-   * since a bare `2` beside a chapter link would not say what it is.
+   * `João 1, João 2` — the same numbers read as chapters of the book instead,
+   * and the same links under the numbers alone. Every chapter has to be there:
+   * a run quietly cut short points at something other than what was typed,
+   * which is why a reference reaching too far is refused rather than trimmed.
+   *
+   * Spelled out, each link says its whole reference, since a bare `2` next to
+   * `João 1` would read as a verse of it. Written as the numbers alone there
+   * is nothing to tell the row from the verses of the same name, so it says
+   * which it is.
    */
-  async chapterRow(
+  async chapterRows(
     here: Location,
     chapters: number[],
     embed: boolean,
     from: TFile | null
-  ): Promise<RefSuggestion | null> {
+  ): Promise<ContextRows> {
     const files: TFile[] = [];
     for (const chapter of chapters) {
       const file = this.plugin.referenceFile(here.version, here.bookIndex, chapter);
-      if (!file) return null;
+      if (!file) return NO_ROWS;
       files.push(file);
     }
 
-    const labels = chapters.map((chapter) => `${here.book} ${chapter}`);
-    return {
-      ref: labels.join(', '),
+    const preview = await this.previewOf(files[0], chapters[0], []);
+    const row = (labels: string[], join: string, note?: string): RefSuggestion => ({
+      ref: labels.join(join),
       book: here.book,
-      preview: await this.previewOf(files[0], chapters[0], []),
+      note,
+      preview,
       // A chapter embeds as the file it is, one to a line, the way a run of
       // verses does. Which of the two `!@1` meant is the choice the rows are
       // already offering.
       markdown: embed
         ? files.map((file) => this.embed(file, null, from)).join('\n')
-        : files.map((file, i) => this.link(file, null, labels[i], from)).join(', '),
+        : files.map((file, i) => this.link(file, null, labels[i], from)).join(join),
+    });
+
+    return {
+      bare: embed ? null : row(chapters.map(String), ',', 'chapter'),
+      full: row(chapters.map((chapter) => `${here.book} ${chapter}`), ', '),
     };
   }
 
