@@ -225,9 +225,24 @@ raises coverage writes the higher floor back. CI is the one that only reads,
 and it says so in its own steps.
 
 Tests are [Vitest](https://vitest.dev) files sitting next to what they cover
-(`src/reference.test.ts`), and cover the parsing the plugin is built on: `@`
-references, chapter and verse file names, and the book table. `npm run build`
-type-checks them along with the rest of `src`.
+(`src/reference.test.ts`), and cover the whole plugin: the parsing it is built
+on — `@` references, chapter and verse file names, the book table — and then
+the indexing, the sidebar, the breadcrumb bars, the reference popup and the
+settings tab. `npm run build` type-checks them along with the rest of `src`.
+
+Every one of those modules imports from `obsidian`, which is type declarations
+and no code — the app supplies the classes at runtime, and the bundle leaves
+the import for it to fill in. Under Vitest there is no app, so `resolve.alias`
+points the name at `test/obsidian.ts`, a stub holding just enough of the API to
+run against and a note of what it was asked to do, for a test to read back.
+Beside it, `test/dom.ts` installs the helpers Obsidian puts on the DOM
+prototypes (`createDiv`, `addClass`, ...), which are not part of the module at
+all, and `test/harness.ts` builds a vault, a workspace and a plugin out of a
+list of files. Only the tests ever see the stub: the source still type-checks
+against the real declarations, which is what keeps the stub from drifting into
+an API Obsidian does not have. A test file that needs a DOM opens with
+`// @vitest-environment jsdom`, and the ones over the pure modules stay in
+`node`.
 
 Formatting is [Prettier](https://prettier.io) at 80 columns, over everything
 but the bundle and the lock file.
@@ -235,21 +250,21 @@ but the bundle and the lock file.
 ### Coverage
 
 `npm run test:coverage` prints a table and writes a browsable report to
-`coverage/index.html`. It counts every file under `src`, so the modules that
-have no tests yet — `main.ts` and the views — show up as the zeroes they are
-rather than going unmentioned.
+`coverage/index.html`. It counts every file under `src`, so a module nothing
+covers shows up as the zero it is rather than going unmentioned.
 
 Two floors have to hold, and both are in `vitest.config.mts`:
 
-- **The modules under test** — `books.ts`, `reference.ts` and `utils.ts` — are
-  at 100% of statements, branches, functions and lines, and have to stay there.
+- **The parsing the plugin is built on** — `books.ts`, `reference.ts` and
+  `utils.ts` — is at 100% of statements, branches, functions and lines, and has
+  to stay there.
   A line that genuinely cannot run is marked `/* v8 ignore next */` with a
   comment saying why, rather than being left to erode the number.
-- **The project as a whole** has a floor too, which is low today because most
-  of it has no tests. It is not meant to stay low: `autoUpdate` raises it to
-  whatever a run reaches whenever a run reaches higher, writing the new
-  numbers back into the config. When `npm run precommit` bumps them, commit
-  that along with the tests that earned it. CI never writes them.
+- **The project as a whole** has a floor too, and it only ever climbs:
+  `autoUpdate` raises it to whatever a run reaches whenever a run reaches
+  higher, writing the new numbers back into the config. When `npm run
+precommit` bumps them, commit that along with the tests that earned it. CI
+  never writes them.
 
 ### Git hooks
 

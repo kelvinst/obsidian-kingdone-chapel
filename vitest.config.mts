@@ -11,6 +11,10 @@ export default defineConfig({
     alias: {
       obsidian: fileURLToPath(new URL('./test/obsidian.ts', import.meta.url)),
     },
+    // And the DOM helpers Obsidian installs on the prototypes, which are no
+    // part of the module and so cannot come from the stand-in. A no-op under
+    // `node`, where the pure modules are tested and there is no DOM to extend.
+    setupFiles: ['./test/dom.ts'],
     coverage: {
       provider: 'v8',
       // Every source file, not only the ones a test happened to import — a
@@ -33,22 +37,24 @@ export default defineConfig({
         // that improves them rewrites this file: commit that with the tests
         // that earned it.
         autoUpdate: true,
-        // What the modules under test have to hold. They are fully covered,
-        // and a change that stops covering one of them is the thing worth
-        // hearing about — the whole-project numbers below are too small a
-        // fraction to move when a tested file slips.
+        // What the parsing the plugin is built on has to hold. It is named on
+        // its own so that a change stopping covering one of these three is
+        // answered for by the file it is in, rather than by a whole-project
+        // number that any other file could just as well have moved.
         'src/{books,reference,utils}.ts': {
           statements: 100,
           branches: 100,
           functions: 100,
           lines: 100,
         },
-        // And what the project as a whole has to hold, which is low because
-        // most of it has no tests yet. It is here to be climbed.
-        statements: 17.28,
-        branches: 22.87,
-        functions: 16.25,
-        lines: 16.52,
+        // And what the project as a whole has to hold. Every module is covered
+        // now, so this is close to the ceiling: what the branches still fall
+        // short of are the fallbacks guarding states a stubbed Obsidian cannot
+        // be put into.
+        statements: 100,
+        branches: 98.27,
+        functions: 100,
+        lines: 100,
       },
     },
   },
