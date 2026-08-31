@@ -24,6 +24,9 @@
   ],
   "author": "Kelvin Stinghen",
   "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
   "devDependencies": {
     "@types/node": "^20.11.0",
     "@vitest/coverage-v8": "^4.1.11",
