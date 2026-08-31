@@ -1,5 +1,5 @@
 ---
-saved_at: 2026-08-31T17:49:51Z
+saved_at: 2026-08-31T17:56:00Z
 session_id: b94027d1-7d14-47e7-bfe6-70594b821584
 transcript: transcript.jsonl.gz
 ---
@@ -137,15 +137,47 @@ it can, and CI that only reads. Work happened on branch
   npm 10/bash, the workflows were parsed with `js-yaml`, and `engines` was shown
   to actually emit `EBADENGINE` by temporarily setting it to `>=99`.
 
+## 2026-08-31 — update
+
+- Pushed the branch (18 commits) and the first real CI run of everything this
+  session changed came back **green**:
+  [run 33421891411](https://github.com/kelvinst/obsidian-kingdone-chapel/actions/runs/33421891411).
+  Every workflow change since `6015d54` had been unexercised until now.
+- **`setup-node` does read `.tool-versions`.** The log shows
+  `Resolved .tool-versions as 25.6.1`, then
+  `Acquiring 25.6.1 - x64 from https://nodejs.org/dist/v25.6.1/...`, then
+  `node: v25.6.1`. Both halves of that open question — parsing and availability
+  of a non-manifest Current release — answered by observation.
+- **The composite action collapses the gate into one step, and that was claimed
+  otherwise.** When the reusable workflow was rejected in favour of a composite
+  action (`a8977a3`), the stated reason included that composite steps still
+  appear individually in the run list. They do not. The run has six top-level
+  steps — `Set up job`, `checkout`, `Run ./.github/actions/gate`,
+  the two `Post Run`s, `Complete job` — with all four checks inside the third
+  as 125 lines of grouped log. The commands are findable in the text, but
+  `Format`, `Type check`, `Bundle` and `Test` are not steps the UI names, which
+  is what splitting them was for. The commit message for `a8977a3` records the
+  wrong claim.
+- Whether a failing step inside the composite action still fails the calling
+  `uses:` step remains unverified — an all-green run cannot show it.
+
 ## Open Questions
 
-- [ ] Does `actions/setup-node@v4` parse `.tool-versions`, and is Node `25.6.1`
+- [x] Does `actions/setup-node@v4` parse `.tool-versions`, and is Node `25.6.1`
       available to it? Supported since v4.1 and we pin `@v4`, but it is
       unexercised — it would fail loudly at the setup step.
+  - Yes to both, observed in run 33421891411: `Resolved .tool-versions as
+    25.6.1`, acquired from `nodejs.org/dist`, `node: v25.6.1`.
 - [ ] Does a failing step inside a composite action still fail the calling
       `uses:` step now that later steps run past it? `release.yml` depends on
       it: `Create release` has no `if:`, so it is skipped only if the gate step
       is marked failed. Getting this wrong means a release ships on a red gate.
+- [ ] Does the gate belong in a composite action at all, now that it is known
+      to collapse the four checks into one step in the run list? The
+      alternatives both cost something: a `workflow_call` reusable workflow
+      names each step but needs artifact plumbing to get `main.js` to
+      `Create release`, and inlining restores the duplication across the two
+      workflows.
 - [ ] Is moving CI from LTS 22 to Current 25 the intent? It followed from
       pinning the version already installed locally, not from a decision about
       release toolchains.
@@ -156,9 +188,10 @@ it can, and CI that only reads. Work happened on branch
 
 ## Action Items
 
-- [ ] Push the 17 commits and watch `Check` go green. **No CI work in this
+- [x] Push the 17 commits and watch `Check` go green. **No CI work in this
       session has run on GitHub** — every workflow change since `6015d54` is
       unexercised.
+  - Pushed as `e39fe94`; run 33421891411 succeeded.
 - [ ] Run `make install-git-hooks` to activate the Node assertion. It will
       reject commits on this machine until the committing shell resolves to
       25.6.1 (`mise install`, then commit from an activated shell).
