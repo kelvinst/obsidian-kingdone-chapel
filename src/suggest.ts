@@ -21,6 +21,7 @@ import {
   booklessLabels,
   booklessPassageLabel,
   fitsChapters,
+  isNumbers,
   parseBookless,
   parseNumbers,
   parseReference,
@@ -167,6 +168,15 @@ const NO_CONTEXT: HintSuggestion = {
   hint: 'No link in this note to read a book from — write one',
 };
 
+/**
+ * Said when the numbers written reach for more verses than one reference may
+ * carry. They are refused rather than cut short, and no book answers a query
+ * of numbers either, so the popup would otherwise close on nothing.
+ */
+const TOO_MANY: HintSuggestion = {
+  hint: 'More verses than one reference can carry — ask for fewer',
+};
+
 export class ReferenceSuggest extends EditorSuggest<Row> {
   plugin: KingdoneChapelPlugin;
 
@@ -234,7 +244,10 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
       );
     } else {
       const numbers = parseNumbers(query);
-      if (numbers && numbers.length) {
+      if (numbers === null && isNumbers(query)) {
+        // Numbers, and nothing wrong with them but how many they came to.
+        out.push(TOO_MANY);
+      } else if (numbers && numbers.length) {
         const here = this.plugin.linkContext(ctx.file);
         out.push(
           ...(here

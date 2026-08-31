@@ -249,8 +249,17 @@ export function booklessPassageLabel(
  * chapters the same numbers have `fitsChapters` to answer to.
  */
 export function parseNumbers(query: string): number[] | null {
-  if (!/^[\d\s,-]+$/.test(query)) return null;
+  if (!isNumbers(query)) return null;
   return expandRun(query, MAX_VERSES);
+}
+
+/**
+ * Whether a query is written as numbers alone, whatever they come to. This is
+ * what tells the two nulls above apart: a query that was never this kind of
+ * reference, and one that was but reached too far.
+ */
+export function isNumbers(query: string): boolean {
+  return /^[\d\s,-]+$/.test(query);
 }
 
 /** Whether a run is short enough to be read as chapters as well as verses. */
