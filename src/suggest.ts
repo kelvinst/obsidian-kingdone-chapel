@@ -281,7 +281,15 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
     // the way the folder is. Take the vault's, since that is what everything
     // else here is looked up by.
     const version = this.plugin.findVersion(name.version);
-    return version ? { ...name, version } : null;
+    if (!version) return null;
+
+    // A name is not a chapter: an ordinary note called `NVI-2-Notas-3` reads
+    // as one. The index is what says which files are chapters, so the passage
+    // only carries when the index answers this very file.
+    return this.plugin.referenceFile(version, name.bookIndex, name.chapter) ===
+      file
+      ? { ...name, version }
+      : null;
   }
 
   /**
