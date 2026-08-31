@@ -633,9 +633,15 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
     from: TFile | null,
   ): Promise<RefSuggestion[]> {
     const [verses, chapters] = await Promise.all([
-      this.passageRows(here, [here.chapter], numbers, embed, from).catch(
-        () => NO_ROWS,
-      ),
+      // Chapter 0 is the introduction a book opens with, and a commentary
+      // keeping one file for the whole book is that introduction — neither
+      // numbers its verses, so a number counted against it would be pointing
+      // at a verse of nothing.
+      here.chapter === 0
+        ? NO_ROWS
+        : this.passageRows(here, [here.chapter], numbers, embed, from).catch(
+            () => NO_ROWS,
+          ),
       // The same numbers as chapters, so long as there are not more of them
       // than a run of chapters may carry.
       fitsChapters(numbers)
