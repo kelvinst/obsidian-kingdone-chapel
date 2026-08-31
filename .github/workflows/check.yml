@@ -3,9 +3,11 @@ name: Check
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-  push:
-    branches: [main]
 
+# A pull request is only ever asked about its latest commit, so a run the next
+# push has already overtaken is worth cancelling. Commits on `main` are not
+# like that — each one is answered for on its own — which is why they are a
+# workflow of their own rather than another trigger here.
 concurrency:
   group: check-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
@@ -16,9 +18,7 @@ permissions:
 jobs:
   check:
     name: Check
-    # A push carries no pull request, so the draft field it would be filtered
-    # by does not exist there.
-    if: ${{ github.event_name == 'push' || !github.event.pull_request.draft }}
+    if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
 
     steps:
@@ -32,15 +32,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # `npm run check` spelled out one command to a step, rather than run as
-      # itself, so that a failure names which check failed in the run's own
-      # list and any step here can be lifted into a job of its own later. Each
-      # calls the script that defines it, so the commands live in one place;
-      # what CI holds is only the order.
+      # The gate, one command to a step rather than one script, so that a
+      # failure names which check failed in the run's own list and any step
+      # here can be lifted into a job of its own later. Each calls the npm
+      # script that defines it, so the commands live in one place and what a
+      # workflow holds is only the order.
       #
-      # This is the same list the pre-commit hook runs, minus the writing: CI
-      # reads and reports, it does not reformat a branch on its author's
-      # behalf, and it is told to leave the coverage floors where they are.
+      # It is the same list `npm run precommit` runs by hand, minus the
+      # writing: CI reads and reports, it does not reformat a branch on its
+      # author's behalf, and it is told to leave the coverage floors alone.
       - name: Format
         run: npm run format:check
 
