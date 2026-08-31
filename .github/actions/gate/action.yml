@@ -1,0 +1,42 @@
+name: Gate
+description: >-
+  The checks every workflow runs, in one place, one command to a step. Held
+  here rather than repeated per workflow so that adding a check adds it
+  everywhere at once, and a pull request, a push to main and a tag cannot
+  drift into answering different questions.
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22.x'
+        cache: npm
+
+    - name: Install dependencies
+      run: npm ci
+      shell: bash
+
+    # Each step calls the npm script that defines it, so the commands live in
+    # package.json and what this holds is only the order. A failure names
+    # which check failed in the run's own list, and any step here can be
+    # lifted into a job of its own later.
+    #
+    # It is the same list `npm run precommit` runs by hand, minus the writing:
+    # CI reads and reports, it does not reformat a branch on its author's
+    # behalf, and it is told to leave the coverage floors alone.
+    - name: Format
+      run: npm run format:check
+      shell: bash
+
+    - name: Type check
+      run: npm run typecheck
+      shell: bash
+
+    - name: Bundle
+      run: npm run bundle
+      shell: bash
+
+    - name: Test
+      run: npm run test:coverage -- --coverage.thresholds.autoUpdate=false
+      shell: bash
