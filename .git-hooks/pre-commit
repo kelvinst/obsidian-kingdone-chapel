@@ -29,10 +29,37 @@ if [ "$want" != "$have" ]; then
   exit 1
 fi
 
+# What this commit is for, remembered before the checks can add to it. The
+# formatter rewrites the whole tree, not only what was staged, so a file it
+# fixes that nobody staged belongs to whoever left it unformatted rather than
+# to this commit. Held in a file because a NUL cannot survive in a variable,
+# and a path is allowed to contain anything but that.
+staged=$(mktemp)
+trap 'rm -f "$staged"' EXIT
+git diff --cached --name-only -z --diff-filter=ACMR >"$staged"
+
 make precommit || exit 1
 
-# The checks rewrite what they can fix: Prettier formats, and a run that raises
-# coverage writes the new floor back to the Vitest config. Everything was
-# staged a moment ago, so whatever differs now was written by them, and belongs
-# in the commit they were run for.
-git add -A
+# A rebase replays commits that were already answered for when they were made,
+# and `git rebase --exec` runs this after each one is written. Staging there
+# leaves an index the rebase cannot continue over, and the rewrite could not
+# reach the commit it belongs to anyway — that commit already exists. So stop
+# the rebase and say why, rather than folding anything in.
+if [ -d "$(git rev-parse --git-path rebase-merge)" ] ||
+  [ -d "$(git rev-parse --git-path rebase-apply)" ]; then
+  git diff --quiet && exit 0
+  echo "Rebase stopped: the checks rewrote files while replaying a commit."
+  echo "Look at them, amend that commit, then continue:"
+  echo ""
+  echo "  git add -A && git commit --amend --no-edit"
+  echo "  git rebase --continue"
+  exit 1
+fi
+
+# Otherwise fold the fixes into the commit they were run for — only the paths
+# that were staged a moment ago, plus the Vitest config, which a run that
+# raised the coverage floors will have rewritten.
+if [ -s "$staged" ]; then
+  xargs -0 git add -- <"$staged"
+fi
+git add -- vitest.config.mts
