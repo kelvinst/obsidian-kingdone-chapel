@@ -142,14 +142,21 @@ export class FakeVault extends Emitter {
   }
 }
 
-export class FakeMetadataCache {
+export class FakeMetadataCache extends Emitter {
   /** path -> block ids the cache knows, for the files where it knows any. */
   blocks = new Map<string, string[]>();
   /** path -> the links the file writes, in the order it writes them. */
   links = new Map<string, string[]>();
 
   /** Reads the vault as it stands, so a file written later still resolves. */
-  constructor(private vault: FakeVault) {}
+  constructor(private vault: FakeVault) {
+    super();
+  }
+
+  /** Drop a handler, the way Obsidian's own events are unregistered. */
+  offref(ref: EventRef) {
+    ref.off();
+  }
 
   getFileCache(file: TFile): {
     blocks?: Record<string, unknown>;

@@ -38,7 +38,10 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName('Bible folder')
       .setDesc(
-        'Folder holding the version folders (ARA, NVI, ...). Inside each version, folders are ignored — only file names matter.',
+        'Folder holding the version folders (ARA, NVI, ...). Inside each version, folders ' +
+          'are ignored — only file names matter. A version kept anywhere else — a study ' +
+          'Bible filed with the commentaries, say — says so in its own note instead, with ' +
+          '`bible-source` in the frontmatter.',
       )
       .addText((text) =>
         text
@@ -157,7 +160,12 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Detected versions')
-      .setDesc(this.plugin.listVersions().join(', ') || 'none')
+      .setDesc(
+        this.plugin
+          .listSources()
+          .map((s) => (s.group ? `${s.code} (${s.group})` : s.code))
+          .join(', ') || 'none',
+      )
       .addButton((b) =>
         b.setButtonText('Reload').onClick(() => {
           this.plugin.invalidateIndex();
