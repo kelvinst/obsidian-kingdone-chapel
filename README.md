@@ -170,7 +170,8 @@ Planned additions, all sharing the same vault-native, no-lock-in approach:
 
 Used by the Bible version features. Only two things are structural:
 
-1. Each direct subfolder of the Bible folder is a **version**.
+1. A **version** is a folder — each direct subfolder of the Bible folder, plus any folder
+   anywhere in the vault that [says so itself](#versions-kept-somewhere-else).
 2. Chapter files are named `<VERSION>-<NN>-<Book>-<CCC>.md` — version, book number, book name,
    chapter.
 
@@ -206,6 +207,47 @@ chapter number. That is what a bare `@Joao` links to; without one it falls back 
 book's first chapter. Nothing separates such a note from an ordinary one that happens to
 be named the same way, so two of them claiming one book are reported and skipped, just
 like two files claiming one chapter.
+
+### Versions kept somewhere else
+
+Filing every version under the Bible folder is fine while they are all translations, and wrong
+as soon as they are not: a study Bible is a version verse for verse, but it belongs with the
+commentaries rather than with the translation it is built on.
+
+So a folder can say it is a version itself. Any note sitting **directly in the folder** — the
+one it probably already keeps — with `bible-source` in its frontmatter makes that folder a
+version, wherever in the vault it is and however deeply it is buried:
+
+```yaml
+---
+bible-source: Editions
+code: Shedd
+name: Bíblia Shedd
+order: 20
+---
+```
+
+| Key            |                                                                                                                                                                                                            |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bible-source` | Marks the folder, and names the heading the version is listed under. `true` for no heading.                                                                                                                |
+| `code`         | What the version's file names start with, and what `@ARA Joao 1.1` calls it. The folder's name when left out, so a folder may be called `Almeida Revista e Atualizada` and still hold `ARA-01-GEN-001.md`. |
+| `name`         | Name to show wherever the version is named. The code when left out.                                                                                                                                        |
+| `order`        | Where it sits among the versions sharing its heading — and where that heading sits, which is its earliest version's. Alphabetical when left out.                                                           |
+
+The heading is the vault's to name, not the plugin's: `Translations`, `Editions`,
+`Comentários`, anything. Versions naming no heading are listed first, under none.
+
+Declaring is optional and adds to the Bible folder rather than replacing it, so a vault that
+keeps every version in one place needs none of it:
+
+```
+Igreja/Biblias/ARA/…                        a version by where it sits
+Igreja/Comentarios/Shedd/Shedd.md           a version because it says so
+Igreja/Comentarios/Shedd/…/Shedd-19-PSA-003.md
+```
+
+Everything else is the same either way: the same file names, the same book numbers, the same
+breadcrumbs, the same sidebar, the same `@` references.
 
 ## Settings
 

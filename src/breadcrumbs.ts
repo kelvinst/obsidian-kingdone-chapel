@@ -161,7 +161,13 @@ export class Breadcrumbs {
     };
   }
 
-  /** Every version, jumping to the verse being read rather than the chapter's top. */
+  /**
+   * Every version, jumping to the verse being read rather than the chapter's
+   * top, under the headings the vault files them under — translations,
+   * editions, whatever a version's own note says. Versions that name no
+   * heading are listed first, with none, which is the whole list in a vault
+   * that names none of them.
+   */
   versionMenu(
     anchor: HTMLElement,
     view: MarkdownView,
@@ -173,12 +179,18 @@ export class Breadcrumbs {
       'kcp-crumb-list',
       'Search versions',
       (body, close) => {
-        for (const version of this.plugin.listVersions()) {
+        let group: Group | null = null;
+
+        for (const source of this.plugin.listSources()) {
+          group = source.group
+            ? section(body, group, 'kcp-crumb-head', source.group)
+            : null;
+          const version = source.code;
           // A version that skips this chapter still shows, greyed: what it is
           // missing is worth seeing, and choosing it says why.
           const missing = !this.plugin.targetFile(version, loc);
           const item = this.item(
-            body,
+            group ? group.el : body,
             this.plugin.label(version),
             version === loc.version,
           );

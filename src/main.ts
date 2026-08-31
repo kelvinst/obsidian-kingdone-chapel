@@ -3,7 +3,6 @@ import {
   Notice,
   Plugin,
   TFile,
-  TFolder,
   WorkspaceLeaf,
   getLinkpath,
 } from 'obsidian';
@@ -31,6 +30,8 @@ import { ReferenceSuggest } from './suggest';
 import { KingdoneChapelSettingTab } from './settings';
 import { KingdoneChapelView } from './view';
 import { Breadcrumbs } from './breadcrumbs';
+import { SOURCE_KEY, collectSources, sortSources, sourceOf } from './sources';
+import type { Source } from './sources';
 
 /** Rendered elements a verse can be: a list item now, a paragraph in older chapters. */
 const VERSE_SELECTOR = '.markdown-preview-sizer li, .markdown-preview-sizer p';
@@ -74,6 +75,10 @@ export default class KingdoneChapelPlugin extends Plugin {
   chapterCache: Map<string, { mtime: number; verses: Verse[] }>;
   /** version -> "book:chapter" -> file. Built lazily, dropped on vault changes. */
   bibleIndex: Map<string, Map<string, TFile>> | null = null;
+  /** Every version folder, by its path. Built with `sourceCodes`. */
+  sourceFolders: Map<string, Source> | null = null;
+  /** The same folders, by the name their files are prefixed with. */
+  sourceCodes: Map<string, Source> = new Map();
   /** version -> book number -> the note listing that book's chapters. */
   bookNotes: Map<string, Map<number, TFile>> = new Map();
   /** version -> every chapter it holds, in reading order. Built on demand. */
@@ -151,6 +156,34 @@ export default class KingdoneChapelPlugin extends Plugin {
     this.registerEvent(this.app.vault.on('create', moved));
     this.registerEvent(this.app.vault.on('delete', moved));
     this.registerEvent(this.app.vault.on('rename', moved));
+    // A note declaring its folder a version changes what the index holds, and
+    // so does one that stops declaring it. `changed` fires on every edit to
+    // every note, so only the two that could say either count: one carrying
+    // the key now, and one sitting where a version was already read from.
+    this.registerEvent(
+      this.app.metadataCache.on('changed', (file, _data, cache) => {
+        const declares = cache.frontmatter
+          ? SOURCE_KEY in cache.frontmatter
+          : false;
+        const known = this.sourceFolders;
+        if (
+          declares ||
+          (file.parent && known !== null && known.has(file.parent.path))
+        )
+          moved();
+      }),
+    );
+    // Which folders are versions is read from the metadata cache, and on a
+    // cold start that cache is still being filled while the first index is
+    // built. The first `resolved` — the parse queue running dry — is the point
+    // the answer can be trusted, so drop whatever was decided before it and
+    // stop listening: `resolved` fires again after every later edit, and by
+    // then the handlers above have already said what changed.
+    const settled = this.app.metadataCache.on('resolved', () => {
+      this.app.metadataCache.offref(settled);
+      moved();
+    });
+    this.registerEvent(settled);
     this.register(() => this.cancelQueuedRefresh());
 
     // A pane picks up the bar when it opens a chapter, and loses it when it
@@ -186,7 +219,42 @@ export default class KingdoneChapelPlugin extends Plugin {
 
   invalidateIndex() {
     this.bibleIndex = null;
+    this.sourceFolders = null;
     this.chapterOrders.clear();
+  }
+
+  /**
+   * Every version folder in the vault, by path, with `sourceCodes` alongside.
+   *
+   * Cached with the index and dropped with it: which folders are versions is
+   * decided by notes that can be written, renamed and deleted like any other.
+   */
+  sources(files?: TFile[]): Map<string, Source> {
+    if (this.sourceFolders) return this.sourceFolders;
+
+    const folders = collectSources(this.app, this.settings.bibleFolder, files);
+    // Two folders may name themselves the same thing, and then they are one
+    // version kept in two places: the index merges their files under the one
+    // code, and the list names it once.
+    const codes = new Map<string, Source>();
+    for (const source of folders.values()) {
+      if (!codes.has(source.code)) codes.set(source.code, source);
+    }
+
+    this.sourceFolders = folders;
+    this.sourceCodes = codes;
+    return folders;
+  }
+
+  /** The version a file belongs to, or null when it is in none of them. */
+  sourceFor(file: TFile): Source | null {
+    return sourceOf(this.sources(), file);
+  }
+
+  /** The version known by `code`, however its folder is named. */
+  source(code: string): Source | null {
+    this.sources();
+    return this.sourceCodes.get(code) || null;
   }
 
   /**
@@ -215,10 +283,11 @@ export default class KingdoneChapelPlugin extends Plugin {
   /**
    * Every chapter file under the Bible folder, grouped by version.
    *
-   * Only two things are structural: the direct subfolders of the Bible folder
-   * are the versions, and file names follow `<VERSION>-<NN>-<Book>-<CCC>`.
-   * Whatever folders a version uses in between are ignored, so each version can
-   * be laid out flat, split by testament, or grouped any other way.
+   * Only two things are structural: a version is a folder — one that says so
+   * itself, or a direct subfolder of the Bible folder — and file names follow
+   * `<VERSION>-<NN>-<Book>-<CCC>`. Whatever folders a version uses in between
+   * are ignored, so each version can be laid out flat, split by testament, or
+   * grouped any other way.
    */
   index(): Map<string, Map<string, TFile>> {
     if (this.bibleIndex) return this.bibleIndex;
@@ -226,13 +295,15 @@ export default class KingdoneChapelPlugin extends Plugin {
     const index = new Map<string, Map<string, TFile>>();
     const books = new Map<string, Map<number, TFile>>();
     const conflicts = new Map<string, TFile[]>();
-    const base = this.settings.bibleFolder;
-    for (const file of this.app.vault.getMarkdownFiles()) {
-      if (!file.path.startsWith(base + '/')) continue;
-      const parts = file.path.slice(base.length + 1).split('/');
-      if (parts.length < 2) continue; // a loose file straight in the Bible folder
+    // One walk of the vault for both: which folders are versions is read from
+    // the same files the chapters are found in.
+    const files = this.app.vault.getMarkdownFiles();
+    const sources = this.sources(files);
+    for (const file of files) {
+      const source = sourceOf(sources, file);
+      if (!source) continue; // an ordinary note, in no version at all
 
-      const version = parts[0];
+      const version = source.code;
       const parsed = parseChapterName(file.basename, version);
       if (!parsed) {
         // Not a chapter, but it may be the note listing the book's chapters.
@@ -333,21 +404,27 @@ export default class KingdoneChapelPlugin extends Plugin {
   }
 
   label(version: string): string {
-    return this.settings.labels[version] || version;
+    const source = this.source(version);
+    return this.settings.labels[version] || (source && source.label) || version;
   }
 
-  /** Versions = direct subfolders of the Bible folder holding chapter files. */
-  listVersions(): string[] {
-    const root = this.app.vault.getAbstractFileByPath(
-      this.settings.bibleFolder,
+  /**
+   * Every version holding chapter files, in the order they are listed in.
+   *
+   * A version folder with nothing in it yet is left out rather than named: an
+   * empty heading in a dropdown is a version that cannot be opened, and the
+   * settings tab already reports what the vault holds.
+   */
+  listSources(): Source[] {
+    const index = this.index(); // fills sourceCodes on the way
+    const found = Array.from(this.sourceCodes.values()).filter((s) =>
+      index.has(s.code),
     );
-    if (!(root instanceof TFolder)) return [];
-    const index = this.index();
-    return root.children
-      .filter((c): c is TFolder => c instanceof TFolder)
-      .map((c) => c.name)
-      .filter((name) => index.has(name))
-      .sort();
+    return sortSources(found);
+  }
+
+  listVersions(): string[] {
+    return this.listSources().map((source) => source.code);
   }
 
   /**
@@ -405,13 +482,10 @@ export default class KingdoneChapelPlugin extends Plugin {
   locationOf(file: TFile | null, view: MarkdownView | null): Location | null {
     if (!file) return null;
 
-    const base = this.settings.bibleFolder;
-    if (!file.path.startsWith(base + '/')) return null;
+    const source = this.sourceFor(file);
+    if (!source) return null;
 
-    const parts = file.path.slice(base.length + 1).split('/');
-    if (parts.length < 2) return null; // a loose file straight in the Bible folder
-
-    const parsed = parseChapterName(file.basename, parts[0]);
+    const parsed = parseChapterName(file.basename, source.code);
     if (!parsed) return null;
 
     return {
