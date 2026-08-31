@@ -1,5 +1,5 @@
 ---
-saved_at: 2026-08-31T18:20:00Z
+saved_at: 2026-08-31T18:45:00Z
 session_id: b94027d1-7d14-47e7-bfe6-70594b821584
 transcript: transcript.jsonl.gz
 ---
@@ -190,6 +190,24 @@ it can, and CI that only reads. Work happened on branch
   file into an unrelated commit; and during a rebase the hook now stops with a
   message rather than staging into an index the rebase cannot continue over.
 
+## 2026-08-31 — update
+
+- **Hooks installed**, and installing them exposed a bug they carried. Worktrees
+  share one hooks directory, so the Node assertion applied itself to all eight
+  branches of this repo at once — including the seven that predate
+  `.tool-versions` and the main checkout, where the file does not exist. There
+  `want` came back empty, never matched, and refused every commit for missing a
+  version nobody had written down. `1420976` treats an absent pin as no pin.
+  Verified both ways afterwards: the main checkout allows, this branch enforces.
+- **Branch protection is on**, done as a repository ruleset rather than classic
+  branch protection — which is why `repos/.../branches/main/protection` still
+  answers "Branch not protected" and `repos/.../rules/branches/main` is where it
+  shows. It requires the `Check` status with `strict: true`, so a branch out of
+  date with `main` cannot merge, plus `deletion` and `non_fast_forward` rules.
+  That is the answer to the coverage-ratchet question in force.
+- **Covering the untested modules is handed off** to its own session rather than
+  continued here; the prompt is at the end of this file.
+
 ## Open Questions
 
 - [x] Does `actions/setup-node@v4` parse `.tool-versions`, and is Node `25.6.1`
@@ -223,19 +241,94 @@ it can, and CI that only reads. Work happened on branch
       session has run on GitHub** — every workflow change since `6015d54` is
       unexercised.
   - Pushed as `e39fe94`; run 33421891411 succeeded.
-- [ ] Run `make install-git-hooks` to activate the Node assertion. It will
+- [x] Run `make install-git-hooks` to activate the Node assertion. It will
       reject commits on this machine until the committing shell resolves to 25.6.1
       (`mise install`, then commit from an activated shell).
+  - Done. Installing it also exposed a bug it caused across the shared hooks directory, fixed in `1420976`.
 - [x] Address or close the two open `.git-hooks/pre-commit` findings:
       `git add -A` sweeps unrelated reformatted files into a commit, and it dirties
       the index under `git rebase --exec`, which `/kix:rebase` runs. They share a
       line and would land as one rewrite.
   - Both closed in `eb8d0c5`, as one rewrite.
-- [ ] Enable branch protection on `main`: require the `Check` status and
+- [x] Enable branch protection on `main`: require the `Check` status and
       require branches to be up to date before merging (`strict: true`). Attempted
       in-session and refused by the permission classifier, so it needs doing by
       hand — the exact `gh api` call is in the session's closing message.
-- [ ] Cover the untested modules — `main.ts` (955 lines), `breadcrumbs.ts`
+  - Done by the repo owner, as a ruleset — `strict: true` with `Check` required, plus `deletion` and `non_fast_forward`. Verified via `repos/.../rules/branches/main`.
+- [x] Cover the untested modules — `main.ts` (955 lines), `breadcrumbs.ts`
       (577), `suggest.ts` (352), `view.ts`, `modal.ts`, `settings.ts`. Each needs a
       stubbed `obsidian` module (`resolve.alias`) and `environment: 'jsdom'`. The
       project floor exists to be climbed by this.
+  - Handed off to a separate session; the prompt to start it is in `Next Session` at the end of this file.
+
+## Next Session
+
+Copy the block below into a new session to pick up the one action item this
+session deliberately did not do.
+
+```markdown
+Cover the untested modules of the `obsidian-kingdone-chapel` Obsidian plugin
+with Vitest tests, and raise the project-wide coverage floor by doing it.
+
+## Where things stand
+
+A Vitest suite already exists. Tests sit beside what they cover as
+`src/*.test.ts`, and three pure modules are at 100% of statements, branches,
+functions and lines: `src/reference.ts`, `src/utils.ts`, `src/books.ts`.
+
+Whole-project coverage is ~14% because six modules have no tests at all:
+
+| Module               | Lines |
+| -------------------- | ----- |
+| `src/main.ts`        | 955   |
+| `src/breadcrumbs.ts` | 577   |
+| `src/suggest.ts`     | 352   |
+| `src/settings.ts`    | 181   |
+| `src/view.ts`        | 154   |
+| `src/modal.ts`       | 48    |
+
+All six import from `obsidian`, which esbuild marks external and the Obsidian
+app supplies at runtime. That is exactly why they are untested: there is no
+`obsidian` to import under Vitest, and much of the code touches the DOM.
+
+## What the work needs
+
+1. A stub for the `obsidian` module wired through `resolve.alias` in
+   `vitest.config.mts`. Read the real imports rather than guessing which
+   classes to fake — `Plugin`, `ItemView`, `Modal`, `PluginSettingTab`,
+   `Setting`, `TFile`, `MarkdownView`, `Notice` and `EditorSuggest` are the
+   likely ones.
+2. A DOM. Install `jsdom` and turn it on only where it is needed — a per-file
+   `// @vitest-environment jsdom` docblock, or `environmentMatchGlobs` — so the
+   pure-module tests keep running in `node`.
+3. Tests for behaviour that can actually break: the chapter/book indexing and
+   its conflict reporting in `main.ts`, cursor and preview verse resolution,
+   the breadcrumbs, the `@` suggestion popup, and the settings tab.
+
+## Constraints already in force — do not break these
+
+- Two coverage gates live in `vitest.config.mts`. Per-file:
+  `src/{books,reference,utils}.ts` must stay at 100% on all four metrics.
+  Global: a floor with `autoUpdate: true`, so a local run that raises coverage
+  rewrites the floor into the config — commit that together with the tests
+  that earned it. CI passes `--coverage.thresholds.autoUpdate=false`, so only
+  local runs may move it.
+- `npm run precommit` is the local gate: formats, type-checks, bundles, tests.
+  There is deliberately no read-only `check` script — locally the point is to
+  be fixed, not told. CI runs the same list read-only through the composite
+  action in `.github/actions/gate`.
+- Prettier at 80 columns over everything, and `tsc --noEmit` type-checks the
+  test files along with the rest of `src`.
+- The pre-commit hook refuses a commit that has unstaged or untracked changes,
+  and asserts the running Node matches `.tool-versions` (`nodejs 25.6.1`). Run
+  `make install-git-hooks` once per clone. If your shell resolves a different
+  Node, commit via `mise exec -- git commit` or from a shell where mise is
+  active.
+- `main` carries a ruleset requiring the `Check` status with `strict: true`, so
+  the branch must be up to date with `main` before it can merge. Rebase rather
+  than merge.
+
+Start from `main`. The full history of how this setup was arrived at, including
+what was tried and rejected, is in
+`docs/sessions/2026-08-31-vitest-suite-coverage-floors-and-the-ci-gate-b94027d1/log.md`.
+```
