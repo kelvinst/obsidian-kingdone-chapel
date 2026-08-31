@@ -435,7 +435,7 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
               );
               out.push({
                 ref: label,
-                book: name,
+                book: passageLabel(name, head.chapter, parsed.verses, version),
                 note: 'quote at the end',
                 preview,
                 markdown: `[[#^${id}|${label}]]`,
@@ -444,6 +444,15 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
             }
             continue;
           }
+
+          // What the row points at, spelled out under the book's own name: an
+          // abbreviation says the reference short, and this says it whole.
+          const spelled = referenceLabels(
+            name,
+            chapters,
+            parsed.verses,
+            named ? version : null,
+          ).join(',');
 
           for (const form of this.forms(match, name)) {
             const labels = referenceLabels(
@@ -463,7 +472,7 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
             );
             out.push({
               ref: labels.join(','),
-              book: name,
+              book: spelled,
               preview,
               markdown: links.join(','),
             });
