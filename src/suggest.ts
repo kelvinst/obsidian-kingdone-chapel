@@ -124,7 +124,11 @@ export interface RefSuggestion {
    * embed writes no label of its own, and the row names the passage instead.
    */
   ref: string;
-  /** Book `ref` points at, for the rows where an abbreviation hides it. */
+  /**
+   * What `ref` points at, spelled out, for the rows where reading it does not
+   * say: the book an abbreviation stands for, the passage a bare number is
+   * counted against.
+   */
   book: string;
   /** What this row writes, where the reference alone does not say. */
   note?: string;
@@ -701,9 +705,14 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
         )[0].markdown
       : null;
 
+    const said = spelled.join(',');
     const row = (labels: string[]): RefSuggestion => ({
       ref: labels.join(','),
-      book: here.book,
+      // Numbers on their own do not say what they point at, so the row says it
+      // for them, in the reference they would have been written as. It is also
+      // what tells the two bare rows apart, which are the same numbers read
+      // two ways: `João 1.2` beside `João 2`.
+      book: said,
       preview,
       markdown:
         written ??
