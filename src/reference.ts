@@ -13,6 +13,10 @@
  *   @Joao 1.1 -ara   the same, written the way the finished link reads it,
  *                    which may sit anywhere in the reference
  *   @1               numbers alone, read against the passage the note is about
+ *   @1.1             a chapter and a verse of the book that passage is in
+ *   @ARA 1           the same in a named version, as do `@1 ARA`, `@1 -ara`
+ *                    and `@ARA` on its own
+ *   @1               numbers alone, read against the passage the note is about
  *
  * The text is still being typed, so half-written references (`@Joao 1.`,
  * `@Joao 1-`, `@Joao 1.1-`) have to parse into the most complete thing they
@@ -65,14 +69,15 @@ export interface ParsedRef {
  * `@ARA Joao` from a two-word book name, or `@Joao ARA` from one whose name
  * carries on. A marked version says so itself, and is not asked.
  */
-export function parseReference(
+/**
+ * Take the version out of `query`, wherever it was written, and hand back what
+ * is left to be read as the reference. Both parses share it, a version being
+ * written the same way whether or not a book was written with it.
+ */
+function takeVersion(
   query: string,
   isVersion: (word: string) => boolean,
-): ParsedRef | null {
-  let text = query;
-  let version: string | null = null;
-  let versionPrefix = false;
-
+): { version: string | null; versionPrefix: boolean; text: string } {
   // A marked version is taken out wherever it sits, before anything else reads
   // the query, so the rest is a plain reference again. Nothing marks its end,
   // so it is read as a beginning: as much of a version name as is there yet.
@@ -81,25 +86,34 @@ export function parseReference(
   // separates the two: a run is written closed up (`1.1-3`), so a dash with a
   // space before it is a version every time — including the dash that has no
   // name after it yet, which is the beginning of every version there is.
-  const marked = text.match(/(?:^|\s)-\s?([\p{L}\p{N}]*)(?=\s|$)/u);
+  const marked = query.match(/(?:^|\s)-\s?([\p{L}\p{N}]*)(?=\s|$)/u);
   if (marked) {
     // A match always says where it was found. The fallback is for the type,
     // which allows for the `exec` of a sticky regexp that this never is.
     /* v8 ignore next */
     const at = marked.index ?? 0;
-    version = marked[1];
-    versionPrefix = true;
-    text = text.slice(0, at) + ' ' + text.slice(at + marked[0].length);
+    const text = query.slice(0, at) + ' ' + query.slice(at + marked[0].length);
+    return { version: marked[1], versionPrefix: true, text };
   }
 
   // An unmarked version may come after the reference, the way it is said out
   // loud (`Joao 1 NVI`). It comes off first, so the chapter is still the last
   // number of what is left.
-  const trailing = marked ? null : text.match(/^\s*(.*\S)\s+(\S+)\s*$/);
+  const trailing = query.match(/^\s*(.*\S)\s+(\S+)\s*$/);
   if (trailing && isVersion(trailing[2])) {
-    version = trailing[2];
-    text = trailing[1];
+    return { version: trailing[2], versionPrefix: false, text: trailing[1] };
   }
+
+  return { version: null, versionPrefix: false, text: query };
+}
+
+export function parseReference(
+  query: string,
+  isVersion: (word: string) => boolean,
+): ParsedRef | null {
+  const taken = takeVersion(query, isVersion);
+  const { versionPrefix, text } = taken;
+  let version = taken.version;
 
   // The chapter is the last bare number, so `1 Joao 1.1` splits after `Joao`.
   // A run of them is still that one number, with commas and dashes hanging off
@@ -122,8 +136,7 @@ export function parseReference(
 
   // Or before it (`NVI Joao 1`), which is the only way to tell a version from
   // the first word of a two-word book name.
-  const named =
-    marked || version !== null ? null : book.match(/^(\S+)\s+(.+)$/);
+  const named = version !== null ? null : book.match(/^(\S+)\s+(.+)$/);
   if (named && isVersion(named[1])) {
     version = named[1];
     book = named[2];
@@ -237,30 +250,75 @@ export function booklessPassageLabel(
 }
 
 /**
- * A reference written as numbers alone (`1`, `1,2,3`, `1-3`), for a note that
- * already says which passage it is about. There is no book in it to read, only
- * the numbers, which the caller reads against that passage — as verses of the
- * chapter it names, or as chapters of its book.
- *
- * Anything carrying a letter is not one of these and comes back null, to be
- * read by `parseReference` the way it always was. A run asking for more than a
- * reference may carry comes back null as well, for the reason `expandRun`
- * gives. It is measured against the verse cap, the wider of the two; read as
- * chapters the same numbers have `fitsChapters` to answer to.
+ * A reference written with no book in it, for the note's own passage to fill.
+ * `parseBookless` above reads the same shape against the link before a
+ * semicolon; this one reads it against what the note is already about, so it
+ * carries a version too, and its numbers are still to be read either way.
  */
-export function parseNumbers(query: string): number[] | null {
-  if (!isNumbers(query)) return null;
-  return expandRun(query, MAX_VERSES);
+export interface ParsedContextRef {
+  /** Version named in the query, as typed, or null to keep the note's own. */
+  version: string | null;
+  /** Whether `version` is only as much of a name as has been typed, as above. */
+  versionPrefix: boolean;
+  /** Chapter written in front of the numbers (`1.1`), or null when none was. */
+  chapter: number | null;
+  /**
+   * Verses of that chapter; with no chapter, verses or chapters alike, for the
+   * caller to read both ways. Null when the run reaches past what a reference
+   * may carry, which is a reference this could read and will not, rather than
+   * one it could never read.
+   */
+  numbers: number[] | null;
 }
 
 /**
- * Whether a query is written as numbers alone, whatever they come to. This is
- * what tells the two nulls above apart: a query that was never this kind of
- * reference, and one that was but reached too far.
+ * Read a query that names no book, for a note that already says which passage
+ * it is about: `@1`, `@1-3`, `@1.1`, and any of those in a version the reader
+ * named — `@ARA 1`, `@1 ARA`, `@1 -ara`, or `@ARA` on its own, which asks for
+ * the note's own passage in another version.
+ *
+ * Null when the query is not one of these at all, leaving it to be read as a
+ * book. The numbers are measured against the verse cap, the wider of the two;
+ * read as chapters they have `fitsChapters` to answer to.
  */
-export function isNumbers(query: string): boolean {
-  return /^[\d\s,-]+$/.test(query);
+export function parseContextRef(
+  query: string,
+  isVersion: (word: string) => boolean,
+): ParsedContextRef | null {
+  const taken = takeVersion(query, isVersion);
+  let rest = taken.text.trim();
+  let version = taken.version;
+
+  // A version leads a reference too (`ARA Joao 1`), and with no book behind it
+  // to be the rest of a name, a lone word naming a version is only ever that.
+  const lead = version === null ? rest.match(/^(\S+)(?:\s+([\s\S]*))?$/) : null;
+  if (lead && isVersion(lead[1])) {
+    version = lead[1];
+    rest = (lead[2] || '').trim();
+  }
+
+  // A chapter written in front of the numbers says they are its verses. Only
+  // one chapter may be: verses hang off a single chapter, so `1-3.2` is no
+  // more readable here than it is with a book in front of it, and is read as
+  // no reference at all.
+  const spec = rest.match(/^(\d+)\s*[.:]\s*([\d,\s-]*)$/);
+  const chapter = spec ? parseInt(spec[1], 10) : null;
+  let numbers: number[] | null;
+  if (spec) numbers = expandRun(spec[2], MAX_VERSES);
+  else if (!rest) numbers = [];
+  else if (NUMBERS.test(rest)) numbers = expandRun(rest, MAX_VERSES);
+  // Anything carrying a letter is a book being written, not this.
+  else return null;
+
+  // And nothing was written that the note's own passage does not already say.
+  if (version === null && chapter === null && numbers && !numbers.length) {
+    return null;
+  }
+  return { version, versionPrefix: taken.versionPrefix, chapter, numbers };
 }
+
+/** A query written as numbers alone, whatever they come to. */
+const NUMBERS = /^[\d\s,-]+$/;
 
 /** Whether a run is short enough to be read as chapters as well as verses. */
 export function fitsChapters(numbers: number[]): boolean {
@@ -385,6 +443,32 @@ export function passageLabel(
 }
 
 /**
+ * As much of `raw` as a block id can carry: accents folded into the letters
+ * they sit on, everything else a dash, and no dash left hanging off an end.
+ */
+function slug(raw: string): string {
+  return raw
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+/**
+ * A name reduced to something a block id can carry, for the names that reduce
+ * to nothing. It stands for one name and no other, which is all the id needs
+ * of it — it is never read back, only told apart.
+ */
+function nameTag(raw: string): string {
+  let hash = 0;
+  for (let i = 0; i < raw.length; i++) {
+    hash = (hash * 31 + raw.charCodeAt(i)) >>> 0;
+  }
+  return hash.toString(36);
+}
+
+/**
  * Block id of the quote a passage link points at, in the shape the verse
  * anchors already use: `nvi-mat-26-47-56`. It is built from the passage alone,
  * so the same passage referenced twice in a note finds the quote already
@@ -410,30 +494,4 @@ export function passageId(
 ): string {
   const named = slug(version);
   return `${named || nameTag(version)}-${slug(code)}-${chapter}-${slug(verseSpec(verses))}`;
-}
-
-/**
- * As much of `raw` as a block id can carry: accents folded into the letters
- * they sit on, everything else a dash, and no dash left hanging off an end.
- */
-function slug(raw: string): string {
-  return raw
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-}
-
-/**
- * A name reduced to something a block id can carry, for the names that reduce
- * to nothing. It stands for one name and no other, which is all the id needs
- * of it — it is never read back, only told apart.
- */
-function nameTag(raw: string): string {
-  let hash = 0;
-  for (let i = 0; i < raw.length; i++) {
-    hash = (hash * 31 + raw.charCodeAt(i)) >>> 0;
-  }
-  return hash.toString(36);
 }

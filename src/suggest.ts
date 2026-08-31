@@ -21,9 +21,8 @@ import {
   booklessLabels,
   booklessPassageLabel,
   fitsChapters,
-  isNumbers,
   parseBookless,
-  parseNumbers,
+  parseContextRef,
   parseReference,
   passageId,
   passageLabel,
@@ -32,7 +31,7 @@ import {
 } from './reference';
 import { hasBlockId, parseChapterName, quotePlacement } from './utils';
 import type { BookMatch } from './books';
-import type { BooklessRef, ParsedRef } from './reference';
+import type { BooklessRef, ParsedContextRef, ParsedRef } from './reference';
 import type { ChapterTarget, Location } from './types';
 import type { ChapterName } from './utils';
 import type KingdoneChapelPlugin from './main';
@@ -251,28 +250,29 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
         ...(await this.carriedSuggestions(carried, bookless, embed, ctx.file)),
       );
     } else {
-      const asked = this.contextQuery(query);
-      const numbers = asked && asked.numbers;
-      if (asked && numbers === null) {
+      const asked = parseContextRef(
+        query,
+        (word) => this.plugin.findVersion(word) !== null,
+      );
+      if (asked && asked.numbers === null) {
         // Numbers, and nothing wrong with them but how many they came to.
         hints.push(TOO_MANY);
-      } else if (asked && numbers && numbers.length) {
+      } else if (asked) {
         const here = this.plugin.linkContext(ctx.file);
         if (!here) hints.push(NO_CONTEXT);
         else {
           // A version nobody named is the note's own, which the labels leave
           // unsaid; one that was asked for is offered in every version it could
           // still be finished as, and said in what the row writes.
-          const named =
-            asked.parsed.versionPrefix || asked.parsed.version !== null;
+          const named = asked.versionPrefix || asked.version !== null;
           const versions = named
-            ? this.versionsFor(asked.parsed, ctx.file)
+            ? this.versionsFor(asked, ctx.file)
             : [here.version];
           for (const version of versions) {
             out.push(
               ...(await this.contextSuggestions(
                 { ...here, version },
-                numbers,
+                asked,
                 embed,
                 ctx.file,
                 named ? version : null,
@@ -295,28 +295,6 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
       )),
     );
     return [...out, ...hints];
-  }
-
-  /**
-   * A query written as numbers alone, with whatever version it names read off
-   * it first: `@1`, `@1-3`, `@2 -nvi`, `@2 NVI`. The numbers are what is left
-   * once the version is gone, so the same forms that name one after a book
-   * name one after a number. Null when the query is not this kind at all, and
-   * `numbers` null when the run reaches past what a reference may carry.
-   */
-  contextQuery(
-    query: string,
-  ): { parsed: ParsedRef; numbers: number[] | null } | null {
-    const parsed = parseReference(
-      query,
-      (word) => this.plugin.findVersion(word) !== null,
-    );
-    // A chapter means a book was written before it, which is a reference of
-    // the other kind and reads itself.
-    if (!parsed || parsed.chapters.length || !isNumbers(parsed.book)) {
-      return null;
-    }
-    return { parsed, numbers: parseNumbers(parsed.book) };
   }
 
   /**
@@ -631,7 +609,10 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
    * whole reference rather than only the version name. Anything else names at
    * most one version, or leaves it to the default.
    */
-  versionsFor(parsed: ParsedRef, from: TFile | null): string[] {
+  versionsFor(
+    parsed: Pick<ParsedRef, 'version' | 'versionPrefix'>,
+    from: TFile | null,
+  ): string[] {
     if (parsed.versionPrefix) {
       const wanted = (parsed.version || '').toLowerCase();
       return this.plugin
@@ -667,12 +648,15 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
   }
 
   /**
-   * The two things numbers can mean against the passage a note is about: those
-   * verses of its chapter, or those chapters of its book. Verses come first —
-   * a note about a chapter cites verses of it far more often than it moves on
-   * to another chapter.
+   * The rows a bookless reference comes to, read against the passage the note
+   * is about. A chapter said outright (`@1.1`) leaves nothing to choose: it is
+   * that chapter of the book at hand. Numbers alone can be two things — those
+   * verses of its chapter, or those chapters of its book — and verses come
+   * first, a note about a chapter citing verses of it far more often than it
+   * moves on to another chapter. A reference that says only a version asks for
+   * the note's own passage, in that version.
    *
-   * Both come twice over, under the label the reader typed and under the one
+   * Each comes twice over, under the label the reader typed and under the one
    * spelling the reference out, and the typed one leads: someone who wrote
    * `@1` was writing a sentence with a `1` in it, the same way someone who
    * wrote `@Jn` meant the note to go on saying `Jn`.
@@ -682,36 +666,57 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
    */
   async contextSuggestions(
     here: Location,
-    numbers: number[],
+    asked: ParsedContextRef,
     embed: boolean,
     from: TFile | null,
     name: string | null,
   ): Promise<RefSuggestion[]> {
+    const numbers = asked.numbers || [];
+    const rows = (chapters: number[], verses: number[], bare: string[]) =>
+      this.passageRows(here, chapters, verses, bare, embed, from, name).catch(
+        () => NO_ROWS,
+      );
+
+    if (asked.chapter !== null) {
+      const said = [asked.chapter];
+      const one = await rows(said, numbers, this.bareLabels(said, numbers));
+      return [one.bare, one.full].filter(
+        (row): row is RefSuggestion => row !== null,
+      );
+    }
+
+    if (!numbers.length) {
+      // A version and nothing else. The note's own passage is the reference,
+      // and its book alone when what the note is about is a book — which is
+      // what a chapter of 0, a book's introduction, says.
+      const said = here.chapter ? [here.chapter] : [];
+      const one = await rows(said, [], this.bareLabels(said, []));
+      return [one.full].filter((row): row is RefSuggestion => row !== null);
+    }
+
+    const typed = numbers.map(String);
     const [verses, chapters] = await Promise.all([
       // Chapter 0 is the introduction a book opens with, and a commentary
       // keeping one file for the whole book is that introduction — neither
       // numbers its verses, so a number counted against it would be pointing
       // at a verse of nothing.
-      here.chapter === 0
-        ? NO_ROWS
-        : this.passageRows(
-            here,
-            [here.chapter],
-            numbers,
-            embed,
-            from,
-            name,
-          ).catch(() => NO_ROWS),
+      here.chapter === 0 ? NO_ROWS : rows([here.chapter], numbers, typed),
       // The same numbers as chapters, so long as there are not more of them
       // than a run of chapters may carry.
-      fitsChapters(numbers)
-        ? this.passageRows(here, numbers, [], embed, from, name).catch(
-            () => NO_ROWS,
-          )
-        : NO_ROWS,
+      fitsChapters(numbers) ? rows(numbers, [], typed) : NO_ROWS,
     ]);
-    const rows = [verses.bare, chapters.bare, verses.full, chapters.full];
-    return rows.filter((row): row is RefSuggestion => row !== null);
+    return [verses.bare, chapters.bare, verses.full, chapters.full].filter(
+      (row): row is RefSuggestion => row !== null,
+    );
+  }
+
+  /**
+   * The reference as the reader typed it, with the book they never wrote left
+   * out: `1.1,2` for `@1.1,2`, `1` for `@ARA`. It is `referenceLabels` under a
+   * book with no name, which is what a bookless reference is.
+   */
+  bareLabels(chapters: number[], verses: number[]): string[] {
+    return referenceLabels('', chapters, verses).map((label) => label.trim());
   }
 
   /**
@@ -727,6 +732,7 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
     here: Location,
     chapters: number[],
     verses: number[],
+    bare: string[],
     embed: boolean,
     from: TFile | null,
     name: string | null,
@@ -785,9 +791,9 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
     });
 
     return {
-      // The numbers as they were typed, which is how the sentence around them
-      // reads: `as verse 2 says`, not `as João 1.2 says`.
-      bare: embed ? null : row((verses.length ? verses : asked).map(String)),
+      // What the reader typed, which is how the sentence around it reads: `as
+      // verse 2 says`, not `as João 1.2 says`.
+      bare: embed || !bare.length ? null : row(bare),
       full: row(spelled),
     };
   }
