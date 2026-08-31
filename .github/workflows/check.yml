@@ -3,6 +3,8 @@ name: Check
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
 
 concurrency:
   group: check-${{ github.head_ref || github.ref }}
@@ -14,7 +16,9 @@ permissions:
 jobs:
   check:
     name: Check
-    if: ${{ !github.event.pull_request.draft }}
+    # A push carries no pull request, so the draft field it would be filtered
+    # by does not exist there.
+    if: ${{ github.event_name == 'push' || !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
 
     steps:
