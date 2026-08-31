@@ -1,5 +1,5 @@
 ---
-saved_at: 2026-08-31T17:56:00Z
+saved_at: 2026-08-31T18:20:00Z
 session_id: b94027d1-7d14-47e7-bfe6-70594b821584
 transcript: transcript.jsonl.gz
 ---
@@ -161,28 +161,61 @@ it can, and CI that only reads. Work happened on branch
 - Whether a failing step inside the composite action still fails the calling
   `uses:` step remains unverified — an all-green run cannot show it.
 
+## 2026-08-31 — update
+
+- **The composite-action failure question is answered, by experiment rather
+  than by reasoning.** A throwaway branch carried a probe action whose first
+  step exits 1 and whose next two carry `!cancelled()`, called from a workflow
+  ending in a step with no `if:` — the shape `release.yml` relies on. Run
+  33426521250: `Run ./.github/actions/probe` **failed**, `Caller continued` was
+  **skipped**, and all three probe markers printed. So later steps do run past
+  a failure and the caller still sees failure. `Create release` cannot run on a
+  red gate. Branch and worktree deleted afterwards.
+- The first attempt at that probe failed at startup with zero jobs, and the
+  cause was mine, not GitHub's: `run: echo "PROBE: this step fails"` puts a
+  `: ` inside a YAML plain scalar, which parses as a nested mapping. Worth
+  remembering — the `js-yaml` check that caught nothing on the real workflows
+  was simply never run on the probe.
+- **The gate stays a composite action.** The condition attached to that
+  decision — that the steps still run when an earlier one fails — is the same
+  thing the probe demonstrated, so it holds.
+- **Current 25 over LTS 22 is intentional**, confirmed rather than inferred.
+- **The coverage ratchet is not going to handle parallel branches.** The answer
+  is upstream of it: a branch that is out of date has to be rebased onto `main`
+  before it can merge, so two branches never race to raise the same floor.
+  That is branch protection, not test config.
+- **Both `.git-hooks/pre-commit` findings closed** in `eb8d0c5`. The staged
+  path set is captured before the checks and restaged afterwards instead of
+  `git add -A`, so the formatter can no longer sweep somebody else's unformatted
+  file into an unrelated commit; and during a rebase the hook now stops with a
+  message rather than staging into an index the rebase cannot continue over.
+
 ## Open Questions
 
 - [x] Does `actions/setup-node@v4` parse `.tool-versions`, and is Node `25.6.1`
       available to it? Supported since v4.1 and we pin `@v4`, but it is unexercised
       — it would fail loudly at the setup step.
   - Yes to both, observed in run 33421891411: `Resolved .tool-versions as 25.6.1`, acquired from `nodejs.org/dist`, `node: v25.6.1`.
-- [ ] Does a failing step inside a composite action still fail the calling
+- [x] Does a failing step inside a composite action still fail the calling
       `uses:` step now that later steps run past it? `release.yml` depends on it:
       `Create release` has no `if:`, so it is skipped only if the gate step is
       marked failed. Getting this wrong means a release ships on a red gate.
-- [ ] Does the gate belong in a composite action at all, now that it is known to
+  - Yes. Probe run 33426521250 — the gate step failed, the caller's next step was skipped, and the later composite steps still ran past it. A release cannot ship on a red gate.
+- [x] Does the gate belong in a composite action at all, now that it is known to
       collapse the four checks into one step in the run list? The alternatives both
       cost something: a `workflow_call` reusable workflow names each step but needs
       artifact plumbing to get `main.js` to `Create release`, and inlining restores
       the duplication across the two workflows.
-- [ ] Is moving CI from LTS 22 to Current 25 the intent? It followed from
+  - Yes, on the condition that a failing step does not stop the ones after it — which `cfc8606` arranged and the probe confirmed.
+- [x] Is moving CI from LTS 22 to Current 25 the intent? It followed from
       pinning the version already installed locally, not from a decision about
       release toolchains.
-- [ ] Should the coverage ratchet handle parallel branches? Two branches that
+  - Yes, intentional.
+- [x] Should the coverage ratchet handle parallel branches? Two branches that
       both raise the floor conflict in `vitest.config.mts`, and after rebasing the
       loser fails against a floor it did not reach — even though it increased
       coverage relative to its base. Raised but not decided.
+  - No. Branch protection answers it upstream — a branch out of date with `main` must be rebased onto it before merging, so two branches never race to raise one floor.
 
 ## Action Items
 
@@ -193,10 +226,15 @@ it can, and CI that only reads. Work happened on branch
 - [ ] Run `make install-git-hooks` to activate the Node assertion. It will
       reject commits on this machine until the committing shell resolves to 25.6.1
       (`mise install`, then commit from an activated shell).
-- [ ] Address or close the two open `.git-hooks/pre-commit` findings:
+- [x] Address or close the two open `.git-hooks/pre-commit` findings:
       `git add -A` sweeps unrelated reformatted files into a commit, and it dirties
       the index under `git rebase --exec`, which `/kix:rebase` runs. They share a
       line and would land as one rewrite.
+  - Both closed in `eb8d0c5`, as one rewrite.
+- [ ] Enable branch protection on `main`: require the `Check` status and
+      require branches to be up to date before merging (`strict: true`). Attempted
+      in-session and refused by the permission classifier, so it needs doing by
+      hand — the exact `gh api` call is in the session's closing message.
 - [ ] Cover the untested modules — `main.ts` (955 lines), `breadcrumbs.ts`
       (577), `suggest.ts` (352), `view.ts`, `modal.ts`, `settings.ts`. Each needs a
       stubbed `obsidian` module (`resolve.alias`) and `environment: 'jsdom'`. The
