@@ -265,19 +265,24 @@ ln -s /path/to/obsidian-kingdone-chapel /path/to/vault/.obsidian/plugins/kingdon
 
 ### CI
 
-`Check` runs on every pull request that is not a draft — marking a draft ready
-for review starts it — and on every push to `main`, so a commit that never went
-through a pull request is still answered for.
+Three workflows run the same four steps — `Format`, `Type check`, `Bundle`,
+`Test` — one command to a step rather than one script, so a failure names
+itself in the run's own list.
 
-It runs the same list as the hook, one command to a step (`Format`, `Type
-check`, `Bundle`, `Test`) rather than as one script, so a failure names itself
-and any step can become a job of its own later. Two things differ from the
-local run, on purpose: it checks the formatting instead of writing it, and it
-passes `--coverage.thresholds.autoUpdate=false`, so CI can only ever read the
-floors. Raising them stays the hook's job.
+| Workflow  | Runs on                              | Cancels a run in flight |
+| --------- | ------------------------------------ | ----------------------- |
+| `Check`   | pull requests that are not drafts    | yes                     |
+| `Main`    | every push to `main`                 | no                      |
+| `Release` | a tag, before the release is created | no                      |
 
-`Release` runs those same four steps before it publishes, since a tag is the
-last chance to catch something.
+`Check` cancels because a pull request is only ever asked about its latest
+commit. `Main` does not, and that is the point of it being separate: merge two
+pull requests a minute apart and a cancelling group would drop the first
+merge's run, leaving that commit with neither a green nor a red against it.
+
+Two things differ from the local run, on purpose: CI checks the formatting
+instead of writing it, and it passes `--coverage.thresholds.autoUpdate=false`,
+so it can only ever read the coverage floors. Raising them stays the hook's job.
 
 Releases are cut by pushing a tag matching the `manifest.json` version (e.g. `1.0.0`); CI
 attaches `main.js`, `manifest.json` and `styles.css` to the GitHub release.

@@ -1,0 +1,48 @@
+name: Main
+
+on:
+  push:
+    branches: [main]
+
+# No `concurrency` here, deliberately. Every commit on `main` is answered for
+# on its own, and a group that cancels would drop exactly the commits this
+# workflow exists to cover: merge two pull requests a minute apart and the
+# first merge's run would be cancelled by the second, leaving that commit with
+# neither a green nor a red against it. Pull requests are the opposite case and
+# are cancelled on purpose, in `check.yml`.
+
+permissions:
+  contents: read
+
+jobs:
+  main:
+    name: Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The same gate `check.yml` runs, in the same order. A commit reaches
+      # `main` through a pull request that already answered it, so this is the
+      # second look rather than the first: what it catches is a push that never
+      # went through review, and a merge whose result differs from what either
+      # side was tested as.
+      - name: Format
+        run: npm run format:check
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Bundle
+        run: npm run bundle
+
+      - name: Test
+        run: npm run test:coverage -- --coverage.thresholds.autoUpdate=false
