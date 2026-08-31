@@ -12,6 +12,23 @@ if ! git diff --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]; t
   exit 1
 fi
 
+# `.tool-versions` pins Node for mise and asdf, but git runs a hook through a
+# plain shell, which may have neither activated — and a contributor may have
+# neither installed. Left unchecked, the hook answers for the commit on one
+# Node while CI answers for it on another, which is the one gap a check run
+# before the commit cannot otherwise close.
+want=$(awk '/^nodejs /{print $2}' .tool-versions)
+have=$(node -v 2>/dev/null | sed 's/^v//')
+if [ "$want" != "$have" ]; then
+  echo "Commit rejected: Node ${have:-not found on PATH}, but .tool-versions pins $want."
+  echo "CI runs the checks on $want, so this commit would be answered for on another."
+  echo ""
+  echo "  mise install    # then commit from a shell where mise is active"
+  echo ""
+  echo "asdf reads the same file. Without either, install Node $want."
+  exit 1
+fi
+
 make precommit || exit 1
 
 # The checks rewrite what they can fix: Prettier formats, and a run that raises
