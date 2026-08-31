@@ -250,17 +250,35 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
         ...(await this.carriedSuggestions(carried, bookless, embed, ctx.file)),
       );
     } else {
-      const numbers = parseNumbers(query);
-      if (numbers === null && isNumbers(query)) {
+      const asked = this.contextQuery(query);
+      const numbers = asked && asked.numbers;
+      if (asked && numbers === null) {
         // Numbers, and nothing wrong with them but how many they came to.
         hints.push(TOO_MANY);
-      } else if (numbers && numbers.length) {
+      } else if (asked && numbers && numbers.length) {
         const here = this.plugin.linkContext(ctx.file);
-        if (here) {
-          out.push(
-            ...(await this.contextSuggestions(here, numbers, embed, ctx.file)),
-          );
-        } else hints.push(NO_CONTEXT);
+        if (!here) hints.push(NO_CONTEXT);
+        else {
+          // A version nobody named is the note's own, which the labels leave
+          // unsaid; one that was asked for is offered in every version it could
+          // still be finished as, and said in what the row writes.
+          const named =
+            asked.parsed.versionPrefix || asked.parsed.version !== null;
+          const versions = named
+            ? this.versionsFor(asked.parsed, ctx.file)
+            : [here.version];
+          for (const version of versions) {
+            out.push(
+              ...(await this.contextSuggestions(
+                { ...here, version },
+                numbers,
+                embed,
+                ctx.file,
+                named ? version : null,
+              )),
+            );
+          }
+        }
       }
     }
     // The hint is what the popup is there to say when the rows run out, so the
@@ -276,6 +294,28 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
       )),
     );
     return [...out, ...hints];
+  }
+
+  /**
+   * A query written as numbers alone, with whatever version it names read off
+   * it first: `@1`, `@1-3`, `@2 -nvi`, `@2 NVI`. The numbers are what is left
+   * once the version is gone, so the same forms that name one after a book
+   * name one after a number. Null when the query is not this kind at all, and
+   * `numbers` null when the run reaches past what a reference may carry.
+   */
+  contextQuery(
+    query: string,
+  ): { parsed: ParsedRef; numbers: number[] | null } | null {
+    const parsed = parseReference(
+      query,
+      (word) => this.plugin.findVersion(word) !== null,
+    );
+    // A chapter means a book was written before it, which is a reference of
+    // the other kind and reads itself.
+    if (!parsed || parsed.chapters.length || !isNumbers(parsed.book)) {
+      return null;
+    }
+    return { parsed, numbers: parseNumbers(parsed.book) };
   }
 
   /**
@@ -635,6 +675,7 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
     numbers: number[],
     embed: boolean,
     from: TFile | null,
+    name: string | null,
   ): Promise<RefSuggestion[]> {
     const [verses, chapters] = await Promise.all([
       // Chapter 0 is the introduction a book opens with, and a commentary
@@ -643,13 +684,20 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
       // at a verse of nothing.
       here.chapter === 0
         ? NO_ROWS
-        : this.passageRows(here, [here.chapter], numbers, embed, from).catch(
-            () => NO_ROWS,
-          ),
+        : this.passageRows(
+            here,
+            [here.chapter],
+            numbers,
+            embed,
+            from,
+            name,
+          ).catch(() => NO_ROWS),
       // The same numbers as chapters, so long as there are not more of them
       // than a run of chapters may carry.
       fitsChapters(numbers)
-        ? this.passageRows(here, numbers, [], embed, from).catch(() => NO_ROWS)
+        ? this.passageRows(here, numbers, [], embed, from, name).catch(
+            () => NO_ROWS,
+          )
         : NO_ROWS,
     ]);
     const rows = [verses.bare, chapters.bare, verses.full, chapters.full];
@@ -657,10 +705,10 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
   }
 
   /**
-   * A passage of the book the note is about, in the version it was already
-   * linking — which nobody asked for here, so it goes unnamed in the label for
-   * the same reason the default version does: it would only be reading the
-   * note back to itself.
+   * A passage of the book the note is about. `name` is the version to write,
+   * which is set only when the reader asked for one: the note's own version
+   * goes unnamed for the same reason the default version does — it would only
+   * be reading the note back to itself.
    *
    * The links are the same either way, so the two labellings share the one
    * read of the file behind them.
@@ -671,6 +719,7 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
     verses: number[],
     embed: boolean,
     from: TFile | null,
+    name: string | null,
   ): Promise<ContextRows> {
     const found = this.chapterTargets(here.version, here.bookIndex, chapters);
     if (!found.length) return NO_ROWS;
@@ -685,7 +734,7 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
     const asked = found
       .map((f) => f.chapter)
       .filter((c): c is number => c !== null);
-    const spelled = referenceLabels(here.book, asked, verses);
+    const spelled = referenceLabels(here.book, asked, verses, name);
     // An embed writes no label at all, so there is nothing to choose between
     // and the one row stands for both.
     const written = embed
