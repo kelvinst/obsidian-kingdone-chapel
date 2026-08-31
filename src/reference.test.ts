@@ -5,12 +5,14 @@ import {
   booklessPassageLabel,
   fitsChapters,
   isNumbers,
+  numberRuns,
   parseBookless,
   parseNumbers,
   parseReference,
   passageId,
   passageLabel,
   referenceLabels,
+  shortReference,
   verseSpec,
 } from './reference';
 
@@ -637,5 +639,55 @@ describe('fitsChapters', () => {
 
   it('turns down one that only a run of verses could carry', () => {
     expect(fitsChapters(parseNumbers('1-26') as number[])).toBe(false);
+  });
+});
+
+describe('numberRuns', () => {
+  it('closes a run of three or more up', () => {
+    expect(numberRuns([1, 2, 3])).toBe('1-3');
+    expect(numberRuns([1, 2, 3, 4, 5])).toBe('1-5');
+  });
+
+  it('leaves a pair as it is said, being no shorter with a dash', () => {
+    expect(numberRuns([1, 2])).toBe('1,2');
+  });
+
+  it('writes what is not a run as itself, run and all', () => {
+    expect(numberRuns([1, 3])).toBe('1,3');
+    expect(numberRuns([1, 3, 4, 5, 9])).toBe('1,3-5,9');
+  });
+
+  it('reads a run only where one was written', () => {
+    expect(numberRuns([3, 1, 2])).toBe('3,1,2');
+  });
+
+  it('writes a single number, and nothing for none', () => {
+    expect(numberRuns([7])).toBe('7');
+    expect(numberRuns([])).toBe('');
+  });
+});
+
+describe('shortReference', () => {
+  it('names a book on its own', () => {
+    expect(shortReference('João', [], [])).toBe('João');
+  });
+
+  it('names a whole chapter, and a run of them', () => {
+    expect(shortReference('João', [1], [])).toBe('João 1');
+    expect(shortReference('João', [1, 2, 3], [])).toBe('João 1-3');
+  });
+
+  it('says a run of verses the short way, under its one chapter', () => {
+    expect(shortReference('João', [1], [1, 2, 3])).toBe('João 1.1-3');
+    expect(shortReference('João', [1], [1, 3])).toBe('João 1.1,3');
+  });
+
+  it('says the version once, at the end, whatever the shape', () => {
+    expect(shortReference('João', [1], [1, 2, 3], 'NVI')).toBe(
+      'João 1.1-3 - NVI',
+    );
+    expect(shortReference('João', [1], [], 'NVI')).toBe('João 1 - NVI');
+    expect(shortReference('João', [1, 2, 3], [], 'NVI')).toBe('João 1-3 - NVI');
+    expect(shortReference('João', [], [], 'NVI')).toBe('João - NVI');
   });
 });

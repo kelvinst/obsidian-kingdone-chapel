@@ -268,6 +268,53 @@ export function fitsChapters(numbers: number[]): boolean {
 }
 
 /**
+ * A run of numbers written the short way it is read: `[1, 2, 3, 5]` -> `1-3,5`.
+ * Only a run of three or more is worth closing up — `1,2` is as short written
+ * out as it is with a dash through it, and it is how it would be said.
+ *
+ * The numbers are left in the order they were asked for, so a run is only one
+ * where it was written as one: `3,1` stays as it was typed.
+ */
+export function numberRuns(numbers: number[]): string {
+  const parts: string[] = [];
+  for (let at = 0; at < numbers.length;) {
+    let end = at;
+    while (end + 1 < numbers.length && numbers[end + 1] === numbers[end] + 1) {
+      end++;
+    }
+    if (end - at >= 2) {
+      parts.push(`${numbers[at]}-${numbers[end]}`);
+      at = end + 1;
+      continue;
+    }
+    parts.push(String(numbers[at]));
+    at++;
+  }
+  return parts.join(',');
+}
+
+/**
+ * The whole reference on one line, as short as it is written by hand:
+ * `João 1.1-3 - NVI`. This is what a row says it points at, where the label it
+ * writes cannot — `referenceLabels` spells the same reference across one label
+ * per link, because that is how many links there are.
+ */
+export function shortReference(
+  book: string,
+  chapters: number[],
+  verses: number[],
+  version: string | null = null,
+): string {
+  const said = version ? ` - ${version}` : '';
+  if (!chapters.length) return `${book}${said}`;
+  // Verses never span chapters, so there is the one chapter number to say.
+  if (verses.length) {
+    return `${book} ${chapters[0]}.${numberRuns(verses)}${said}`;
+  }
+  return `${book} ${numberRuns(chapters)}${said}`;
+}
+
+/**
  * How a reference reads in a note, one label per link. The first carries the
  * whole reference and the rest only their own number, joined the way they were
  * typed and the way they are written by hand: `João 1.1,2,3` for a run of
