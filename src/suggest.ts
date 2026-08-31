@@ -136,7 +136,12 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
       const rows = here ? await this.contextSuggestions(here, bookless, embed, ctx.file) : [NO_CONTEXT];
       out.push(...rows);
     }
-    out.push(...(await this.bookSuggestions(query, embed, ctx.file)));
+    // A half-written version fills the popup with the passage read against the
+    // note's own, and the books would only be read out of the vault to be cut
+    // off the end of it.
+    if (out.length < MAX_ROWS) {
+      out.push(...(await this.bookSuggestions(query, embed, ctx.file)));
+    }
     return out.slice(0, MAX_ROWS);
   }
 
