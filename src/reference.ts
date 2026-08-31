@@ -169,6 +169,41 @@ function expandRun(spec: string, max: number): number[] | null {
   return out;
 }
 
+/** A reference written without a book, for one to be carried into it. */
+export interface BooklessRef {
+  /** Chapter written in it, or null when it names verses alone. */
+  chapter: number | null;
+  /** Verses asked for, in the order written, without duplicates. */
+  verses: number[];
+}
+
+/**
+ * A reference written as numbers alone — `3.1`, `3.1-4`, `9`, `9,10` — which
+ * is how the second reference of a pair is written when the first already said
+ * which book they are both in: `Jn 2.9; 3.1`. There is no book in it to read,
+ * only the numbers, and the caller supplies the passage they are counted from.
+ *
+ * A number with a chapter in front of it (`3.1`) names its own chapter, and
+ * bare numbers (`9,10`) are verses of whatever chapter is carried in. Anything
+ * carrying a letter is not one of these and comes back null, to be read by
+ * `parseReference` the way it always was; so does a spec asking for more
+ * verses than a reference may carry, for the reason `expandRun` gives.
+ */
+export function parseBookless(query: string): BooklessRef | null {
+  const text = query.trim();
+  if (!text || !/^[\d\s.,:-]+$/.test(text)) return null;
+
+  // Half-written, `3.` is still chapter three — the verse is only being typed.
+  const m = text.match(/^(\d+)\s*[.:]\s*([\d,\s-]*)$/);
+  if (m) {
+    const verses = expandRun(m[2], MAX_VERSES);
+    return verses === null ? null : { chapter: parseInt(m[1], 10), verses };
+  }
+
+  const verses = expandRun(text, MAX_VERSES);
+  return verses && verses.length ? { chapter: null, verses } : null;
+}
+
 /**
  * How a reference reads in a note, one label per link. The first carries the
  * whole reference and the rest only their own number, joined the way they were

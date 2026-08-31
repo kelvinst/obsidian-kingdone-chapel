@@ -8,11 +8,20 @@ import type {
   TFile,
 } from 'obsidian';
 
-import { abbrLabel, langsFor, matchBooks, plain } from './books';
-import { parseReference, referenceLabels } from './reference';
+import {
+  abbrLabel,
+  bookNameAt,
+  langsFor,
+  matchBooks,
+  nameLang,
+  plain,
+} from './books';
+import { parseBookless, parseReference, referenceLabels } from './reference';
+import { parseChapterName } from './utils';
 import type { BookMatch } from './books';
-import type { ParsedRef } from './reference';
+import type { BooklessRef, ParsedRef } from './reference';
 import type { ChapterTarget } from './types';
+import type { ChapterName } from './utils';
 import type KingdoneChapelPlugin from './main';
 
 /**
@@ -30,12 +39,24 @@ import type KingdoneChapelPlugin from './main';
  */
 const TRIGGER = /(?:(!)@|(?:^|[^\p{L}\p{N}_@!])@)([\p{L}\p{N} .,:-]{0,40})$/u;
 
+/**
+ * The reference a new one carries on from: a link this plugin wrote, closed by
+ * the semicolon that separates one reference from the next. References are
+ * chained that way on paper — `Jn 2.9; Ap 7.10` — and the second of a pair
+ * names its book only when it is a different one, so `Jn 2.9; 3.1` is John
+ * again. Only the link right before the semicolon is read: it is the reference
+ * being carried on from, and anything earlier on the line was left behind by
+ * the one that already replaced it.
+ */
+const CARRIED = /\[\[([^[\]|#]+)(?:#[^[\]|]*)?(?:\|[^[\]]*)?\]\]\s*;\s*$/;
+
 /** The line under the rows, saying what else a reference may carry. */
 const INSTRUCTIONS: Instruction[] = [
   { command: 'Jo 1', purpose: 'book and chapter' },
   { command: '.1', purpose: 'verse' },
   { command: ',2-4', purpose: 'more verses' },
   { command: '-nvi', purpose: 'version' },
+  { command: ';@3.1', purpose: 'same book again' },
   { command: '!@', purpose: 'to embed' },
   { command: '↵', purpose: 'to insert' },
 ];
@@ -100,16 +121,44 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
     };
   }
 
+  /**
+   * A reference written after a semicolon may leave its book out and carry it
+   * on from the one before, the way the second of a pair is written by hand.
+   * The books still answer under those rows: `;@3` is verse 3 of the chapter
+   * being carried as much as it is the start of `3 João`, and one costs
+   * nothing to show beside the other.
+   */
   async getSuggestions(ctx: EditorSuggestContext): Promise<RefSuggestion[]> {
     const embed = ctx.query.startsWith('!');
     const query = embed ? ctx.query.slice(1) : ctx.query;
+
+    const out: RefSuggestion[] = [];
+    const bookless = parseBookless(query);
+    if (bookless) {
+      const here = this.carriedFrom(ctx);
+      if (here) {
+        out.push(
+          ...(await this.carriedSuggestions(here, bookless, embed, ctx.file)),
+        );
+      }
+    }
+    out.push(...(await this.bookSuggestions(query, embed, ctx.file)));
+    return out.slice(0, MAX_ROWS);
+  }
+
+  /** The reference as it was written out in full: a book, and what follows it. */
+  async bookSuggestions(
+    query: string,
+    embed: boolean,
+    from: TFile | null,
+  ): Promise<RefSuggestion[]> {
     const parsed = parseReference(
       query,
       (word) => this.plugin.findVersion(word) !== null,
     );
     if (!parsed) return [];
 
-    const versions = this.versionsFor(parsed, ctx.file);
+    const versions = this.versionsFor(parsed, from);
     if (!versions.length) return [];
     // A version nobody asked for is the one already in force, and naming it in
     // the label would only be the setting read back. One that was asked for is
@@ -167,12 +216,7 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
               named ? version : null,
             );
             const base = { ref: labels.join(','), book: name, preview };
-            for (const row of await this.embeds(
-              found,
-              parsed,
-              anchors,
-              ctx.file,
-            )) {
+            for (const row of await this.embeds(found, parsed, anchors, from)) {
               out.push({ ...base, ...row });
             }
             continue;
@@ -191,8 +235,8 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
             // no anchor to stop at.
             const links = labels.map((label, i) =>
               parsed.verses.length
-                ? this.link(found[0], anchors[i] || null, label, ctx.file)
-                : this.link(found[i], null, label, ctx.file),
+                ? this.link(found[0], anchors[i] || null, label, from)
+                : this.link(found[i], null, label, from),
             );
             out.push({
               ref: labels.join(','),
@@ -210,6 +254,117 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
       }
     }
     return out.slice(0, MAX_ROWS);
+  }
+
+  /**
+   * The reference the query carries its book on from: the link written right
+   * before the semicolon the query follows, read back into the passage it
+   * points at. A link to anything that is not a chapter of a version the vault
+   * still holds carries nothing, and the numbers are left to the books.
+   */
+  carriedFrom(ctx: EditorSuggestContext): ChapterName | null {
+    const before = ctx.editor.getLine(ctx.start.line).slice(0, ctx.start.ch);
+    const m = before.match(CARRIED);
+    if (!m) return null;
+
+    const file = this.app.metadataCache.getFirstLinkpathDest(
+      m[1].trim(),
+      ctx.file ? ctx.file.path : '',
+    );
+    const name = file ? parseChapterName(file.basename) : null;
+    if (!name) return null;
+    // The file names the version the way the file is named; the vault names it
+    // the way the folder is. Take the vault's, since that is what everything
+    // else here is looked up by.
+    const version = this.plugin.findVersion(name.version);
+    return version ? { ...name, version } : null;
+  }
+
+  /**
+   * The carried passage, under both labels it could be written with: the
+   * numbers as they were typed, and the reference spelled out. The typed one
+   * leads — someone writing `Jn 2.9; 3.1` wants the note to go on saying
+   * `3.1`, and the whole point of the semicolon is that the book is already
+   * said. The version goes unnamed for the same reason: it is the one the
+   * reference before it was already in.
+   */
+  async carriedSuggestions(
+    here: ChapterName,
+    bookless: BooklessRef,
+    embed: boolean,
+    from: TFile | null,
+  ): Promise<RefSuggestion[]> {
+    const chapter = bookless.chapter === null ? here.chapter : bookless.chapter;
+    const file = this.plugin.referenceFile(
+      here.version,
+      here.bookIndex,
+      chapter,
+    );
+    if (!file) return [];
+
+    // A carried reference names the one chapter, so there is the one file to
+    // link into, written the way the vault already holds it.
+    const target: ChapterTarget = { chapter, file, path: file.path };
+    const name = bookNameAt(
+      here.bookIndex,
+      nameLang(this.plugin.settings.language),
+    );
+    try {
+      // The anchors and the opening verse are the passage, not the wording, so
+      // both labellings share the one read.
+      const anchors = await this.plugin.findAnchors(
+        file,
+        chapter,
+        bookless.verses,
+      );
+      const preview = await this.previewOf(file, chapter, bookless.verses);
+      const full = referenceLabels(name, [chapter], bookless.verses);
+
+      if (embed) {
+        // An embed carries no label, so both labellings write the same thing
+        // and the row names the passage instead. What it may still be asked
+        // in is the same as anywhere else: a chapter whole, or verse by verse.
+        const parsed: ParsedRef = {
+          version: null,
+          versionPrefix: false,
+          book: name,
+          chapters: [chapter],
+          verses: bookless.verses,
+        };
+        const base = { ref: full.join(','), book: name, preview };
+        return (await this.embeds([target], parsed, anchors, from)).map(
+          (row) => ({ ...base, ...row }),
+        );
+      }
+
+      const row = (labels: string[]): RefSuggestion => ({
+        ref: labels.join(','),
+        book: name,
+        preview,
+        markdown: labels
+          .map((label, i) => this.link(target, anchors[i] || null, label, from))
+          .join(','),
+      });
+      return [row(this.carriedLabels(bookless, chapter)), row(full)];
+    } catch (e) {
+      // The read goes to the file the index named, which may have gone away
+      // since it was indexed. Leave the passage out rather than taking the
+      // whole popup down with it.
+      return [];
+    }
+  }
+
+  /**
+   * The carried reference written as the numbers alone, the way it was typed:
+   * `3.1,2` keeps its chapter, `9,10` stays verses of the chapter it was
+   * counted from, and a chapter still missing its verse is the number itself.
+   */
+  carriedLabels(bookless: BooklessRef, chapter: number): string[] {
+    if (!bookless.verses.length) return [String(chapter)];
+    if (bookless.chapter === null) return bookless.verses.map(String);
+    return bookless.verses.map((v, i) =>
+      i === 0 ? `${chapter}.${v}` : String(v),
+    );
   }
 
   /**

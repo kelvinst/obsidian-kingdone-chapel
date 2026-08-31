@@ -69,6 +69,21 @@ so what you pick is what the note ends up saying.
 | `@Joao 1.1,2` | `[[NVI-43-JHN-001#^nvi-jhn-1-1\|João 1.1]],[[NVI-43-JHN-001#^nvi-jhn-1-2\|2]]` — one link per verse |
 | `@Joao 1.1-3` | the same as `1.1,2,3`                                                                               |
 
+References are chained with a semicolon on paper — `Jn 2.9; Ap 7.10` — and the second of a
+pair names its book only when it is a different one. Write it the same way here: after a
+`;`, a reference may be numbers alone and it carries the book, the chapter and the version
+on from the link right before the semicolon. The books still answer under those rows, so
+`;@3` is verse 3 of the chapter being carried as much as it is the start of `3 João`.
+
+| You type, after `[[NVI-43-JHN-002\|João 2.9]];` | You get                                                                    |
+| ----------------------------------------------- | -------------------------------------------------------------------------- |
+| `@3.1`                                          | `[[NVI-43-JHN-003#^nvi-jhn-3-1\|3.1]]` — John again, chapter 3             |
+| `@10`                                           | `[[NVI-43-JHN-002#^nvi-jhn-2-10\|10]]` — another verse of the same chapter |
+| `@3.1,2`                                        | one link per verse, the way a spelled-out reference writes them            |
+
+Each of those comes twice: once labelled with the numbers as you typed them, once with the
+reference spelled out (`João 3.1`), for when the sentence needs the book said again.
+
 Put a `!` in front — `!@Joao 1.1` — and the same reference comes back as embeds, showing the
 text in the note instead of pointing at it. An embed carries no label, so a book's
 abbreviation and its full name write the same thing and the popup offers each book once,
