@@ -17,6 +17,7 @@ runs:
         cache: npm
 
     - name: Install dependencies
+      id: install
       run: npm ci
       shell: bash
 
@@ -28,18 +29,29 @@ runs:
     # It is the same list `npm run precommit` runs by hand, minus the writing:
     # CI reads and reports, it does not reformat a branch on its author's
     # behalf, and it is told to leave the coverage floors alone.
+    #
+    # Each carries the same condition so that one failing check does not hide
+    # the others: a commit with both a formatting slip and a failing test
+    # should hear about both from one run rather than over two pushes. The
+    # `install` half stops that from turning a failed `npm ci` into four more
+    # failures saying the same thing — without a `node_modules` there is
+    # nothing any of them could report.
     - name: Format
+      if: ${{ !cancelled() && steps.install.outcome == 'success' }}
       run: npm run format:check
       shell: bash
 
     - name: Type check
+      if: ${{ !cancelled() && steps.install.outcome == 'success' }}
       run: npm run typecheck
       shell: bash
 
     - name: Bundle
+      if: ${{ !cancelled() && steps.install.outcome == 'success' }}
       run: npm run bundle
       shell: bash
 
     - name: Test
+      if: ${{ !cancelled() && steps.install.outcome == 'success' }}
       run: npm run test:coverage -- --coverage.thresholds.autoUpdate=false
       shell: bash
