@@ -1,0 +1,230 @@
+// @vitest-environment jsdom
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { chapter, harness } from '../test/harness';
+import type { Harness } from '../test/harness';
+import { KingdoneChapelSettingTab } from './settings';
+
+/** The block of one setting, found by the name written above it. */
+function setting(container: HTMLElement, name: string): HTMLElement {
+  const found = Array.from(
+    container.querySelectorAll<HTMLElement>('.setting-item'),
+  ).find((el) => el.querySelector('.setting-item-name')?.textContent === name);
+  if (!found) throw new Error(`no setting named ${name}`);
+  return found;
+}
+
+function control<T extends HTMLElement>(
+  container: HTMLElement,
+  name: string,
+  selector: string,
+): T {
+  const el = setting(container, name).querySelector<T>(selector);
+  if (!el) throw new Error(`${name} has no ${selector}`);
+  return el;
+}
+
+function toggle(container: HTMLElement, name: string): HTMLInputElement {
+  return control<HTMLInputElement>(container, name, 'input[type="checkbox"]');
+}
+
+/** Change a control the way the app does: set the value, then say so. */
+function change(el: HTMLElement, event: 'change' | 'input') {
+  el.dispatchEvent(new Event(event));
+}
+
+const vault = {
+  ...chapter('NVI', 1, 'GEN', 1, ['No princípio']),
+  ...chapter('ARA', 1, 'GEN', 1, ['No princípio']),
+};
+
+let world: Harness;
+let tab: KingdoneChapelSettingTab;
+let containerEl: HTMLElement;
+
+beforeEach(() => {
+  world = harness(vault, { labels: { NVI: 'Nova Versão Internacional' } });
+  tab = new KingdoneChapelSettingTab(world.app, world.plugin);
+  containerEl = tab.containerEl;
+  tab.display();
+});
+
+describe('the language', () => {
+  it('offers no preference beside each language', () => {
+    const drop = control<HTMLSelectElement>(containerEl, 'Language', 'select');
+    expect(Array.from(drop.options).map((o) => o.value)).toEqual([
+      '',
+      'pt',
+      'en',
+    ]);
+  });
+
+  it('opens on the language already chosen', () => {
+    world.plugin.settings.language = 'en';
+    tab.display();
+    expect(
+      control<HTMLSelectElement>(containerEl, 'Language', 'select').value,
+    ).toBe('en');
+  });
+
+  it('saves the language it is changed to', async () => {
+    const drop = control<HTMLSelectElement>(containerEl, 'Language', 'select');
+    drop.value = 'pt';
+    change(drop, 'change');
+    await vi.waitFor(() => expect(world.plugin.settings.language).toBe('pt'));
+    expect(world.plugin.data).toMatchObject({ language: 'pt' });
+  });
+});
+
+describe('the Bible folder', () => {
+  it('opens on the folder in force', () => {
+    expect(
+      control<HTMLInputElement>(containerEl, 'Bible folder', 'input').value,
+    ).toBe('Bibles');
+  });
+
+  it('drops the trailing slashes off what is typed', async () => {
+    const input = control<HTMLInputElement>(
+      containerEl,
+      'Bible folder',
+      'input',
+    );
+    input.value = 'Textos/Bíblias//';
+    change(input, 'input');
+    await vi.waitFor(() =>
+      expect(world.plugin.settings.bibleFolder).toBe('Textos/Bíblias'),
+    );
+  });
+});
+
+describe('the switches', () => {
+  const switches: [string, keyof typeof world.plugin.settings][] = [
+    ['Open in new tab', 'openInNewTab'],
+    ['Chapter breadcrumbs', 'showBreadcrumbs'],
+    ['Group books by category', 'bookCategories'],
+    ['Follow cursor', 'followCursor'],
+    ['Show the version you are reading', 'showCurrentVersion'],
+    ['Open sidebar on startup', 'openSidebarOnStart'],
+  ];
+
+  for (const [name, key] of switches) {
+    it(`opens ${name} on the setting in force`, () => {
+      expect(toggle(containerEl, name).checked).toBe(
+        world.plugin.settings[key],
+      );
+    });
+
+    it(`saves ${name} when it is flipped`, async () => {
+      const was = world.plugin.settings[key];
+      const el = toggle(containerEl, name);
+      el.checked = !was;
+      change(el, 'change');
+      await vi.waitFor(() => expect(world.plugin.settings[key]).toBe(!was));
+      expect(world.plugin.data).toMatchObject({ [key]: !was });
+    });
+  }
+});
+
+describe('the default version for @ references', () => {
+  const name = 'Default version for @ references';
+
+  it('offers every version under its label, after Automatic', () => {
+    const drop = control<HTMLSelectElement>(containerEl, name, 'select');
+    expect(
+      Array.from(drop.options).map((o) => [o.value, o.textContent]),
+    ).toEqual([
+      ['', 'Automatic'],
+      ['ARA', 'ARA'],
+      ['NVI', 'Nova Versão Internacional'],
+    ]);
+  });
+
+  it('saves the version it is set to', async () => {
+    const drop = control<HTMLSelectElement>(containerEl, name, 'select');
+    drop.value = 'NVI';
+    change(drop, 'change');
+    await vi.waitFor(() =>
+      expect(world.plugin.settings.defaultVersion).toBe('NVI'),
+    );
+  });
+});
+
+describe('the headings', () => {
+  it('breaks the references and the sidebar out of the rest', () => {
+    expect(
+      Array.from(containerEl.querySelectorAll('h3')).map((h) => h.textContent),
+    ).toEqual(['References', 'Sidebar']);
+  });
+});
+
+describe('the versions it found', () => {
+  it('names them, in order', () => {
+    expect(
+      setting(containerEl, 'Detected versions').querySelector(
+        '.setting-item-description',
+      )?.textContent,
+    ).toBe('ARA, NVI');
+  });
+
+  it('says so when there are none', () => {
+    const empty = harness();
+    const bare = new KingdoneChapelSettingTab(empty.app, empty.plugin);
+    bare.display();
+    expect(
+      setting(bare.containerEl, 'Detected versions').querySelector(
+        '.setting-item-description',
+      )?.textContent,
+    ).toBe('none');
+  });
+
+  it('reads the vault again, and the chapters with it, on Reload', () => {
+    world.plugin.index();
+    world.plugin.chapterCache.set('stale', { mtime: 1, verses: [] });
+    world.vault.write(...Object.entries(chapter('ACF', 1, 'GEN', 1, ['x']))[0]);
+
+    control<HTMLButtonElement>(
+      containerEl,
+      'Detected versions',
+      'button',
+    ).click();
+
+    expect(world.plugin.chapterCache.size).toBe(0);
+    expect(
+      setting(containerEl, 'Detected versions').querySelector(
+        '.setting-item-description',
+      )?.textContent,
+    ).toBe('ACF, ARA, NVI');
+  });
+
+  it('gives every version its own command again', () => {
+    const spy = vi.spyOn(world.plugin, 'registerVersionCommands');
+    control<HTMLButtonElement>(
+      containerEl,
+      'Detected versions',
+      'button',
+    ).click();
+    expect(spy).toHaveBeenCalled();
+  });
+});
+
+describe('the duplicate files', () => {
+  it('are left out when the vault has none', () => {
+    expect(containerEl.querySelector('.kcp-conflicts')).toBeNull();
+  });
+
+  it('name the files fighting over each chapter', () => {
+    const clashing = harness({
+      ...vault,
+      'Bibles/NVI/copy/NVI-01-GEN-001.md': 'duplicate',
+    });
+    const other = new KingdoneChapelSettingTab(clashing.app, clashing.plugin);
+    other.display();
+
+    const items = Array.from(
+      other.containerEl.querySelectorAll('.kcp-conflicts li'),
+    ).map((li) => li.textContent);
+    expect(items).toEqual([
+      'Bibles/NVI/NVI-01-GEN-001.md  |  Bibles/NVI/copy/NVI-01-GEN-001.md',
+    ]);
+  });
+});
