@@ -10,7 +10,7 @@ import type {
 
 import {
   abbrLabel,
-  bookNameAt,
+  bookName,
   langsFor,
   matchBooks,
   nameLang,
@@ -47,8 +47,12 @@ const TRIGGER = /(?:(!)@|(?:^|[^\p{L}\p{N}_@!])@)([\p{L}\p{N} .,:-]{0,40})$/u;
  * again. Only the link right before the semicolon is read: it is the reference
  * being carried on from, and anything earlier on the line was left behind by
  * the one that already replaced it.
+ *
+ * A link inside a table writes its label after an escaped pipe (`\|`), since a
+ * bare one would end the cell, so both forms are read here.
  */
-const CARRIED = /\[\[([^[\]|#]+)(?:#[^[\]|]*)?(?:\|[^[\]]*)?\]\]\s*;\s*$/;
+const CARRIED =
+  /\[\[([^[\]|#\\]+)(?:#[^[\]|\\]*)?(?:\\?\|[^[\]]*)?\]\]\s*;\s*$/;
 
 /** The line under the rows, saying what else a reference may carry. */
 const INSTRUCTIONS: Instruction[] = [
@@ -305,10 +309,9 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
     // A carried reference names the one chapter, so there is the one file to
     // link into, written the way the vault already holds it.
     const target: ChapterTarget = { chapter, file, path: file.path };
-    const name = bookNameAt(
-      here.bookIndex,
-      nameLang(this.plugin.settings.language),
-    );
+    // The file name holds the book's code, which names a book this table never
+    // heard of as well as one it did — better in a label than the number is.
+    const name = bookName(here.book, nameLang(this.plugin.settings.language));
     try {
       // The anchors and the opening verse are the passage, not the wording, so
       // both labellings share the one read.
