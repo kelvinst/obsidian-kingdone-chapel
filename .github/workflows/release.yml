@@ -22,8 +22,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
-        run: npm run build
+      # The same checks a pull request answers, in the same order and one to a
+      # step: a tag is the last chance to catch something, and building alone
+      # would have published a bundle the suite rejects. `Bundle` is what
+      # writes the `main.js` the release carries.
+      - name: Format
+        run: npm run format:check
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Bundle
+        run: npm run bundle
+
+      - name: Test
+        run: npm run test:coverage -- --coverage.thresholds.autoUpdate=false
 
       - name: Create release
         env:
