@@ -2,3 +2,7 @@
 main.js
 package-lock.json
 coverage/
+
+# Saved sessions are a record, not source: the transcript is a gzip blob and
+# the log is written as it was written.
+docs/sessions/
