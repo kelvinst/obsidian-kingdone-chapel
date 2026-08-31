@@ -17,9 +17,14 @@ fi
 # neither installed. Left unchecked, the hook answers for the commit on one
 # Node while CI answers for it on another, which is the one gap a check run
 # before the commit cannot otherwise close.
-want=$(awk '/^nodejs /{print $2}' .tool-versions)
+#
+# Only where the pin exists, though. Worktrees share one hooks directory, so
+# this same file runs on branches that predate `.tool-versions` — and there,
+# with nothing written down to be measured against, every commit would be
+# refused for failing to match a version nobody chose.
+want=$(awk '/^nodejs /{print $2}' .tool-versions 2>/dev/null)
 have=$(node -v 2>/dev/null | sed 's/^v//')
-if [ "$want" != "$have" ]; then
+if [ -n "$want" ] && [ "$want" != "$have" ]; then
   echo "Commit rejected: Node ${have:-not found on PATH}, but .tool-versions pins $want."
   echo "CI runs the checks on $want, so this commit would be answered for on another."
   echo ""
