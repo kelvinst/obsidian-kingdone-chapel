@@ -255,9 +255,11 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
     // any use — and a half-written one asks for every version it begins.
     const named = parsed.versionPrefix || parsed.version !== null;
 
-    for (const version of this.versionsFor(parsed, here.version)) {
-      if (out.length >= MAX_ROWS) break;
-
+    // Every passage is read at once and the rows are cut to the popup after.
+    // Each of them is two reads deep, and a half-written version asks for as
+    // many passages as the vault has versions — waiting them out one at a time
+    // is the popup waiting on the vault, on every keystroke.
+    const read = this.versionsFor(parsed, here.version).map((version) => {
       const at: Location = {
         ...here,
         version,
@@ -265,16 +267,19 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
       };
       const label = named ? version : null;
 
-      const verses = await this.verseRows(at, parsed, label, embed, from).catch(() => NO_ROWS);
-      // Only bare numbers are open to being chapters as well: a chapter written
-      // in front of them has already said they are verses, and a reference with
-      // no numbers at all (`@ARA`) is the note's own chapter, which the verse
-      // rows already offer.
-      const chapters =
+      return Promise.all([
+        this.verseRows(at, parsed, label, embed, from).catch(() => NO_ROWS),
+        // Only bare numbers are open to being chapters as well: a chapter
+        // written in front of them has already said they are verses, and a
+        // reference with no numbers at all (`@ARA`) is the note's own chapter,
+        // which the verse rows already offer.
         parsed.chapter === null && parsed.numbers.length
-          ? await this.chapterRows(at, parsed.numbers, label, embed, from).catch(() => NO_ROWS)
-          : NO_ROWS;
+          ? this.chapterRows(at, parsed.numbers, label, embed, from).catch(() => NO_ROWS)
+          : Promise.resolve(NO_ROWS),
+      ]);
+    });
 
+    for (const [verses, chapters] of await Promise.all(read)) {
       const rows = [verses.bare, chapters.bare, verses.full, chapters.full];
       out.push(...rows.filter((row): row is RefSuggestion => row !== null));
     }
