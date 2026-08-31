@@ -8,9 +8,12 @@ description: >-
 runs:
   using: composite
   steps:
+    # The version comes from `.tool-versions`, so the runner and whoever runs
+    # `npm run precommit` are on the same Node rather than on whatever each
+    # happened to have. asdf and mise read the same file.
     - uses: actions/setup-node@v4
       with:
-        node-version: '22.x'
+        node-version-file: .tool-versions
         cache: npm
 
     - name: Install dependencies
