@@ -2,13 +2,16 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   booklessLabels,
+  booklessPassageLabel,
+  fitsChapters,
+  isNumbers,
   parseBookless,
+  parseNumbers,
   parseReference,
   passageId,
   passageLabel,
   referenceLabels,
   verseSpec,
-  booklessPassageLabel,
 } from './reference';
 
 /** No word names a version, so a leading word is always part of the book. */
@@ -535,5 +538,104 @@ describe('booklessPassageLabel', () => {
     expect(booklessPassageLabel({ chapter: null, verses: [1, 4] }, 3)).toBe(
       '1,4',
     );
+  });
+});
+
+describe('parseNumbers', () => {
+  it('reads a number written on its own', () => {
+    expect(parseNumbers('1')).toEqual([1]);
+  });
+
+  it('reads a list and a run, the way a reference writes them', () => {
+    expect(parseNumbers('1,2,3')).toEqual([1, 2, 3]);
+    expect(parseNumbers('1-3')).toEqual([1, 2, 3]);
+  });
+
+  it('reads what is written around the spaces', () => {
+    expect(parseNumbers(' 1, 2 ')).toEqual([1, 2]);
+  });
+
+  it('is not this kind of reference once a letter is in it', () => {
+    expect(parseNumbers('Joao 1')).toBeNull();
+    expect(parseNumbers('1 ARA')).toBeNull();
+    expect(parseNumbers('1.1')).toBeNull();
+  });
+
+  it('refuses a run reaching for more verses than a reference may carry', () => {
+    expect(parseNumbers('1-99')).toBeNull();
+  });
+
+  it('comes back with nothing when the numbers are still to be written', () => {
+    expect(parseNumbers(',')).toEqual([]);
+    expect(parseNumbers('-')).toEqual([]);
+  });
+});
+
+describe('isNumbers', () => {
+  it('tells a query written as numbers alone from any other', () => {
+    expect(isNumbers('1-3')).toBe(true);
+    expect(isNumbers(' 1, 2 ')).toBe(true);
+    expect(isNumbers('Joao 1')).toBe(false);
+    expect(isNumbers('1.1')).toBe(false);
+  });
+
+  it('says so of a run past the cap, which reads as numbers all the same', () => {
+    expect(isNumbers('1-99')).toBe(true);
+    expect(parseNumbers('1-99')).toBeNull();
+  });
+});
+
+describe('parseNumbers', () => {
+  it('reads a number written on its own', () => {
+    expect(parseNumbers('1')).toEqual([1]);
+  });
+
+  it('reads a list and a run, the way a reference writes them', () => {
+    expect(parseNumbers('1,2,3')).toEqual([1, 2, 3]);
+    expect(parseNumbers('1-3')).toEqual([1, 2, 3]);
+  });
+
+  it('reads what is written around the spaces', () => {
+    expect(parseNumbers(' 1, 2 ')).toEqual([1, 2]);
+  });
+
+  it('is not this kind of reference once a letter is in it', () => {
+    expect(parseNumbers('Joao 1')).toBeNull();
+    expect(parseNumbers('1 ARA')).toBeNull();
+    expect(parseNumbers('1.1')).toBeNull();
+  });
+
+  it('refuses a run reaching for more verses than a reference may carry', () => {
+    expect(parseNumbers('1-99')).toBeNull();
+  });
+
+  it('comes back with nothing when the numbers are still to be written', () => {
+    expect(parseNumbers(',')).toEqual([]);
+    expect(parseNumbers('-')).toEqual([]);
+  });
+});
+
+describe('isNumbers', () => {
+  it('tells a query written as numbers alone from any other', () => {
+    expect(isNumbers('1-3')).toBe(true);
+    expect(isNumbers(' 1, 2 ')).toBe(true);
+    expect(isNumbers('Joao 1')).toBe(false);
+    expect(isNumbers('1.1')).toBe(false);
+  });
+
+  it('says so of a run past the cap, which reads as numbers all the same', () => {
+    expect(isNumbers('1-99')).toBe(true);
+    expect(parseNumbers('1-99')).toBeNull();
+  });
+});
+
+describe('fitsChapters', () => {
+  it('takes a run no longer than a run of chapters may be', () => {
+    expect(fitsChapters([1, 2, 3])).toBe(true);
+    expect(fitsChapters(parseNumbers('1-25') as number[])).toBe(true);
+  });
+
+  it('turns down one that only a run of verses could carry', () => {
+    expect(fitsChapters(parseNumbers('1-26') as number[])).toBe(false);
   });
 });
