@@ -164,27 +164,25 @@ it can, and CI that only reads. Work happened on branch
 ## Open Questions
 
 - [x] Does `actions/setup-node@v4` parse `.tool-versions`, and is Node `25.6.1`
-      available to it? Supported since v4.1 and we pin `@v4`, but it is
-      unexercised — it would fail loudly at the setup step.
-  - Yes to both, observed in run 33421891411: `Resolved .tool-versions as
-    25.6.1`, acquired from `nodejs.org/dist`, `node: v25.6.1`.
+      available to it? Supported since v4.1 and we pin `@v4`, but it is unexercised
+      — it would fail loudly at the setup step.
+  - Yes to both, observed in run 33421891411: `Resolved .tool-versions as 25.6.1`, acquired from `nodejs.org/dist`, `node: v25.6.1`.
 - [ ] Does a failing step inside a composite action still fail the calling
-      `uses:` step now that later steps run past it? `release.yml` depends on
-      it: `Create release` has no `if:`, so it is skipped only if the gate step
-      is marked failed. Getting this wrong means a release ships on a red gate.
-- [ ] Does the gate belong in a composite action at all, now that it is known
-      to collapse the four checks into one step in the run list? The
-      alternatives both cost something: a `workflow_call` reusable workflow
-      names each step but needs artifact plumbing to get `main.js` to
-      `Create release`, and inlining restores the duplication across the two
-      workflows.
+      `uses:` step now that later steps run past it? `release.yml` depends on it:
+      `Create release` has no `if:`, so it is skipped only if the gate step is
+      marked failed. Getting this wrong means a release ships on a red gate.
+- [ ] Does the gate belong in a composite action at all, now that it is known to
+      collapse the four checks into one step in the run list? The alternatives both
+      cost something: a `workflow_call` reusable workflow names each step but needs
+      artifact plumbing to get `main.js` to `Create release`, and inlining restores
+      the duplication across the two workflows.
 - [ ] Is moving CI from LTS 22 to Current 25 the intent? It followed from
       pinning the version already installed locally, not from a decision about
       release toolchains.
 - [ ] Should the coverage ratchet handle parallel branches? Two branches that
-      both raise the floor conflict in `vitest.config.mts`, and after rebasing
-      the loser fails against a floor it did not reach — even though it
-      increased coverage relative to its base. Raised but not decided.
+      both raise the floor conflict in `vitest.config.mts`, and after rebasing the
+      loser fails against a floor it did not reach — even though it increased
+      coverage relative to its base. Raised but not decided.
 
 ## Action Items
 
@@ -193,13 +191,13 @@ it can, and CI that only reads. Work happened on branch
       unexercised.
   - Pushed as `e39fe94`; run 33421891411 succeeded.
 - [ ] Run `make install-git-hooks` to activate the Node assertion. It will
-      reject commits on this machine until the committing shell resolves to
-      25.6.1 (`mise install`, then commit from an activated shell).
-- [ ] Address or close the two open `.git-hooks/pre-commit` findings: `git add -A`
-      sweeps unrelated reformatted files into a commit, and it dirties the index
-      under `git rebase --exec`, which `/kix:rebase` runs. They share a line and
-      would land as one rewrite.
+      reject commits on this machine until the committing shell resolves to 25.6.1
+      (`mise install`, then commit from an activated shell).
+- [ ] Address or close the two open `.git-hooks/pre-commit` findings:
+      `git add -A` sweeps unrelated reformatted files into a commit, and it dirties
+      the index under `git rebase --exec`, which `/kix:rebase` runs. They share a
+      line and would land as one rewrite.
 - [ ] Cover the untested modules — `main.ts` (955 lines), `breadcrumbs.ts`
-      (577), `suggest.ts` (352), `view.ts`, `modal.ts`, `settings.ts`. Each needs
-      a stubbed `obsidian` module (`resolve.alias`) and `environment: 'jsdom'`.
-      The project floor exists to be climbed by this.
+      (577), `suggest.ts` (352), `view.ts`, `modal.ts`, `settings.ts`. Each needs a
+      stubbed `obsidian` module (`resolve.alias`) and `environment: 'jsdom'`. The
+      project floor exists to be climbed by this.
