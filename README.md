@@ -265,20 +265,21 @@ ln -s /path/to/obsidian-kingdone-chapel /path/to/vault/.obsidian/plugins/kingdon
 
 ### CI
 
-Three workflows run the same four steps — `Format`, `Type check`, `Bundle`,
-`Test` — one command to a step rather than one script, so a failure names
-itself in the run's own list.
+`Check` answers pull requests that are not drafts and every push to `main`, so
+a commit that never went through a pull request is still answered for.
+`Release` answers a tag before the release is created. Both run the same four
+steps — `Format`, `Type check`, `Bundle`, `Test` — from one composite action in
+`.github/actions/gate`, one command to a step rather than one script, so a
+failure names itself in the run's own list and neither workflow can drift into
+checking something the other does not.
 
-| Workflow  | Runs on                              | Cancels a run in flight |
-| --------- | ------------------------------------ | ----------------------- |
-| `Check`   | pull requests that are not drafts    | yes                     |
-| `Main`    | every push to `main`                 | no                      |
-| `Release` | a tag, before the release is created | no                      |
-
-`Check` cancels because a pull request is only ever asked about its latest
-commit. `Main` does not, and that is the point of it being separate: merge two
-pull requests a minute apart and a cancelling group would drop the first
-merge's run, leaving that commit with neither a green nor a red against it.
+`Check` cancels a superseded run on a pull request, which is only ever asked
+about its latest commit, and never on `main`, where each commit is answered for
+on its own. Both halves of the concurrency key say so: the group is the branch
+for a pull request and the commit for a push, and cancelling is switched off
+outside a pull request. The group is what does the work — switching cancelling
+off alone would queue instead, and a queued run is cancelled when a third merge
+arrives, which loses the commit one merge further out.
 
 Two things differ from the local run, on purpose: CI checks the formatting
 instead of writing it, and it passes `--coverage.thresholds.autoUpdate=false`,

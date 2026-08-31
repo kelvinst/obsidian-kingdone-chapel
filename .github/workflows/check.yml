@@ -3,14 +3,25 @@ name: Check
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
 
+# The two triggers want opposite things, and both halves say so.
+#
 # A pull request is only ever asked about its latest commit, so a run the next
-# push has already overtaken is worth cancelling. Commits on `main` are not
-# like that — each one is answered for on its own — which is why they are a
-# workflow of their own rather than another trigger here.
+# push has overtaken is worth cancelling, and every run for one branch shares a
+# group in order to be cancellable.
+#
+# A commit on `main` is answered for on its own, so it gets a group of its own:
+# `head_ref` is empty outside a pull request, and keying on the commit instead
+# means there is never a run in the group to cancel or to queue behind. The
+# flag below says the same thing a second way. Both are needed — `false` alone
+# would queue rather than cancel, and a run left pending when a third merge
+# arrives is cancelled to make room for it, which is the same commit going
+# unanswered one merge further out.
 concurrency:
-  group: check-${{ github.head_ref || github.ref }}
-  cancel-in-progress: true
+  group: check-${{ github.head_ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -18,7 +29,9 @@ permissions:
 jobs:
   check:
     name: Check
-    if: ${{ !github.event.pull_request.draft }}
+    # A push carries no pull request to read a `draft` off, so it is admitted
+    # by name rather than by that field being absent.
+    if: ${{ github.event_name == 'push' || !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
 
     steps:
