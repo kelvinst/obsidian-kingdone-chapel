@@ -28,6 +28,7 @@ import {
   passageId,
   passageLabel,
   referenceLabels,
+  shortReference,
 } from './reference';
 import { hasBlockId, parseChapterName, quotePlacement } from './utils';
 import type { BookMatch } from './books';
@@ -447,12 +448,12 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
 
           // What the row points at, spelled out under the book's own name: an
           // abbreviation says the reference short, and this says it whole.
-          const spelled = referenceLabels(
+          const spelled = shortReference(
             name,
             chapters,
             parsed.verses,
             named ? version : null,
-          ).join(',');
+          );
 
           for (const form of this.forms(match, name)) {
             const labels = referenceLabels(
@@ -763,7 +764,7 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
         )[0].markdown
       : null;
 
-    const said = spelled.join(',');
+    const said = shortReference(here.book, asked, verses, name);
     const row = (labels: string[]): RefSuggestion => ({
       ref: labels.join(','),
       // Numbers on their own do not say what they point at, so the row says it
