@@ -189,14 +189,20 @@ npm install
 make install-git-hooks # see below — do this once per clone
 
 npm run dev        # watch build, writes main.js
-npm run build      # type-check then production build
+npm run typecheck  # tsc only
+npm run bundle     # production build, writes main.js
+npm run build      # both of the above
 npm test           # run the test suite once
 npm run test:watch # re-run tests as files change
 npm run test:coverage
 npm run format     # write the formatting
-npm run check      # everything CI runs, writing nothing
-npm run precommit  # the same, allowed to fix what it can
+npm run precommit  # everything, fixing what it can fix
 ```
+
+There is no read-only `check` to run by hand. Locally the point is to be
+fixed, not told: `precommit` formats rather than complains, and a run that
+raises coverage writes the higher floor back. CI is the one that only reads,
+and it says so in its own steps.
 
 Tests are [Vitest](https://vitest.dev) files sitting next to what they cover
 (`src/reference.test.ts`), and cover the parsing the plugin is built on: `@`
@@ -259,9 +265,19 @@ ln -s /path/to/obsidian-kingdone-chapel /path/to/vault/.obsidian/plugins/kingdon
 
 ### CI
 
-`Check` runs `npm run check` — the same list as the hook, minus the writing —
-on every pull request that is not a draft. Marking a draft ready for review
-starts it.
+`Check` runs on every pull request that is not a draft — marking a draft ready
+for review starts it — and on every push to `main`, so a commit that never went
+through a pull request is still answered for.
+
+It runs the same list as the hook, one command to a step (`Format`, `Type
+check`, `Bundle`, `Test`) rather than as one script, so a failure names itself
+and any step can become a job of its own later. Two things differ from the
+local run, on purpose: it checks the formatting instead of writing it, and it
+passes `--coverage.thresholds.autoUpdate=false`, so CI can only ever read the
+floors. Raising them stays the hook's job.
+
+`Release` runs those same four steps before it publishes, since a tag is the
+last chance to catch something.
 
 Releases are cut by pushing a tag matching the `manifest.json` version (e.g. `1.0.0`); CI
 attaches `main.js`, `manifest.json` and `styles.css` to the GitHub release.

@@ -1,11 +1,8 @@
-.PHONY: all precommit check install-git-hooks
+.PHONY: all precommit install-git-hooks
 all: precommit
 
 precommit:
 	npm run precommit
-
-check:
-	npm run check
 
 # `.git` is a file rather than a directory inside a worktree, and worktrees
 # share the one hooks directory, so ask git where it is rather than guessing.
