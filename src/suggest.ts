@@ -236,6 +236,9 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
     const query = embed ? ctx.query.slice(1) : ctx.query;
 
     const out: Row[] = [];
+    // A hint is not a row anyone can pick, so it goes below every row that is:
+    // the popup opens on its first one, and Enter has to write something.
+    const hints: Row[] = [];
     const bookless = parseBookless(query);
     const carried = bookless ? this.carriedFrom(ctx) : null;
     if (bookless && carried) {
@@ -246,18 +249,20 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
       const numbers = parseNumbers(query);
       if (numbers === null && isNumbers(query)) {
         // Numbers, and nothing wrong with them but how many they came to.
-        out.push(TOO_MANY);
+        hints.push(TOO_MANY);
       } else if (numbers && numbers.length) {
         const here = this.plugin.linkContext(ctx.file);
-        out.push(
-          ...(here
-            ? await this.contextSuggestions(here, numbers, embed, ctx.file)
-            : [NO_CONTEXT]),
-        );
+        if (here) {
+          out.push(
+            ...(await this.contextSuggestions(here, numbers, embed, ctx.file)),
+          );
+        } else hints.push(NO_CONTEXT);
       }
     }
     out.push(...(await this.bookSuggestions(query, embed, ctx.file)));
-    return out.slice(0, MAX_ROWS);
+    // The hint is what the popup is there to say when the rows run out, so the
+    // room for it comes off the rows rather than the other way about.
+    return [...out.slice(0, MAX_ROWS - hints.length), ...hints];
   }
 
   /** The reference as it was written out in full: a book, and what follows it. */
