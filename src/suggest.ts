@@ -259,18 +259,33 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
         } else hints.push(NO_CONTEXT);
       }
     }
-    out.push(...(await this.bookSuggestions(query, embed, ctx.file)));
     // The hint is what the popup is there to say when the rows run out, so the
-    // room for it comes off the rows rather than the other way about.
-    return [...out.slice(0, MAX_ROWS - hints.length), ...hints];
+    // room for it comes off the rows rather than the other way about, and the
+    // books are told what room is left rather than filling the popup twice
+    // over and having the surplus read from the vault and then dropped.
+    out.push(
+      ...(await this.bookSuggestions(
+        query,
+        embed,
+        ctx.file,
+        MAX_ROWS - out.length - hints.length,
+      )),
+    );
+    return [...out, ...hints];
   }
 
-  /** The reference as it was written out in full: a book, and what follows it. */
+  /**
+   * The reference as it was written out in full: a book, and what follows it.
+   * `limit` is the room left in the popup, which is also the point at which
+   * reading the vault for another book stops being worth it.
+   */
   async bookSuggestions(
     query: string,
     embed: boolean,
     from: TFile | null,
+    limit: number,
   ): Promise<RefSuggestion[]> {
+    if (limit <= 0) return [];
     const parsed = parseReference(
       query,
       (word) => this.plugin.findVersion(word) !== null,
@@ -292,7 +307,7 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
     const books = Math.max(1, Math.ceil(MAX_BOOKS / versions.length));
     for (const version of versions) {
       for (const match of matchBooks(parsed.book, books, langs)) {
-        if (out.length >= MAX_ROWS) return out.slice(0, MAX_ROWS);
+        if (out.length >= limit) return out.slice(0, limit);
 
         const found = this.chapterTargets(
           version,
@@ -417,7 +432,7 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
         }
       }
     }
-    return out.slice(0, MAX_ROWS);
+    return out.slice(0, limit);
   }
 
   /**
