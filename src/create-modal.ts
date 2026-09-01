@@ -2,9 +2,9 @@ import { Modal, Notice, Setting, TFolder, normalizePath } from 'obsidian';
 import type { App, TFile } from 'obsidian';
 
 import { bookName, nameLang } from './books';
-import { chapterNote, declaringNote, renameSegments } from './create';
+import { chapterNote, declaringNote, renameSegments, verseId } from './create';
 import type { Quoted } from './create';
-import { parseChapterName } from './utils';
+import { parseChapterName, verseInId } from './utils';
 import type { Source } from './sources';
 import type KingdoneChapelPlugin from './main';
 
@@ -220,7 +220,7 @@ export class CreateVersionModal extends Modal {
           `${bookName(parsed.book, lang)} ${parsed.chapter}`,
           file.basename,
           source.code,
-          await this.quoted(file, parsed.chapter),
+          await this.quoted(file, parsed.chapter, source.code, parsed.book),
           this.code,
           parsed.book,
           parsed.chapter,
@@ -237,19 +237,35 @@ export class CreateVersionModal extends Modal {
     return written;
   }
 
-  /** Every verse of a chapter that the translation gave a block id to. */
-  async quoted(file: TFile, chapter: number): Promise<Quoted[]> {
+  /**
+   * Every verse of a chapter, quoted from the translation.
+   *
+   * A verse the translation never anchored is quoted under the id it would
+   * have carried had it been. `findAnchors` answers such a verse with the
+   * nearest anchor above it — which is another verse's — and quoting that
+   * would put one verse's words under another's heading, silently. Naming the
+   * id that is missing instead leaves an embed that does not resolve, which is
+   * what the translation honestly holds: the run keeps every verse, and the
+   * one that was never anchored says so where it is read.
+   */
+  async quoted(
+    file: TFile,
+    chapter: number,
+    code: string,
+    book: string,
+  ): Promise<Quoted[]> {
     const verses = (await this.plugin.chapterVerses(file)).map((v) => v.verse);
     const anchors = await this.plugin.findAnchors(file, chapter, verses);
-    const out: Quoted[] = [];
-    verses.forEach((verse, at) => {
+    return verses.map((verse, at) => {
       const anchor = anchors[at];
-      // A verse the translation never anchored cannot be embedded on its own,
-      // and an embed of the whole chapter under one verse's heading would say
-      // something the version does not mean. Leave it out.
-      if (anchor) out.push({ verse, anchor });
+      return {
+        verse,
+        anchor:
+          anchor && verseInId(anchor) === verse
+            ? anchor
+            : verseId(code, book, chapter, verse),
+      };
     });
-    return out;
   }
 
   /** Make the folders `path`'s file will sit in, outermost first. */
