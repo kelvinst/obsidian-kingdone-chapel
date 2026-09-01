@@ -462,7 +462,9 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
             );
             out.push({
               ref: labels.join(','),
-              book: spelled,
+              // The row written under the book's own name already says the
+              // whole reference; only an abbreviation leaves something to name.
+              book: form === name ? labels.join(',') : spelled,
               preview,
               markdown: links.join(','),
             });
@@ -809,7 +811,9 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
     });
 
     if (shapes) {
-      const base = { ref: spelled.join(','), book: said, preview };
+      // An embed row reads as the passage it writes, so it says what it points
+      // at already and has nothing to name beside it.
+      const base = { ref: spelled.join(','), book: spelled.join(','), preview };
       return {
         bare: null,
         full: shapes.map((shape) => ({ ...base, ...shape })),
@@ -820,7 +824,9 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
       // What the reader typed, which is how the sentence around it reads: `as
       // verse 2 says`, not `as João 1.2 says`.
       bare: bare.length ? row(bare) : null,
-      full: [row(spelled)],
+      // Spelled out, the row is the reference, so it names itself and the
+      // chip beside it stays away.
+      full: [{ ...row(spelled), book: spelled.join(',') }],
     };
   }
 
