@@ -24,7 +24,7 @@ import {
   parseChapterName,
   parseVerseLine,
 } from './utils';
-import { bookName, bookNameAt, nameLang } from './books';
+import { bookName, bookNameAt, nameLang, translationsName } from './books';
 import { VersionSuggestModal } from './modal';
 import { ReferenceSuggest } from './suggest';
 import { KingdoneChapelSettingTab } from './settings';
@@ -99,7 +99,15 @@ export default class KingdoneChapelPlugin extends Plugin {
   previewLock: { path: string; verse: number; scrollTop: number } | null = null;
 
   async onload() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const stored = ((await this.loadData()) || {}) as Record<string, unknown>;
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, stored);
+    // The folder was named `bibleFolder` while it was what made a folder a
+    // version. It now says only where the translations sit, and is named for
+    // that. A vault saved before the rename still carries the old name, so
+    // take it once; the next save writes the new one.
+    if (!stored.translationsFolder && typeof stored.bibleFolder === 'string') {
+      this.settings.translationsFolder = stored.bibleFolder;
+    }
     this.chapterCache = new Map();
 
     this.addSettingTab(new KingdoneChapelSettingTab(this.app, this));
@@ -238,7 +246,12 @@ export default class KingdoneChapelPlugin extends Plugin {
   sources(files?: TFile[]): Map<string, Source> {
     if (this.sourceFolders) return this.sourceFolders;
 
-    const folders = collectSources(this.app, this.settings.bibleFolder, files);
+    const folders = collectSources(
+      this.app,
+      this.settings.translationsFolder,
+      translationsName(nameLang(this.settings.language)),
+      files,
+    );
     // Two folders may name themselves the same thing, and then they are one
     // version kept in two places: the index merges their files under the one
     // code, and the list names it once.
@@ -290,10 +303,10 @@ export default class KingdoneChapelPlugin extends Plugin {
   }
 
   /**
-   * Every chapter file under the Bible folder, grouped by version.
+   * Every chapter file the vault's versions hold, grouped by version.
    *
    * Only two things are structural: a version is a folder — one that says so
-   * itself, or a direct subfolder of the Bible folder — and file names follow
+   * itself, or a direct subfolder of the translations folder — and file names follow
    * `<VERSION>-<NN>-<Book>-<CCC>`. Whatever folders a version uses in between
    * are ignored, so each version can be laid out flat, split by testament, or
    * grouped any other way.
@@ -438,7 +451,7 @@ export default class KingdoneChapelPlugin extends Plugin {
 
   /**
    * Parse the active file into { version, bookIndex, book, chapter, verse }.
-   * Expects <bibleFolder>/<VERSION>/<any folders>/<VERSION>-<NN>-<CODE>-<CCC>.md
+   * Expects <VERSION>/<any folders>/<VERSION>-<NN>-<CODE>-<CCC>.md
    */
   currentLocation(): Location | null {
     const view = this.app.workspace.getActiveViewOfType(MarkdownView);

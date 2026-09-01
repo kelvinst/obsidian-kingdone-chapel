@@ -231,8 +231,8 @@ describe('listVersions', () => {
     expect(world.plugin.listVersions()).toEqual(['ARA', 'NVI']);
   });
 
-  it('names none at all where the Bible folder is not a folder', () => {
-    world.plugin.settings.bibleFolder = 'Estudos/Romanos.md';
+  it('names none at all where the translations folder is not a folder', () => {
+    world.plugin.settings.translationsFolder = 'Estudos/Romanos.md';
     world.plugin.invalidateIndex();
     expect(world.plugin.listVersions()).toEqual([]);
   });
@@ -1390,10 +1390,10 @@ describe('refreshViews', () => {
 
 describe('saveSettings', () => {
   it('writes the settings, and reads the vault again', async () => {
-    world.plugin.settings.bibleFolder = 'Textos';
+    world.plugin.settings.translationsFolder = 'Textos';
     world.plugin.index();
     await world.plugin.saveSettings();
-    expect(world.plugin.data).toMatchObject({ bibleFolder: 'Textos' });
+    expect(world.plugin.data).toMatchObject({ translationsFolder: 'Textos' });
     expect(world.plugin.bibleIndex).toBeNull();
   });
 });
@@ -1437,10 +1437,10 @@ describe('onload', () => {
   });
 
   it('reads the settings that were saved, over the defaults', async () => {
-    world.plugin.data = { bibleFolder: 'Textos', followCursor: false };
+    world.plugin.data = { translationsFolder: 'Textos', followCursor: false };
     await world.plugin.onload();
     expect(world.plugin.settings).toMatchObject({
-      bibleFolder: 'Textos',
+      translationsFolder: 'Textos',
       followCursor: false,
       openInNewTab: false,
     });

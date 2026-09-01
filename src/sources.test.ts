@@ -57,6 +57,14 @@ function vault(notes: Note[], root: Folder | null = null): App {
   } as unknown as App;
 }
 
+/**
+ * `collectSources`, under a fixed heading for the translations folder — which
+ * language names it is the plugin's to decide, and not what these are about.
+ */
+function collect(app: App, translationsFolder: string) {
+  return collectSources(app, translationsFolder, 'Translations');
+}
+
 function source(over: Partial<Source> = {}): Source {
   return {
     path: 'p',
@@ -72,7 +80,7 @@ function source(over: Partial<Source> = {}): Source {
 describe('collectSources', () => {
   it('takes the folder of a note that declares one', () => {
     const shedd = folder('Igreja/Comentarios/Shedd');
-    const found = collectSources(
+    const found = collect(
       vault([
         note('Igreja/Comentarios/Shedd/Shedd.md', shedd, {
           [SOURCE_KEY]: 'Editions',
@@ -93,7 +101,7 @@ describe('collectSources', () => {
 
   it('reads the name, code and order a declaring note gives', () => {
     const ara = folder('Bibles/Almeida Revista e Atualizada');
-    const found = collectSources(
+    const found = collect(
       vault([
         note('Bibles/Almeida Revista e Atualizada/index.md', ara, {
           [SOURCE_KEY]: ' Translations ',
@@ -115,7 +123,7 @@ describe('collectSources', () => {
 
   it('leaves a version that names no heading without one', () => {
     const shedd = folder('Notes/Shedd');
-    const found = collectSources(
+    const found = collect(
       vault([
         note('Notes/Shedd/Shedd.md', shedd, {
           [SOURCE_KEY]: true,
@@ -130,7 +138,7 @@ describe('collectSources', () => {
 
   it('ignores a note that says nothing, and one with no frontmatter at all', () => {
     const plain = folder('Journal');
-    const found = collectSources(
+    const found = collect(
       vault([
         note('Journal/monday.md', plain),
         note('Journal/tuesday.md', plain, { tags: ['prayer'] }),
@@ -142,7 +150,7 @@ describe('collectSources', () => {
   });
 
   it('ignores a declaring note that is in no folder at all', () => {
-    const found = collectSources(
+    const found = collect(
       vault([note('loose.md', null, { [SOURCE_KEY]: 'Editions' })]),
       'Bibles',
     );
@@ -152,7 +160,7 @@ describe('collectSources', () => {
 
   it('keeps the first of two notes declaring the one folder', () => {
     const shedd = folder('Notes/Shedd');
-    const found = collectSources(
+    const found = collect(
       vault([
         note('Notes/Shedd/Shedd.md', shedd, { [SOURCE_KEY]: 'Editions' }),
         note('Notes/Shedd/also.md', shedd, { [SOURCE_KEY]: 'Notes' }),
@@ -163,35 +171,35 @@ describe('collectSources', () => {
     expect(found.get('Notes/Shedd')).toMatchObject({ group: 'Editions' });
   });
 
-  it('takes the direct subfolders of the Bible folder as versions too', () => {
+  it("heads the translations folder's own subfolders as translations", () => {
     const bibles = folder('Bibles');
     folder('Bibles/ARA', bibles);
     folder('Bibles/NVI', bibles);
-    const found = collectSources(vault([], bibles), 'Bibles');
+    const found = collect(vault([], bibles), 'Bibles');
 
     expect([...found.keys()]).toEqual(['Bibles/ARA', 'Bibles/NVI']);
     expect(found.get('Bibles/ARA')).toEqual({
       path: 'Bibles/ARA',
       code: 'ARA',
       label: 'ARA',
-      group: '',
+      group: 'Translations',
       order: 0,
       declaredBy: '',
     });
   });
 
-  it('skips a loose note sitting in the Bible folder itself', () => {
+  it('skips a loose note sitting in the translations folder itself', () => {
     const bibles = folder('Bibles');
     const readme = note('Bibles/README.md', bibles);
-    const found = collectSources(vault([readme], bibles), 'Bibles');
+    const found = collect(vault([readme], bibles), 'Bibles');
 
     expect(found.size).toBe(0);
   });
 
-  it('lets a folder inside the Bible folder still name itself', () => {
+  it('lets a folder inside the translations folder still name itself', () => {
     const bibles = folder('Bibles');
     const ara = folder('Bibles/ARA', bibles);
-    const found = collectSources(
+    const found = collect(
       vault(
         [note('Bibles/ARA/ARA.md', ara, { [SOURCE_KEY]: 'Translations' })],
         bibles,
@@ -202,8 +210,8 @@ describe('collectSources', () => {
     expect(found.get('Bibles/ARA')).toMatchObject({ group: 'Translations' });
   });
 
-  it('finds nothing where the Bible folder is not a folder', () => {
-    expect(collectSources(vault([]), 'Bibles').size).toBe(0);
+  it('finds nothing where the translations folder is not a folder', () => {
+    expect(collect(vault([]), 'Bibles').size).toBe(0);
   });
 });
 

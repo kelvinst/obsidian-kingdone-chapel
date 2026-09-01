@@ -36,19 +36,20 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName('Bible folder')
+      .setName('Translations folder')
       .setDesc(
-        'Folder holding the version folders (ARA, NVI, ...). Inside each version, folders ' +
-          'are ignored — only file names matter. A version kept anywhere else — a study ' +
-          'Bible filed with the commentaries, say — says so in its own note instead, with ' +
-          '`bible-source` in the frontmatter.',
+        'Folder holding one folder per translation (ARA, NVI, ...), which are listed ' +
+          'under a heading of their own. Inside each of them, folders are ignored — only ' +
+          'file names matter. A version kept anywhere else — a study Bible filed with the ' +
+          'commentaries, say — says so in its own note instead, with `bible-source` in the ' +
+          'frontmatter, and heads itself.',
       )
       .addText((text) =>
         text
           .setPlaceholder('Bibles')
-          .setValue(this.plugin.settings.bibleFolder)
+          .setValue(this.plugin.settings.translationsFolder)
           .onChange(async (value) => {
-            this.plugin.settings.bibleFolder = value.replace(/\/+$/, '');
+            this.plugin.settings.translationsFolder = value.replace(/\/+$/, '');
             await this.plugin.saveSettings();
           }),
       );
@@ -160,12 +161,7 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Detected versions')
-      .setDesc(
-        this.plugin
-          .listSources()
-          .map((s) => (s.group ? `${s.code} (${s.group})` : s.code))
-          .join(', ') || 'none',
-      )
+      .setDesc(this.plugin.listVersions().join(', ') || 'none')
       .addButton((b) =>
         b.setButtonText('Reload').onClick(() => {
           this.plugin.invalidateIndex();

@@ -78,23 +78,24 @@ describe('the language', () => {
   });
 });
 
-describe('the Bible folder', () => {
+describe('the translations folder', () => {
   it('opens on the folder in force', () => {
     expect(
-      control<HTMLInputElement>(containerEl, 'Bible folder', 'input').value,
+      control<HTMLInputElement>(containerEl, 'Translations folder', 'input')
+        .value,
     ).toBe('Bibles');
   });
 
   it('drops the trailing slashes off what is typed', async () => {
     const input = control<HTMLInputElement>(
       containerEl,
-      'Bible folder',
+      'Translations folder',
       'input',
     );
     input.value = 'Textos/Bíblias//';
     change(input, 'input');
     await vi.waitFor(() =>
-      expect(world.plugin.settings.bibleFolder).toBe('Textos/Bíblias'),
+      expect(world.plugin.settings.translationsFolder).toBe('Textos/Bíblias'),
     );
   });
 });

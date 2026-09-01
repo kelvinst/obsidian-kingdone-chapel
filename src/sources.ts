@@ -1,11 +1,11 @@
 /**
  * What counts as a version, and where the plugin is allowed to find one.
  *
- * A version used to be a direct subfolder of the Bible folder, which said that
- * every version had to be filed beside every other one. That is fine while they
- * are all translations, and wrong as soon as they are not: a study Bible is a
+ * A version used to be a direct subfolder of one folder, which said that every
+ * version had to be filed beside every other one. That is fine while they are
+ * all translations, and wrong as soon as they are not: a study Bible is a
  * version verse for verse, but it belongs with the commentaries, not with the
- * translations it is based on.
+ * translation it is based on.
  *
  * So a folder says so itself, in the note it already keeps. Any note sitting
  * directly in a folder with `bible-source` in its frontmatter makes that folder
@@ -22,9 +22,9 @@
  * grouping is the vault's to name — `Translations`, `Editions`, `Comentários`,
  * anything — rather than a set of kinds this plugin decides on.
  *
- * Declaring is not required. The direct subfolders of the Bible folder are
- * still versions on their own, so a vault that only holds translations needs
- * none of this, and one that declares a folder somewhere else keeps them.
+ * Declaring is not required. The direct subfolders of the translations folder
+ * are still versions on their own, headed as translations, so a vault that only
+ * holds translations needs none of this and still reads as one list.
  */
 
 import { TFolder } from 'obsidian';
@@ -61,15 +61,20 @@ export interface Source {
 
 /**
  * Every version folder in the vault, by its path: the ones that declare
- * themselves, wherever they are, and then the direct subfolders of the Bible
- * folder, which are versions by where they sit.
+ * themselves, wherever they are, and then the direct subfolders of the
+ * translations folder, which are versions by where they sit.
  *
- * Declared ones come first so that a folder inside the Bible folder can still
- * name and group itself rather than being taken as a plain one.
+ * Those are headed by `translations` without being asked to say so: the folder
+ * they sit in is what says what they are, and having named it once in the
+ * settings there is nothing left for each of them to add.
+ *
+ * Declared ones come first so that a folder inside the translations folder can
+ * still name and group itself rather than being taken as a plain one.
  */
 export function collectSources(
   app: App,
-  bibleFolder: string,
+  translationsFolder: string,
+  translations: string,
   files: TFile[] = app.vault.getMarkdownFiles(),
 ): Map<string, Source> {
   const out = new Map<string, Source>();
@@ -82,7 +87,7 @@ export function collectSources(
     out.set(folder.path, declared(folder, front, file.path));
   }
 
-  const root = app.vault.getAbstractFileByPath(bibleFolder);
+  const root = app.vault.getAbstractFileByPath(translationsFolder);
   if (root instanceof TFolder) {
     for (const child of root.children) {
       if (!(child instanceof TFolder) || out.has(child.path)) continue;
@@ -90,7 +95,7 @@ export function collectSources(
         path: child.path,
         code: child.name,
         label: child.name,
-        group: '',
+        group: translations,
         order: 0,
         declaredBy: '',
       });

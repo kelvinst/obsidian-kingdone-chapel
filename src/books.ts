@@ -668,6 +668,23 @@ export const CATEGORIES: Section[] = [
 const OTHER: Record<Lang, string> = { pt: 'Outros', en: 'Other' };
 
 /**
+ * The heading versions in the translations folder are listed under.
+ *
+ * Named here rather than written into the settings, so a vault reading in
+ * Portuguese and one reading in English see the same folder headed in the
+ * language each of them reads. A version filed elsewhere names its own
+ * heading, in whatever language it likes.
+ */
+const TRANSLATIONS: Record<Lang, string> = {
+  pt: 'Traduções',
+  en: 'Translations',
+};
+
+export function translationsName(lang: Lang = 'pt'): string {
+  return TRANSLATIONS[lang];
+}
+
+/**
  * The heading a book falls under. A vault may hold books this table never
  * heard of — an apocryphal one, or a version numbering its own way — and they
  * are gathered under a heading of their own rather than left loose.

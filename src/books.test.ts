@@ -15,6 +15,7 @@ import {
   plain,
   sectionName,
   quoteHeadings,
+  translationsName,
 } from './books';
 
 /** Codes of the books a query matched, best first. */
@@ -274,5 +275,16 @@ describe('quoteHeadings', () => {
 
   it('writes Portuguese where no language was chosen, as names are', () => {
     expect(quoteHeadings('')).toEqual(['Citações', 'Quotes']);
+  });
+});
+
+describe('translationsName', () => {
+  it('names the heading in the language being read', () => {
+    expect(translationsName('pt')).toBe('Traduções');
+    expect(translationsName('en')).toBe('Translations');
+  });
+
+  it('reads in Portuguese when no language is named', () => {
+    expect(translationsName()).toBe('Traduções');
   });
 });
