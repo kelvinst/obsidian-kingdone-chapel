@@ -9,6 +9,7 @@ import {
   parseChapterName,
   parseVerseLine,
   parseVerses,
+  verseInId,
 } from './utils';
 
 describe('parseChapterName', () => {
@@ -405,5 +406,17 @@ describe('parseVerses', () => {
     expect(
       parseVerses('## Uma seção\n1. Falou o SENHOR. ^ara-lev-1-1\n'),
     ).toEqual([{ verse: 1, text: 'Falou o SENHOR.' }]);
+  });
+});
+
+describe('verseInId', () => {
+  it('reads the verse a block id closes with', () => {
+    expect(verseInId('ara-lev-1-2')).toBe(2);
+    expect(verseInId('test-lev-1-12')).toBe(12);
+  });
+
+  it('answers with nothing for an id naming something else', () => {
+    expect(verseInId('a500c4')).toBeNull();
+    expect(verseInId('ara-lev-1-')).toBeNull();
   });
 });
