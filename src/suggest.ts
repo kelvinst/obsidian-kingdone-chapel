@@ -300,15 +300,18 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
               )),
             );
           }
-        }
-        // The numbers were read as verses alone, the run being longer than a
-        // run of chapters may be.
-        if (
-          asked.chapter === null &&
-          asked.numbers &&
-          !fitsChapters(asked.numbers)
-        ) {
-          hints.push(TOO_MANY_CHAPTERS);
+          // The numbers were read as verses alone, the run being longer than
+          // a run of chapters may be. A chapter of 0 numbers no verses, so
+          // there was no verse reading either and nothing to say they were
+          // read as.
+          if (
+            here.chapter !== 0 &&
+            asked.chapter === null &&
+            asked.numbers &&
+            !fitsChapters(asked.numbers)
+          ) {
+            hints.push(TOO_MANY_CHAPTERS);
+          }
         }
       }
     }
