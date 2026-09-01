@@ -25,6 +25,7 @@ export class CreateVersionModal extends Modal {
   folder: string;
   code = '';
   name = '';
+  group = '';
   /** Whether the name has been written by hand, and so stopped following the code. */
   named = false;
   nameField: HTMLInputElement | null = null;
@@ -100,6 +101,18 @@ export class CreateVersionModal extends Modal {
           this.named = value.trim() !== '';
         });
       });
+
+    new Setting(contentEl)
+      .setName('Heading')
+      .setDesc(
+        'What the version is listed under, beside the translations rather than ' +
+          'among them. Left empty it is listed first, under no heading at all.',
+      )
+      .addText((text) =>
+        text.setPlaceholder('Comentários').onChange((value) => {
+          this.group = value.trim();
+        }),
+      );
 
     new Setting(contentEl).addButton((button) =>
       button
@@ -182,7 +195,7 @@ export class CreateVersionModal extends Modal {
     await this.folderOf(root);
     await this.app.vault.create(
       `${root}/${this.code}.md`,
-      declaringNote(this.code, this.name || this.code),
+      declaringNote(this.code, this.name || this.code, this.group),
     );
 
     // In reading order, so a run that is stopped part way leaves the version

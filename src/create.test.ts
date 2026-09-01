@@ -96,8 +96,18 @@ describe('chapterNote', () => {
 });
 
 describe('declaringNote', () => {
-  it('says the code and the name, which is all the folder has to say', () => {
-    expect(declaringNote('Shedd', 'Bíblia Shedd')).toBe(
+  it('says the heading, the code and the name', () => {
+    expect(declaringNote('Shedd', 'Bíblia Shedd', 'Versões')).toBe(
+      '---\n' +
+        'bible-group: Versões\n' +
+        'bible-code: Shedd\n' +
+        'bible-name: Bíblia Shedd\n' +
+        '---\n',
+    );
+  });
+
+  it('leaves the heading out rather than writing it empty', () => {
+    expect(declaringNote('Shedd', 'Bíblia Shedd', '')).toBe(
       '---\nbible-code: Shedd\nbible-name: Bíblia Shedd\n---\n',
     );
   });
