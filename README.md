@@ -223,7 +223,6 @@ version, wherever in the vault it is and however deeply it is buried:
 bible-group: Editions
 bible-code: Shedd
 bible-name: Bíblia Shedd
-bible-order: 20
 ---
 ```
 
@@ -232,7 +231,6 @@ bible-order: 20
 | `bible-group` | The heading the version is listed under. No heading when left out.                                                                                                                                         |
 | `bible-code`  | What the version's file names start with, and what `@ARA Joao 1.1` calls it. The folder's name when left out, so a folder may be called `Almeida Revista e Atualizada` and still hold `ARA-01-GEN-001.md`. |
 | `bible-name`  | Name to show wherever the version is named. The code when left out.                                                                                                                                        |
-| `bible-order` | Where it sits among the versions sharing its heading — and where that heading sits, which is its earliest version's. Alphabetical when left out.                                                           |
 
 Every one of them is optional, and carrying any one of them is what declares the folder — so
 the shortest declaration is the one key you had a reason to write, usually `bible-group`. The
@@ -243,9 +241,9 @@ already used those keys for.
 
 The heading is the vault's to name, not the plugin's: `Editions`, `Comentários`, anything —
 except the one the translations folder gives its own, which the plugin writes in the language
-book names are read in (**Traduções**, **Translations**). Naming none is a heading of its own,
-ordered like the rest: those versions are listed together, under no heading, wherever the
-lowest `bible-order` among them puts them.
+book names are read in (**Traduções**, **Translations**). Headings are listed alphabetically
+and the versions under each by their code, so nothing has to be numbered. Naming no heading
+sorts before naming one, so those versions are listed first.
 
 Declaring is optional and adds to the translations folder rather than replacing it, so a vault
 that keeps every version in one place needs none of it:
