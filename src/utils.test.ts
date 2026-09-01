@@ -8,6 +8,7 @@ import {
   parseBookName,
   parseChapterName,
   parseVerseLine,
+  parseVerses,
 } from './utils';
 
 describe('parseChapterName', () => {
@@ -346,5 +347,63 @@ describe('hasBlockId', () => {
 
   it('does not answer for an id the note does not carry', () => {
     expect(hasBlockId('texto ^nvi-jhn-1-1-2', 'nvi-jhn-1-1-3')).toBe(false);
+  });
+});
+
+describe('parseVerses', () => {
+  it('reads a version that writes each verse on its own line', () => {
+    expect(
+      parseVerses(
+        '# Levítico 1\n\n' +
+          '¹ Falou o SENHOR a Moisés. ^ara-lev-1-1\n\n' +
+          '² Fala aos filhos de Israel. ^ara-lev-1-2\n',
+      ),
+    ).toEqual([
+      { verse: 1, text: '¹ Falou o SENHOR a Moisés.' },
+      { verse: 2, text: '² Fala aos filhos de Israel.' },
+    ]);
+  });
+
+  it('takes what stands above an id that sits on a line of its own', () => {
+    expect(
+      parseVerses(
+        '# Levítico 1\n\n' +
+          '## [[NVI-03-LEV-001|NVI]]\n\n' +
+          '![[NVI-03-LEV-001#^nvi-lev-1-1]]\n' +
+          '^test-lev-1-1\n\n' +
+          '![[NVI-03-LEV-001#^nvi-lev-1-2]]\n' +
+          '^test-lev-1-2\n',
+      ),
+    ).toEqual([
+      { verse: 1, text: '![[NVI-03-LEV-001#^nvi-lev-1-1]]' },
+      { verse: 2, text: '![[NVI-03-LEV-001#^nvi-lev-1-2]]' },
+    ]);
+  });
+
+  it('carries every line written under the verse, down to its id', () => {
+    expect(
+      parseVerses(
+        '![[NVI-03-LEV-001#^nvi-lev-1-1]]\n' +
+          'A oferta é voluntária.\n' +
+          '^test-lev-1-1\n',
+      ),
+    ).toEqual([
+      {
+        verse: 1,
+        text: '![[NVI-03-LEV-001#^nvi-lev-1-1]]\nA oferta é voluntária.',
+      },
+    ]);
+  });
+
+  it('stops at the blank line, so a heading is not read as a verse', () => {
+    expect(parseVerses('## Uma seção\n\n^test-lev-1-1\n')).toEqual([
+      { verse: 1, text: '' },
+    ]);
+  });
+
+  it('leaves a verse that writes itself out alone', () => {
+    expect(
+      parseVerses('## Uma seção\n1. Falou o SENHOR. ^ara-lev-1-1\n'),
+    ).toEqual([{ verse: 1, text: 'Falou o SENHOR.' }]);
   });
 });
