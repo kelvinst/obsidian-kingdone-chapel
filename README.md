@@ -26,6 +26,44 @@ in your vault, keeping chapter _and_ verse alignment.
   finds it and labels the card `v.1`.
 - Alt-click a card to copy that version's verse text.
 
+### Writing a version
+
+A study Bible, a commentary, a set of notes on the text — each of them is a version whose
+chapters answer a translation's chapters one for one, and none of them is worth typing out by
+hand. **Create a Bible version from a translation** asks for four things:
+
+|              |                                                                                                                  |
+| ------------ | ---------------------------------------------------------------------------------------------------------------- |
+| **Based on** | The translation it answers. Its folders, its file names and its verses are what the new version is written from. |
+| **Folder**   | Where the version folder is made. Made if it is not there.                                                       |
+| **Code**     | Names the folder, starts every file name, and opens every block id — what `@Shedd Joao 1.1` calls it.            |
+| **Name**     | What a reader sees. Follows the code until you write over it.                                                    |
+
+It then copies the translation's layout, renaming only the segments that carry the version —
+`5-NT-Gospels/ARA-41-MRK/ARA-41-MRK-014.md` becomes `5-NT-Gospels/Shedd-41-MRK/Shedd-41-MRK-014.md`
+— and writes each chapter as an embed of every verse the translation anchored, each under a
+block id of the new version's own:
+
+```markdown
+# Marcos 14
+
+## [[ARA-41-MRK-014|ARA]]
+
+![[ARA-41-MRK-014#^ara-mrk-14-1]]
+^shedd-mrk-14-1
+
+![[ARA-41-MRK-014#^ara-mrk-14-2]]
+^shedd-mrk-14-2
+```
+
+The id sits on the line under its embed, with a blank line before the next: the id belongs to
+the block above it, so anything you write between the two is written inside that verse — and
+`@Shedd Mc 14.1` links straight to it. The text itself is never copied, only embedded, so the
+new version stays notes about a translation rather than another copy of one.
+
+A folder holding the code and the name is written beside the chapters, so the new version is
+[one the plugin knows](#versions-kept-somewhere-else) wherever you put it.
+
 ### Chapter breadcrumbs
 
 Every chapter you open gets a bar above it naming the passage, and each part of it is a way

@@ -1450,6 +1450,7 @@ describe('onload', () => {
     await world.plugin.onload();
     expect(world.plugin.commands.map((c) => c.id)).toEqual([
       'open-verse-in-another-version',
+      'create-version',
       'open-sidebar',
       'open-in-ara',
       'open-in-nvi',
