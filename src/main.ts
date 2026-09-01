@@ -30,7 +30,12 @@ import { ReferenceSuggest } from './suggest';
 import { KingdoneChapelSettingTab } from './settings';
 import { KingdoneChapelView } from './view';
 import { Breadcrumbs } from './breadcrumbs';
-import { SOURCE_KEY, collectSources, sortSources, sourceOf } from './sources';
+import {
+  collectSources,
+  declaresSource,
+  sortSources,
+  sourceOf,
+} from './sources';
 import type { Source } from './sources';
 
 /** Rendered elements a verse can be: a list item now, a paragraph in older chapters. */
@@ -176,9 +181,8 @@ export default class KingdoneChapelPlugin extends Plugin {
     // otherwise throw away the index and read the vault back in.
     this.registerEvent(
       this.app.metadataCache.on('changed', (file, _data, cache) => {
-        const declares = cache.frontmatter
-          ? SOURCE_KEY in cache.frontmatter
-          : false;
+        const front = cache.frontmatter;
+        const declares = front ? declaresSource(front) : false;
         if (declares || this.declaringNotes.has(file.path)) moved();
       }),
     );
