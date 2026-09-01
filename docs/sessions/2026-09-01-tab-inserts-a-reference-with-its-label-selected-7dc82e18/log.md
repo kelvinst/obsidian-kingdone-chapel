@@ -1,5 +1,5 @@
 ---
-saved_at: 2026-09-01T09:35:00Z
+saved_at: 2026-09-01T09:40:00Z
 session_id: 7dc82e18-7d41-41c8-80c1-15627cbd4e76
 transcript: transcript.jsonl.gz
 ---
@@ -60,6 +60,24 @@ is highlighted inside the link, ready to become anything else.
   being that the numbers only ever climb: 14.31% → 16.72% statements.
 - README's `@` references section now says what Enter and Tab each do, with the
   `@Sl 1.1` example spelled out.
+
+## 2026-09-01T09:40:00Z — update
+
+- Committed as `ad5d424`, the session archive riding along in it via
+  `/kix:commit` → `/kix:save-session --no-commit`. The pre-commit gate ran the
+  whole of `npm run precommit` — format, typecheck, bundle, 130 tests and the
+  coverage floors — and passed.
+- The commit carries the `Co-Authored-By: Claude Opus 5` trailer, which
+  `/kix:commit-message` says to leave off. The repo's own history and the
+  harness both ask for it, and two out of three won.
+- Branch pushed and PR
+  [#22](https://github.com/kelvinst/obsidian-kingdone-chapel/pull/22) opened
+  against `main`, ready rather than draft. Its body carries what a reviewer
+  needs that the diff does not say: that the Tab binding copies Obsidian's own
+  bundled one verbatim, why the event is read by `'key' in evt` rather than
+  `instanceof`, why the first label is the one selected, why `obsidian` needed
+  a runtime stand-in at all, and that none of it has been run inside a real
+  vault yet.
 
 ## Open Questions
 
