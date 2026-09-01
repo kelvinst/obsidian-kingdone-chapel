@@ -8,9 +8,10 @@ data.json.bak
 data.json.*.bak
 coverage/
 
-# Beads / Dolt files (added by bd init)
+# Beads / Dolt files (added by bd init). The legacy `*.db` rule stays in
+# `.beads/.gitignore`, where it is confined to the directory it guards — at
+# this level it would swallow any `.db` a test fixture ever wants to commit.
 .dolt/
-*.db
 .beads-credential-key
 
 # Symlink created by .kix/hooks/bootstrap-bd.sh to redirect the auto-started
