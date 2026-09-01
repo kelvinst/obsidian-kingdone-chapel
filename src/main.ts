@@ -24,6 +24,7 @@ import {
   parseChapterName,
   parseVerseLine,
   parseVerses,
+  verseInId,
 } from './utils';
 import { bookName, bookNameAt, nameLang, translationsName } from './books';
 import { VersionSuggestModal } from './modal';
@@ -568,7 +569,35 @@ export default class KingdoneChapelPlugin extends Plugin {
     return this.cursorVerse(view);
   }
 
-  /** Verse number at the cursor: the nearest verse line at or above the cursor. */
+  /**
+   * Verse of the block `line` falls in, read off the block ids Obsidian found.
+   *
+   * A version that writes its verses over more than one line puts the id under
+   * what it names rather than at the end of it, so the line being read may
+   * carry no id at all and the one above it may carry the verse before's.
+   * Which lines a block covers is Obsidian's own answer, and it is the same
+   * answer for a translation writing a verse and its id on one line.
+   *
+   * The tightest block wins, for a verse written as a list item inside a block
+   * that carries an id of its own.
+   */
+  blockVerse(file: TFile, line: number): number | null {
+    const blocks = this.app.metadataCache.getFileCache(file)?.blocks;
+    if (!blocks) return null;
+
+    let best: { verse: number; lines: number } | null = null;
+    for (const id of Object.keys(blocks)) {
+      const at = blocks[id].position;
+      if (line < at.start.line || line > at.end.line) continue;
+      const verse = verseInId(id);
+      if (verse === null) continue;
+      const lines = at.end.line - at.start.line;
+      if (!best || lines < best.lines) best = { verse, lines };
+    }
+    return best ? best.verse : null;
+  }
+
+  /** Verse number at the cursor: the block it sits in, else the nearest verse above it. */
   cursorVerse(view: MarkdownView): number | null {
     const editor = view.editor;
     if (!editor) return null;
@@ -582,6 +611,15 @@ export default class KingdoneChapelPlugin extends Plugin {
     } catch (e) {
       return null;
     }
+
+    // Which block the cursor is in answers both layouts. A version writing no
+    // block ids at all — verses numbered and nothing more — is left to the
+    // walk below, which is what it has.
+    if (view.file) {
+      const inBlock = this.blockVerse(view.file, line);
+      if (inBlock !== null) return inBlock;
+    }
+
     for (let i = line; i >= 0; i--) {
       const parsed = parseVerseLine(editor.getLine(i));
       if (parsed) return parsed.verse;

@@ -113,6 +113,18 @@ const VERSE_ID = /-(\d+)$/;
  * only for a chapter that carries no ids at all.
  */
 /**
+ * The verse a block id names, or null where it names something else.
+ *
+ * Only an id ending in a number names a verse. One ending anywhere else
+ * belongs to something that is not a verse, and one left mid-edit, ending on
+ * the dash itself, names nothing at all.
+ */
+export function verseInId(id: string): number | null {
+  const named = VERSE_ID.exec(id);
+  return named ? Number(named[1]) : null;
+}
+
+/**
  * Every verse a chapter file holds.
  *
  * A verse is usually a line that carries its own number and its own block id,
@@ -156,12 +168,9 @@ export function parseVerseLine(line: string): VerseLine | null {
   // else belongs to something other than a verse, and one left mid-edit, ending
   // on the dash itself, names nothing at all — both fall back to what the line
   // writes rather than being read as a number.
-  const named = id && VERSE_ID.exec(id[1]);
-  const verse = named
-    ? Number(named[1])
-    : marker
-      ? Number(marker[1] || marker[2])
-      : NaN;
+  const named = id ? verseInId(id[1]) : null;
+  const verse =
+    named !== null ? named : marker ? Number(marker[1] || marker[2]) : NaN;
   if (!Number.isInteger(verse)) return null;
 
   // The id sits at the end of the line, so drop it before the opening marker
