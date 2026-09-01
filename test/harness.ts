@@ -145,14 +145,23 @@ export class FakeVault extends Emitter {
 export class FakeMetadataCache {
   /** path -> block ids the cache knows, for the files where it knows any. */
   blocks = new Map<string, string[]>();
+  /** path -> the links the file writes, in the order it writes them. */
+  links = new Map<string, string[]>();
 
   /** Reads the vault as it stands, so a file written later still resolves. */
   constructor(private vault: FakeVault) {}
 
-  getFileCache(file: TFile): { blocks?: Record<string, unknown> } | null {
+  getFileCache(file: TFile): {
+    blocks?: Record<string, unknown>;
+    links?: { link: string }[];
+  } | null {
     const ids = this.blocks.get(file.path);
-    if (!ids) return null;
-    return { blocks: Object.fromEntries(ids.map((id) => [id, {}])) };
+    const links = this.links.get(file.path);
+    if (!ids && !links) return null;
+    return {
+      ...(ids ? { blocks: Object.fromEntries(ids.map((id) => [id, {}])) } : {}),
+      ...(links ? { links: links.map((link) => ({ link })) } : {}),
+    };
   }
 
   fileToLinktext(file: TFile, _from: string, omitExtension = false): string {

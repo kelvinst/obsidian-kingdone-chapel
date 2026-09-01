@@ -855,6 +855,54 @@ describe('locationOf', () => {
   });
 });
 
+describe('linkContext', () => {
+  /** A note whose links are `targets`, in the order it writes them. */
+  function note(...targets: string[]): TFile {
+    const file = world.vault.write('Estudos/Salmo.md', 'Um estudo.');
+    world.metadataCache.links.set(file.path, targets);
+    return file;
+  }
+
+  it('reads the passage off the first link that lands in the Bible', () => {
+    expect(world.plugin.linkContext(note('NVI-43-JHN-001'))).toEqual(
+      locationFor(world, chapterPath('NVI', 43, 'JHN', 1)),
+    );
+  });
+
+  it('walks past everything the note links that is not a chapter', () => {
+    const here = note('Estudos/Romanos', 'Bibles/Notas', 'NVI-01-GEN-002');
+    expect(world.plugin.linkContext(here)).toEqual(
+      locationFor(world, chapterPath('NVI', 1, 'GEN', 2)),
+    );
+  });
+
+  it('takes the first chapter linked, not the last', () => {
+    const here = note('NVI-01-GEN-001', 'NVI-43-JHN-001');
+    expect(world.plugin.linkContext(here)).toEqual(
+      locationFor(world, chapterPath('NVI', 1, 'GEN', 1)),
+    );
+  });
+
+  it('reads the chapter a link names past the verse it points into', () => {
+    const here = note('NVI-43-JHN-001#^nvi-jhn-1-1');
+    expect(world.plugin.linkContext(here)).toEqual(
+      locationFor(world, chapterPath('NVI', 43, 'JHN', 1)),
+    );
+  });
+
+  it('carries nothing from a link to nothing the vault holds', () => {
+    expect(world.plugin.linkContext(note('Salmos 151'))).toBeNull();
+  });
+
+  it('carries nothing from a note that links nothing at all', () => {
+    const file = world.vault.write('Estudos/Vazio.md', 'Sem links.');
+    expect(world.plugin.linkContext(file)).toBeNull();
+  });
+
+  it('carries nothing where there is no note to read', () => {
+    expect(world.plugin.linkContext(null)).toBeNull();
+  });
+});
 describe('cursorVerse', () => {
   function editing(text: string) {
     const view = pane(world.app, {
