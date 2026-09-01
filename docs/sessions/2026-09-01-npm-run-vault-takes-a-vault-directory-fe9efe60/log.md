@@ -1,5 +1,5 @@
 ---
-saved_at: 2026-09-01T09:45:00Z
+saved_at: 2026-09-01T12:45:00Z
 session_id: fe9efe60-3c0e-466d-9fb3-ab13db813937
 ---
 
@@ -132,6 +132,37 @@ session.
   original and the just-clobbered state are both recoverable. `data.json.prev`
   would need a `.gitignore` line beside the existing `data.json.bak`.
 
+## 2026-09-01T12:45:00Z — update
+
+Section body written with the `caveman` compression skill (ultra), active all
+session.
+
+- Went to apply the `data.json` finding, and the user overrode the suggested
+  fix mid-request: stamp the `.bak` with a timestamp rather than add a second
+  `data.json.prev` file.
+- The override is the better fix and was taken as given. A stamped name is
+  unique per run, so the `[ ! -f "$TARGET/data.json.bak" ]` guard has nothing
+  left to protect and comes out entirely — one file instead of two, no
+  original-versus-previous special case, and the whole history kept rather than
+  just its two ends.
+- `BAK="data.json.$(date -u +%Y%m%dT%H%M%SZ).bak"`, copied unconditionally
+  whenever the target has a `data.json`. Existing `data.json.bak` files are
+  left where they are.
+- Replaced the comment that justified the old guard; it argued for behaviour
+  the code no longer has.
+- `.gitignore` gets `data.json.*.bak` inserted beside the existing
+  `data.json.bak` line rather than appended at the end, so it cannot collide
+  with the lines PR #21 adds there.
+- Verified with four consecutive switches between the main checkout and this
+  worktree: the worktree collected two distinct backups (`...123912Z.bak` and
+  `...123914Z.bak`) where the old code would have written none the second time.
+  `bash -n` clean.
+- Switch 3 of that test wrote a backup into the main checkout and copied over
+  its `data.json`. Checked before cleaning up: the file was byte-identical to
+  the backup taken, so nothing outside this worktree was altered. Test
+  artifacts removed from both checkouts.
+- Committed as `ebeef9d`.
+
 ## Open Questions
 
 - [ ] Should the positional auto-detect instead (a directory holding
@@ -159,9 +190,9 @@ session.
   - Root-caused in the second review: the `[ ! -f "$TARGET/data.json.bak" ]`
     guard at `scripts/obsidian-link.sh:107` suppressed the backup. Not an
     accident of the test run — a real bug any second switch reaches.
-- [ ] Fix that guard: add an unguarded `cp` to `data.json.prev` before the
-      overwrite at `scripts/obsidian-link.sh:111`, and gitignore
-      `data.json.prev`. Left out of this PR, which does not otherwise touch
-      the settings-carry code.
+- [x] Fix that guard.
+  - `ebeef9d`, by the user's route rather than the reviewer's: the backup name
+    carries a UTC timestamp, so the guard was deleted instead of worked
+    around. `.gitignore` covers `data.json.*.bak`.
 - [ ] Reset this worktree's `data.json` from Obsidian if its settings mattered;
       it currently holds the main checkout's copy.
