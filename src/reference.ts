@@ -303,6 +303,10 @@ export function parseContextRef(
   // no reference at all.
   const spec = rest.match(/^(\d+)\s*[.:]\s*([\d,\s-]*)$/);
   const chapter = spec ? parseInt(spec[1], 10) : null;
+  // No book has a chapter 0 to write verses of — `expandRun` drops the number
+  // wherever else it is written, and a chapter said outright answers to the
+  // same rule rather than linking a file the version will never carry.
+  if (chapter !== null && chapter <= 0) return null;
   let numbers: number[] | null;
   if (spec) numbers = expandRun(spec[2], MAX_VERSES);
   else if (!rest) numbers = [];
