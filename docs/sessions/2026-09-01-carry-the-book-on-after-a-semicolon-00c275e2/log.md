@@ -1,5 +1,5 @@
 ---
-saved_at: 2026-09-01T12:30:56Z
+saved_at: 2026-09-01T12:42:17Z
 session_id: 00c275e2-559d-41c4-8b5c-77f091ae9a96
 ---
 
@@ -90,6 +90,33 @@ verified by `npm run build`:
   hook as `f0c2f28` (escaped pipe + `bookName` + index guard) and `904991d`;
   only the chapter-zero fix was left in the tree and went into `9820eb9`
   together with the first cut of this log.
+
+## 2026-09-01T12:42:17Z — update
+
+- Rebased the branch onto `origin/main` with `/kix:rebase!`. Main had moved 26
+  commits: runs of chapters (`parsed.chapters`, `ChapterTarget`,
+  `chapterTargets`, `verseLabels` → `referenceLabels`), a Vitest suite with
+  coverage floors, Prettier, and the `Makefile` the pre-commit hook wanted all
+  along.
+- Two conflicts in `src/suggest.ts`, both resolved by adapting the carried
+  reference to main's structure rather than keeping either side: one
+  `ChapterTarget` built from the carried chapter, `referenceLabels(name,
+[chapter], verses)`, `embeds([target], …)`. A silent follow-on came with it —
+  main renamed `expandVerses` to `expandRun(spec, max)`, so `parseBookless` was
+  calling a function that no longer exists; repointed at
+  `expandRun(…, MAX_VERSES)`.
+- The coverage gate then failed for real: `src/{books,reference,utils}.ts` must
+  stay at 100% and `parseBookless` had no tests. Added twelve tests and moved
+  the carried labels out of `suggest.ts` into `reference.ts` as
+  `booklessLabels` — pure text, the same as `referenceLabels` beside it, and
+  nothing there needs an editor to test. Tested modules back at 100%; the
+  project floors rose to 14.91/20.86/14.34/14.03 and Vitest wrote them into
+  `vitest.config.mts` (commit `38c80df`).
+- The hook also refuses a commit under an unpinned Node, so the whole rebase
+  ran under `mise exec` — the same rule the memory note already carried.
+- Branch now reads `f5e619e`, `8b98ace`, `43d6bdc`, `e4be763`, `051bfa9`,
+  `38c80df` on top of `c319006`. It has diverged from what PR #18 holds and
+  needs `git push --force-with-lease`.
 
 ## Open Questions
 
