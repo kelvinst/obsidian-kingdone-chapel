@@ -10,34 +10,46 @@ DO_BUILD=1
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/obsidian-link.sh [options] [checkout-path]
+Usage: scripts/obsidian-link.sh [options] [vault-path]
 
-Links <vault>/.obsidian/plugins/<plugin-id> to the given checkout (default: the
-checkout this script lives in), copies data.json over so settings survive, and builds
-main.js (installing dependencies first if the checkout has none). The Hot Reload plugin
-then reloads this plugin by itself.
+Links <vault>/.obsidian/plugins/<plugin-id> to a checkout (default: the checkout this
+script lives in), copies data.json over so settings survive, and builds main.js
+(installing dependencies first if the checkout has none). The Hot Reload plugin then
+reloads this plugin by itself.
+
+The vault defaults to $OBSIDIAN_VAULT or ~/Developer/Stingdom. Pass another one as the
+positional argument to point a second vault at this worktree.
 
 Settings are also backed up to <vault>/.obsidian/<plugin-id>-data.backup.json on every
 run, and restored from there if the previously linked checkout has been deleted.
 
 Options:
+  --checkout PATH   checkout to link (default: the checkout this script lives in)
   --main            link the main checkout instead of the current worktree
-  --vault PATH      vault to link into (default: $OBSIDIAN_VAULT or ~/Developer/Stingdom)
+  --vault PATH      same as the positional vault path
   --no-build        skip the production build
   -h, --help        show this help
+
+Through npm the positional argument passes straight through, but options need a `--`
+separator or npm eats them as its own:
+  npm run vault ~/Developer/OtherVault
+  npm run vault -- --main --no-build
 USAGE
 }
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --main) TARGET="__MAIN__"; shift ;;
+    --checkout)
+      [ $# -ge 2 ] || { echo "--checkout needs a path" >&2; usage >&2; exit 2; }
+      TARGET="$2"; shift 2 ;;
     --vault)
       [ $# -ge 2 ] || { echo "--vault needs a path" >&2; usage >&2; exit 2; }
       VAULT="$2"; shift 2 ;;
     --no-build) DO_BUILD=0; shift ;;
     -h|--help) usage; exit 0 ;;
     -*) echo "unknown option: $1" >&2; usage >&2; exit 2 ;;
-    *) TARGET="$1"; shift ;;
+    *) VAULT="$1"; shift ;;
   esac
 done
 
