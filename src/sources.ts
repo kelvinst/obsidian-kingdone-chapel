@@ -50,6 +50,13 @@ export interface Source {
   group: string;
   /** Where it sits among the versions sharing its heading. */
   order: number;
+  /**
+   * The note that declared this folder a version, empty for one that is a
+   * version by where it sits. It is what says whether a note being edited
+   * could have changed the answer, which every other note in the folder —
+   * a chapter file in a flat layout, above all — could not.
+   */
+  declaredBy: string;
 }
 
 /**
@@ -72,7 +79,7 @@ export function collectSources(
     if (!front || !(SOURCE_KEY in front)) continue;
     const folder = file.parent;
     if (!folder || out.has(folder.path)) continue;
-    out.set(folder.path, declared(folder, front));
+    out.set(folder.path, declared(folder, front, file.path));
   }
 
   const root = app.vault.getAbstractFileByPath(bibleFolder);
@@ -85,6 +92,7 @@ export function collectSources(
         label: child.name,
         group: '',
         order: 0,
+        declaredBy: '',
       });
     }
   }
@@ -93,7 +101,11 @@ export function collectSources(
 }
 
 /** Read a declaring note's frontmatter, filling in what it leaves out. */
-function declared(folder: TFolder, front: Record<string, unknown>): Source {
+function declared(
+  folder: TFolder,
+  front: Record<string, unknown>,
+  declaredBy: string,
+): Source {
   // `bible-source: true` is a folder that says it is a version and nothing
   // more; anything written out is the heading it wants to be listed under.
   const code = text(front.code) || folder.name;
@@ -103,6 +115,7 @@ function declared(folder: TFolder, front: Record<string, unknown>): Source {
     label: text(front.name) || code,
     group: text(front[SOURCE_KEY]),
     order: typeof front.order === 'number' ? front.order : 0,
+    declaredBy,
   };
 }
 
