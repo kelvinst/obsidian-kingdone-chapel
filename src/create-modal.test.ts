@@ -276,7 +276,34 @@ describe('writing the version', () => {
     );
   });
 
-  it('writes the heading alone for a chapter with no anchors to quote', async () => {
+  it('quotes a verse the translation never anchored under the id it would carry', async () => {
+    world.vault.write(
+      'Bibles/ARA/ARA-41-MRK-014.md',
+      '1. Dali a dois dias. ^ara-mrk-14-1\n\n2. Pois diziam.\n',
+    );
+    world.metadataCache.blocks.set('Bibles/ARA/ARA-41-MRK-014.md', [
+      'ara-mrk-14-1',
+    ]);
+    world.plugin.invalidateIndex();
+
+    await write();
+
+    // Verse 2 names `ara-mrk-14-2`, which is not there: the embed does not
+    // resolve, rather than quietly quoting verse 1 a second time.
+    expect(wrote('Comentarios/Shedd/Shedd-41-MRK-014.md')).toBe(
+      '# Marcos 14\n' +
+        '\n' +
+        '## [[ARA-41-MRK-014|ARA]]\n' +
+        '\n' +
+        '![[ARA-41-MRK-014#^ara-mrk-14-1]]\n' +
+        '^shedd-mrk-14-1\n' +
+        '\n' +
+        '![[ARA-41-MRK-014#^ara-mrk-14-2]]\n' +
+        '^shedd-mrk-14-2\n',
+    );
+  });
+
+  it('quotes every verse of a chapter the translation never anchored at all', async () => {
     world.vault.write(
       'Bibles/ARA/ARA-41-MRK-014.md',
       '1. Dali a dois dias.\n\n2. Pois diziam.\n',
@@ -286,9 +313,9 @@ describe('writing the version', () => {
 
     await write();
 
-    expect(wrote('Comentarios/Shedd/Shedd-41-MRK-014.md')).toBe(
-      '# Marcos 14\n\n## [[ARA-41-MRK-014|ARA]]\n\n',
-    );
+    const note = wrote('Comentarios/Shedd/Shedd-41-MRK-014.md') as string;
+    expect(note).toContain('![[ARA-41-MRK-014#^ara-mrk-14-1]]');
+    expect(note).toContain('![[ARA-41-MRK-014#^ara-mrk-14-2]]');
   });
 
   it('says how many it wrote, and reads the vault again', async () => {
