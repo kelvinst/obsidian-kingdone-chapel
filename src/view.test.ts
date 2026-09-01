@@ -44,6 +44,9 @@ beforeEach(() => {
 afterEach(() => {
   view.unload();
   vi.useRealTimers();
+  // The clipboard is one object for the whole file, so a spy on it outlives
+  // the test that put it there unless it is taken off here.
+  vi.restoreAllMocks();
 });
 
 describe('what the pane says it is', () => {
