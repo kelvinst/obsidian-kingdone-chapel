@@ -314,13 +314,26 @@ describe('getSuggestions', () => {
     expect(row.preview).toBe('Era a terra sem forma e vazia.');
   });
 
-  it('writes a link per verse asked for, sharing the one read', async () => {
+  it('writes a run of verses as one link, to a quote of the passage', async () => {
     const [row] = await suggest.getSuggestions(context('Gn 1.1-2'));
     expect(row.ref).toBe('Gn 1.1,2');
-    expect(row.markdown).toBe(
-      '[[NVI-01-GEN-001#^nvi-gen-1-1|Gn 1.1]],' +
-        '[[NVI-01-GEN-001#^nvi-gen-1-2|2]]',
-    );
+    expect(row.markdown).toBe('[[#^nvi-gen-1-1-2|Gn 1.1,2]]');
+    // The verse-by-verse references are not lost: they are the embeds the
+    // quote the link points at is made of.
+    expect(row.passage).toEqual({
+      id: 'nvi-gen-1-1-2',
+      callout: [
+        '> [!quote]+ Gênesis 1.1,2 - NVI',
+        '> ![[NVI-01-GEN-001#^nvi-gen-1-1]]',
+        '> ![[NVI-01-GEN-001#^nvi-gen-1-2]] ^nvi-gen-1-1-2',
+      ].join('\n'),
+    });
+  });
+
+  it('names the version in a passage label too, when it was asked for', async () => {
+    const [row] = await suggest.getSuggestions(context('NVI Gn 1.1-2'));
+    expect(row.ref).toBe('Gn 1.1,2 - NVI');
+    expect(row.markdown).toBe('[[#^nvi-gen-1-1-2|Gn 1.1,2 - NVI]]');
   });
 
   it('names the version in the label only when it was asked for', async () => {
@@ -812,5 +825,77 @@ describe('a reference carried on after a semicolon', () => {
     world.plugin.index();
     world.vault.contents.delete(chapterPath('NVI', 1, 'GEN', 1));
     expect(await suggest.getSuggestions(carried(after('3'), '3'))).toEqual([]);
+  });
+});
+
+describe('appendPassage', () => {
+  /** The quote a passage row carries, as `getSuggestions` builds it. */
+  const passage = {
+    id: 'nvi-gen-1-1-2',
+    callout: [
+      '> [!quote]+ Gênesis 1.1,2 - NVI',
+      '> ![[NVI-01-GEN-001#^nvi-gen-1-1]]',
+      '> ![[NVI-01-GEN-001#^nvi-gen-1-2]] ^nvi-gen-1-1-2',
+    ].join('\n'),
+  };
+
+  it('files the quote under a heading of its own, at the foot of the note', () => {
+    const editor = new FakeEditor('Veja [[#^nvi-gen-1-1-2|Gn 1.1,2]] aqui');
+    const wrote = suggest.appendPassage(editor as unknown as Editor, passage);
+    expect(editor.text).toBe(
+      `Veja [[#^nvi-gen-1-1-2|Gn 1.1,2]] aqui\n\n## Citações\n\n${passage.callout}\n`,
+    );
+    // The line it was written at, and the lines it added there, which is what
+    // moves the reference when the quote lands above it.
+    expect(wrote).toEqual({ line: 0, lines: 7 });
+  });
+
+  it('leaves a passage already quoted as it is', () => {
+    const editor = new FakeEditor(
+      `Veja [[#^nvi-gen-1-1-2|Gn 1.1,2]]\n\n## Citações\n\n${passage.callout}\n`,
+    );
+    const before = editor.text;
+    expect(suggest.appendPassage(editor as unknown as Editor, passage)).toBe(
+      null,
+    );
+    expect(editor.text).toBe(before);
+  });
+
+  it('moves the reference down when the quote is written above it', () => {
+    const editor = new FakeEditor(
+      [
+        '## Citações',
+        '',
+        '> [!quote]+ Gênesis 3.16 - NVI',
+        '',
+        '## Notas',
+        '',
+        'Veja aqui',
+      ].join('\n'),
+    );
+    suggest.context = {
+      start: { line: 6, ch: 5 },
+      end: { line: 6, ch: 9 },
+      editor: editor as unknown as Editor,
+    } as unknown as ReferenceSuggest['context'];
+    suggest.selectSuggestion(
+      {
+        ref: 'Gn 1.1,2',
+        book: 'Gênesis',
+        preview: '',
+        markdown: '[[#^nvi-gen-1-1-2|Gn 1.1,2]]',
+        passage,
+      },
+      press('Enter'),
+    );
+    // The quote went into the section it belongs to, which sits above the line
+    // the reference was written on — four lines above where it started.
+    expect(editor.lines.slice(2, 7)).toEqual([
+      '> [!quote]+ Gênesis 3.16 - NVI',
+      '',
+      ...passage.callout.split('\n'),
+    ]);
+    // So the cursor is read off where that line ended up, not where it was.
+    expect(editor.cursor).toEqual({ line: 10, ch: 33 });
   });
 });

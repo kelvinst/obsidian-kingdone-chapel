@@ -66,13 +66,35 @@ to become `Salmo 1` or anything else. A run of verses writes a link each and Tab
 first label, the only one spelling the reference out; embeds carry no label, so there Tab
 inserts the way Enter does.
 
-| You type      | You get                                                                                             |
-| ------------- | --------------------------------------------------------------------------------------------------- |
-| `@Joao`       | `[[NVI-43-Joao\|João]]` — the note listing the book's chapters                                      |
-| `@Joao 1`     | `[[NVI-43-JHN-001\|João 1]]`                                                                        |
-| `@Joao 1.1`   | `[[NVI-43-JHN-001#^nvi-jhn-1-1\|João 1.1]]`                                                         |
-| `@Joao 1.1,2` | `[[NVI-43-JHN-001#^nvi-jhn-1-1\|João 1.1]],[[NVI-43-JHN-001#^nvi-jhn-1-2\|2]]` — one link per verse |
-| `@Joao 1.1-3` | the same as `1.1,2,3`                                                                               |
+| You type      | You get                                                                 |
+| ------------- | ----------------------------------------------------------------------- |
+| `@Joao`       | `[[NVI-43-Joao\|João]]` — the note listing the book's chapters          |
+| `@Joao 1`     | `[[NVI-43-JHN-001\|João 1]]`                                            |
+| `@Joao 1.1`   | `[[NVI-43-JHN-001#^nvi-jhn-1-1\|João 1.1]]`                             |
+| `@Joao 1.1,2` | `[[#^nvi-jhn-1-1-2\|João 1.1,2]]` — one link, to a quote of the passage |
+| `@Joao 1.1-3` | `[[#^nvi-jhn-1-1-3\|João 1.1-3]]` — the same, written as the run it is  |
+
+A reference to more than one verse is written as a single link, the way it is read out loud,
+and the verses it stands for go into a quote under a `## Citações` heading at the end of the
+note — one embed per verse, exactly what `!@` would have written inline:
+
+```markdown
+## Citações
+
+> [!quote]+ João 1.1-3 - NVI
+> ![[NVI-43-JHN-001#^nvi-jhn-1-1]]
+> ![[NVI-43-JHN-001#^nvi-jhn-1-2]]
+> ![[NVI-43-JHN-001#^nvi-jhn-1-3]] ^nvi-jhn-1-1-3
+```
+
+The line you are writing keeps the reference and nothing else, hovering it shows the whole
+passage at once rather than a verse at a time, and every verse is still linked, inside the
+quote. The heading is named in the language set under **Language** — `## Quotes` in English —
+and is written only where the note has neither name yet; a note that already keeps quotes
+gets the new one at the end of that section, before whatever section follows it. The quote is
+named after the passage and the version it quotes, whichever way the reference itself was
+written; referring to the same passage again links to the quote already there rather than
+writing a second one.
 
 References are chained with a semicolon on paper — `Jn 2.9; Ap 7.10` — and the second of a
 pair names its book only when it is a different one. Write it the same way here: after a

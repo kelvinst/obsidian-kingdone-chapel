@@ -4,7 +4,10 @@ import {
   booklessLabels,
   parseBookless,
   parseReference,
+  passageId,
+  passageLabel,
   referenceLabels,
+  verseSpec,
 } from './reference';
 
 /** No word names a version, so a leading word is always part of the book. */
@@ -423,5 +426,93 @@ describe('booklessLabels', () => {
       '9',
       '10',
     ]);
+  });
+});
+
+describe('verseSpec', () => {
+  it('writes a single verse as itself', () => {
+    expect(verseSpec([1])).toBe('1');
+  });
+
+  it('closes a run of verses back up into the dash it was typed as', () => {
+    expect(verseSpec([47, 48, 49, 50, 51, 52, 53, 54, 55, 56])).toBe('47-56');
+  });
+
+  it('leaves a pair as a pair, which is no longer to read than the dash', () => {
+    expect(verseSpec([1, 2])).toBe('1,2');
+  });
+
+  it('lists verses that are not consecutive', () => {
+    expect(verseSpec([1, 4, 9])).toBe('1,4,9');
+  });
+
+  it('mixes runs and single verses, the way the reference was written', () => {
+    expect(verseSpec([1, 3, 4, 5])).toBe('1,3-5');
+    expect(verseSpec([1, 2, 4, 5, 6, 9])).toBe('1,2,4-6,9');
+  });
+
+  it('keeps the order it was given, so verses out of order stay a list', () => {
+    expect(verseSpec([5, 1])).toBe('5,1');
+  });
+
+  it('writes nothing for no verses at all', () => {
+    expect(verseSpec([])).toBe('');
+  });
+});
+
+describe('passageLabel', () => {
+  it('reads as the whole passage, in one label', () => {
+    expect(passageLabel('Mateus', 26, [47, 48, 49])).toBe('Mateus 26.47-49');
+  });
+
+  it('names a version at the very end, where it belongs to the reference', () => {
+    expect(passageLabel('Mateus', 26, [47, 48, 49], 'NVI')).toBe(
+      'Mateus 26.47-49 - NVI',
+    );
+  });
+
+  it('goes unsaid when there is no version', () => {
+    expect(passageLabel('Mateus', 26, [47, 48], null)).toBe('Mateus 26.47,48');
+  });
+});
+
+describe('passageId', () => {
+  it('is written in the shape the verse anchors already use', () => {
+    expect(passageId('NVI', 'MAT', 26, [47, 48, 49])).toBe('nvi-mat-26-47-49');
+  });
+
+  it('writes a list of verses with dashes, since a block id carries no commas', () => {
+    expect(passageId('NVI', 'JHN', 1, [1, 3, 4, 5])).toBe('nvi-jhn-1-1-3-5');
+  });
+
+  it('writes a version named by a folder as something a block id can hold', () => {
+    expect(passageId('King James', 'JHN', 1, [1, 2, 3])).toBe(
+      'king-james-jhn-1-1-3',
+    );
+    expect(passageId('NVI.2011', 'JHN', 1, [1, 2, 3])).toBe(
+      'nvi-2011-jhn-1-1-3',
+    );
+  });
+
+  it('folds the accents of a version into the letters they sit on', () => {
+    expect(passageId('ARÁ', 'JHN', 1, [1, 2, 3])).toBe('ara-jhn-1-1-3');
+  });
+
+  it('tells apart versions whose names a block id cannot carry at all', () => {
+    const first = passageId('和合本', 'JHN', 1, [1, 2, 3]);
+    const second = passageId('新譯本', 'JHN', 1, [1, 2, 3]);
+    expect(first).not.toBe(second);
+    expect(first).toMatch(/^[a-z0-9]+-jhn-1-1-3$/);
+    expect(second).toMatch(/^[a-z0-9]+-jhn-1-1-3$/);
+  });
+
+  it('leaves no dash hanging off either end of the id', () => {
+    expect(passageId('(ARA)', 'JHN', 1, [1, 2, 3])).toBe('ara-jhn-1-1-3');
+  });
+
+  it('answers the same passage with the same id, however it was asked for', () => {
+    expect(passageId('NVI', 'JHN', 1, [1, 2, 3])).toBe(
+      passageId('nvi', 'jhn', 1, [1, 2, 3]),
+    );
   });
 });

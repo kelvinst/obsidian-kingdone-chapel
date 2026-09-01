@@ -14,6 +14,7 @@ import {
   nameLang,
   plain,
   sectionName,
+  quoteHeadings,
 } from './books';
 
 /** Codes of the books a query matched, best first. */
@@ -258,5 +259,20 @@ describe('sectionName', () => {
   it('gathers a book outside every section under a heading of its own', () => {
     expect(sectionName(CATEGORIES, 67)).toBe('Outros');
     expect(sectionName(CATEGORIES, 67, 'en')).toBe('Other');
+  });
+});
+
+describe('quoteHeadings', () => {
+  it('names the section in the language the reader writes in', () => {
+    expect(quoteHeadings('en')[0]).toBe('Quotes');
+    expect(quoteHeadings('pt')[0]).toBe('Citações');
+  });
+
+  it('still recognises the section under the other language’s name', () => {
+    expect(quoteHeadings('en')).toEqual(['Quotes', 'Citações']);
+  });
+
+  it('writes Portuguese where no language was chosen, as names are', () => {
+    expect(quoteHeadings('')).toEqual(['Citações', 'Quotes']);
   });
 });

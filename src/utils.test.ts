@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   chapterFileName,
   chapterKey,
+  hasBlockId,
+  quotePlacement,
   parseBookName,
   parseChapterName,
   parseVerseLine,
@@ -171,5 +173,178 @@ describe('parseVerseLine', () => {
     ).toMatchObject({
       text: '**Deus** disse: «faça-se»',
     });
+  });
+});
+
+describe('quotePlacement', () => {
+  const headings = ['Citações', 'Quotes'];
+  const quote = '> [!quote]+ João 1.1,2';
+  /** What the placement writes, read back as the note it leaves behind. */
+  const written = (text: string) => {
+    const at = quotePlacement(text, headings, quote);
+    const lines = text.split('\n');
+    const line = lines[at.line];
+    lines[at.line] = line.slice(0, at.ch) + at.text + line.slice(at.ch);
+    return lines.join('\n');
+  };
+
+  it('opens the section at the end of a note that has none', () => {
+    expect(written('Some note')).toBe(`Some note\n\n## Citações\n\n${quote}\n`);
+  });
+
+  it('writes the heading of the language it was given first', () => {
+    expect(quotePlacement('', ['Quotes', 'Citações'], quote).text).toBe(
+      `## Quotes\n\n${quote}\n`,
+    );
+  });
+
+  it('leaves one blank line, however the note happened to end', () => {
+    expect(written('Some note\n')).toBe(
+      `Some note\n\n## Citações\n\n${quote}\n`,
+    );
+    expect(written('Some note\n\n')).toBe(
+      `Some note\n\n## Citações\n\n${quote}\n`,
+    );
+  });
+
+  it('adds to the section a note already keeps its quotes under', () => {
+    expect(written(`Some note\n\n## Citações\n\n> [!quote]+ João 3.16\n`)).toBe(
+      `Some note\n\n## Citações\n\n> [!quote]+ João 3.16\n\n${quote}\n`,
+    );
+  });
+
+  it('closes the file when the quote is the last thing in it', () => {
+    expect(written('## Citações\n\n> [!quote]+ João 3.16')).toBe(
+      `## Citações\n\n> [!quote]+ João 3.16\n\n${quote}\n`,
+    );
+  });
+
+  it('recognises the section under either language’s name', () => {
+    expect(written(`Some note\n\n## Quotes\n\n> [!quote]+ João 3.16\n`)).toBe(
+      `Some note\n\n## Quotes\n\n> [!quote]+ João 3.16\n\n${quote}\n`,
+    );
+  });
+
+  it('passes over the sections that are not the one quotes are kept under', () => {
+    expect(
+      written(
+        `## Notas\n\nMais texto\n\n## Citações\n\n> [!quote]+ João 3.16\n`,
+      ),
+    ).toBe(
+      `## Notas\n\nMais texto\n\n## Citações\n\n> [!quote]+ João 3.16\n\n${quote}\n`,
+    );
+  });
+
+  it('reads past a heading that a fenced example is only showing', () => {
+    const note = [
+      'Como funciona:',
+      '',
+      '```markdown',
+      '## Citações',
+      '',
+      '> [!quote]+ João 3.16',
+      '```',
+      '',
+      '## Notas',
+      '',
+      'Mais texto',
+      '',
+    ].join('\n');
+    // The example is not the section, so the note is given one of its own,
+    // after everything it says.
+    expect(written(note)).toBe(`${note}\n## Citações\n\n${quote}\n`);
+  });
+
+  it('is not ended by a heading inside a fence in its own section', () => {
+    const note = [
+      '## Citações',
+      '',
+      '> [!quote]+ João 3.16',
+      '',
+      '```markdown',
+      '## Notas',
+      '```',
+      '',
+    ].join('\n');
+    expect(written(note)).toBe(
+      `## Citações\n\n> [!quote]+ João 3.16\n\n\`\`\`markdown\n## Notas\n\`\`\`\n\n${quote}\n`,
+    );
+  });
+
+  it('backs out of a code block left open at the end of the note', () => {
+    const note = [
+      '## Citações',
+      '',
+      '> [!quote]+ João 3.16',
+      '',
+      '```markdown',
+      '## exemplo',
+    ].join('\n');
+    expect(written(note)).toBe(
+      `## Citações\n\n> [!quote]+ João 3.16\n\n${quote}\n\n\`\`\`markdown\n## exemplo`,
+    );
+  });
+
+  it('opens the section before a code block left open, not inside it', () => {
+    const note = ['Nota', '', '```markdown', '## exemplo'].join('\n');
+    expect(written(note)).toBe(
+      `Nota\n\n## Citações\n\n${quote}\n\n\`\`\`markdown\n## exemplo`,
+    );
+  });
+
+  it('stops at the section that follows, rather than writing into it', () => {
+    expect(
+      written(
+        `## Citações\n\n> [!quote]+ João 3.16\n\n## Notas\n\nMais texto\n`,
+      ),
+    ).toBe(
+      `## Citações\n\n> [!quote]+ João 3.16\n\n${quote}\n\n## Notas\n\nMais texto\n`,
+    );
+  });
+
+  it('writes the first quote of an empty section under its heading', () => {
+    expect(written('## Citações\n')).toBe(`## Citações\n\n${quote}\n`);
+  });
+
+  it('has nothing to leave a blank line after in an empty note', () => {
+    expect(quotePlacement('', headings, quote).text).toBe(
+      `## Citações\n\n${quote}\n`,
+    );
+  });
+});
+
+describe('hasBlockId', () => {
+  it('finds the id closing a line', () => {
+    expect(
+      hasBlockId('> ![[NVI-43-JHN-001]] ^nvi-jhn-1-1-3', 'nvi-jhn-1-1-3'),
+    ).toBe(true);
+  });
+
+  it('reads past the spaces a line may end in', () => {
+    expect(hasBlockId('texto ^nvi-jhn-1-1-3  \nmais', 'nvi-jhn-1-1-3')).toBe(
+      true,
+    );
+  });
+
+  it('does not read the id out of a link that only names it', () => {
+    expect(hasBlockId('[[#^nvi-jhn-1-1-3|João 1.1-3]]', 'nvi-jhn-1-1-3')).toBe(
+      false,
+    );
+  });
+
+  it('does not read an id a fenced example is only showing', () => {
+    const note = [
+      'Assim:',
+      '',
+      '```markdown',
+      '> ![[NVI-43-JHN-001#^nvi-jhn-1-3]] ^nvi-jhn-1-1-3',
+      '```',
+      '',
+    ].join('\n');
+    expect(hasBlockId(note, 'nvi-jhn-1-1-3')).toBe(false);
+  });
+
+  it('does not answer for an id the note does not carry', () => {
+    expect(hasBlockId('texto ^nvi-jhn-1-1-2', 'nvi-jhn-1-1-3')).toBe(false);
   });
 });
