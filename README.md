@@ -235,7 +235,10 @@ order: 20
 | `order`        | Where it sits among the versions sharing its heading — and where that heading sits, which is its earliest version's. Alphabetical when left out.                                                           |
 
 The heading is the vault's to name, not the plugin's: `Translations`, `Editions`,
-`Comentários`, anything. Versions naming no heading are listed first, under none.
+`Comentários`, anything. Naming none is a heading of its own, ordered like the rest —
+those versions are listed together, under no heading, wherever the lowest `order`
+among them puts them. Which is first in a vault that numbers nothing, since a version
+that is one by sitting in the Bible folder is an `order` of 0 and names no heading.
 
 Declaring is optional and adds to the Bible folder rather than replacing it, so a vault that
 keeps every version in one place needs none of it:
