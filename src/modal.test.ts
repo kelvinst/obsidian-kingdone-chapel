@@ -24,6 +24,7 @@ beforeEach(() => {
   const item = (version: string, label: string, text: string): VersionItem => ({
     version,
     label,
+    group: '',
     file: vault.write(`Bibles/${version}/${version}-43-JHN-003.md`),
     text,
     matchedVerse: 16,
