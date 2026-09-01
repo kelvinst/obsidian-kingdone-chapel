@@ -1,5 +1,5 @@
 ---
-saved_at: 2026-09-01T09:30:00Z
+saved_at: 2026-09-01T09:45:00Z
 session_id: fe9efe60-3c0e-466d-9fb3-ab13db813937
 ---
 
@@ -101,6 +101,37 @@ session.
 - Moved the `.gitignore` lines out of PR #20 into PR #21 so the two cannot
   conflict on that file, and amended PR #20 again.
 
+## 2026-09-01T09:45:00Z — update
+
+Section body written with the `caveman` compression skill (ultra), active all
+session.
+
+- Second review pass over the whole of PR #20, now three commits.
+- Checked the `npm_config_*` seeding by testing the assumption it rests on
+  rather than trusting it: a plain `npm run` leaves both `npm_config_main` and
+  `npm_config_build` unset, and neither `~/.npmrc` nor the repo `.npmrc`
+  defines them. Had either been set by default, the seeding would have skipped
+  every build silently. It does not, so the fix stands.
+- Also confirmed `${npm_config_build-unset}` is the right set-but-empty test
+  for npm's `--no-build` normalisation, that both expansions are `set -u`-safe,
+  and that argv still overrides because the loop runs afterwards.
+- One finding, and it is pre-existing rather than from this diff: the backup
+  guard at `scripts/obsidian-link.sh:107` skips saving the target's
+  `data.json` whenever any `data.json.bak` already exists, so the copy at line
+  111 overwrites live settings with nothing holding the old content.
+- It is the bug that ate this worktree's `data.json` earlier in the session, so
+  it is confirmed by having happened rather than by reading. `4c1dcc1` added
+  the guard deliberately, to keep the first `.bak` as the checkout's original
+  settings — the intent is right, the consequence is a silent loss on the
+  second switch into the same checkout.
+- This PR does not touch that code but does make it fire far more often:
+  putting the vault in the positional slot exists to encourage pointing several
+  vaults at several checkouts, and every switch runs that copy.
+- Suggested fix keeps both properties: leave the `.bak` rule alone, and add an
+  unguarded copy to `data.json.prev` immediately before the overwrite, so the
+  original and the just-clobbered state are both recoverable. `data.json.prev`
+  would need a `.gitignore` line beside the existing `data.json.bak`.
+
 ## Open Questions
 
 - [ ] Should the positional auto-detect instead (a directory holding
@@ -122,9 +153,15 @@ session.
   - `d38b27a` on PR #21.
 - [ ] Merge PR #21 before PR #20, or rebase #20 after, so the branch stops
       carrying the inherited 687 KB blob.
-- [ ] `data.json` in this worktree was overwritten with the main checkout's
+- [x] `data.json` in this worktree was overwritten with the main checkout's
       copy by a verification run of the link script (its `data.json.bak` is an
       unrelated Aug 30 snapshot, so the original is not recoverable from it).
-      Gitignored dev settings for the test vault; the real vault links main,
-      which was only read. Reset it from Obsidian if the worktree's settings
-      mattered.
+  - Root-caused in the second review: the `[ ! -f "$TARGET/data.json.bak" ]`
+    guard at `scripts/obsidian-link.sh:107` suppressed the backup. Not an
+    accident of the test run — a real bug any second switch reaches.
+- [ ] Fix that guard: add an unguarded `cp` to `data.json.prev` before the
+      overwrite at `scripts/obsidian-link.sh:111`, and gitignore
+      `data.json.prev`. Left out of this PR, which does not otherwise touch
+      the settings-carry code.
+- [ ] Reset this worktree's `data.json` from Obsidian if its settings mattered;
+      it currently holds the main checkout's copy.
