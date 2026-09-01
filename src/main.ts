@@ -23,6 +23,7 @@ import {
   parseBookName,
   parseChapterName,
   parseVerseLine,
+  parseVerses,
 } from './utils';
 import { bookName, bookNameAt, nameLang, translationsName } from './books';
 import { VersionSuggestModal } from './modal';
@@ -1057,12 +1058,7 @@ export default class KingdoneChapelPlugin extends Plugin {
     if (hit && hit.mtime === file.stat.mtime) return hit.verses;
 
     const content = await this.app.vault.cachedRead(file);
-    const verses: Verse[] = [];
-    for (const line of content.split('\n')) {
-      const parsed = parseVerseLine(line);
-      if (!parsed) continue;
-      verses.push(parsed);
-    }
+    const verses = parseVerses(content);
     this.chapterCache.set(file.path, { mtime: file.stat.mtime, verses });
     return verses;
   }

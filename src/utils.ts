@@ -112,6 +112,42 @@ const VERSE_ID = /-(\d+)$/;
  * ends in the chapter and verse it belongs to. Fall back to the written number
  * only for a chapter that carries no ids at all.
  */
+/**
+ * Every verse a chapter file holds.
+ *
+ * A verse is usually a line that carries its own number and its own block id,
+ * and reading the file a line at a time finds it. But an id may also sit on a
+ * line of its own under what it names, which is how a version writes verses
+ * that are more than a line long — an embed of the translation it answers, and
+ * whatever has been written beside it. Read that way an id alone would name a
+ * verse with nothing in it, so what stands above it, back to the blank line,
+ * is the verse.
+ *
+ * A line that names a verse and writes it at once is taken as it is: whatever
+ * came before belongs to a heading or to the verse before, not to this one.
+ */
+export function parseVerses(content: string): VerseLine[] {
+  const out: VerseLine[] = [];
+  let above: string[] = [];
+
+  for (const line of content.split('\n')) {
+    const parsed = parseVerseLine(line);
+    if (parsed) {
+      out.push(
+        parsed.text
+          ? parsed
+          : { verse: parsed.verse, text: above.join('\n').trim() },
+      );
+      above = [];
+      continue;
+    }
+    if (line.trim() === '') above = [];
+    else above.push(line);
+  }
+
+  return out;
+}
+
 export function parseVerseLine(line: string): VerseLine | null {
   const id = line.match(BLOCK_ID);
   const marker = line.match(VERSE_MARKER);
