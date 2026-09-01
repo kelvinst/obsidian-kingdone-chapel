@@ -80,6 +80,13 @@ export interface Verse {
 export interface VersionItem {
   version: string;
   label: string;
+  /**
+   * Heading the version is listed under, empty for none. Carried on the item
+   * rather than looked up again, so the list is drawn from one answer: the
+   * order the versions came in is what decides where a heading opens, and a
+   * second lookup could disagree with it.
+   */
+  group: string;
   file: TFile;
   text: string;
   matchedVerse: number | null;

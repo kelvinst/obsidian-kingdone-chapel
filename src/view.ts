@@ -92,7 +92,17 @@ export class KingdoneChapelView extends ItemView {
       });
       return;
     }
-    for (const item of items) this.renderCard(item, loc);
+    // Versions sharing a heading arrive together, so a heading is due whenever
+    // the one an item names is not the one before it. A version naming none
+    // closes whatever was open and sits in the list itself.
+    let group: string | null = null;
+    for (const item of items) {
+      if (item.group !== group) {
+        group = item.group;
+        if (group) this.listEl.createDiv({ cls: 'kcp-group', text: group });
+      }
+      this.renderCard(item, loc);
+    }
   }
 
   renderHeader(loc: Location | null) {

@@ -1058,7 +1058,8 @@ export default class KingdoneChapelPlugin extends Plugin {
     includeCurrent: boolean,
   ): Promise<VersionItem[]> {
     const out: VersionItem[] = [];
-    for (const version of this.listVersions()) {
+    for (const source of this.listSources()) {
+      const version = source.code;
       if (!includeCurrent && version === loc.version) continue;
       const file = this.targetFile(version, loc);
       if (!file) continue;
@@ -1066,6 +1067,7 @@ export default class KingdoneChapelPlugin extends Plugin {
       out.push({
         version,
         label: this.label(version),
+        group: source.group,
         file,
         text: match ? match.text : '',
         matchedVerse: match ? match.verse : null,
