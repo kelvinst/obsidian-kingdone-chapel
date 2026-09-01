@@ -1,5 +1,5 @@
 ---
-saved_at: 2026-09-01T00:00:00Z
+saved_at: 2026-09-01T12:30:56Z
 session_id: 00c275e2-559d-41c4-8b5c-77f091ae9a96
 ---
 
@@ -73,6 +73,23 @@ verified by `npm run build`:
 - A commentary's whole-book `-000` file parses as chapter 0, so `;@18` after
   such a link offered `0.18`; `carriedSuggestions` now returns nothing when
   neither side names a chapter.
+
+## 2026-09-01T12:30:56Z — update
+
+- Ran a third `/code-review` pass over the four commits on the branch
+  (`1ede556`, `f0c2f28`, `904991d`, `9820eb9`). **No findings** — the pass
+  re-checked the polarity of the chapter-zero guard (a named chapter still
+  carries from a `-000` file, a bare verse falls through to the books), that
+  the index guard holds for `-000` files since `referenceFile(v, idx, 0)`
+  answers that same file, `CARRIED` against both pipe forms and against embeds
+  (`![[…]];`), the `parseBookless` edges (`3.`, `3-`, `3:1`, `0`, `1.2.3`,
+  spans past the 50-verse cap), and that `bookSuggestions` receives `from` at
+  both call sites with label/anchor arrays still aligned when `verses` is
+  empty.
+- Earlier turns' review fixes had already been committed by the autocommit
+  hook as `f0c2f28` (escaped pipe + `bookName` + index guard) and `904991d`;
+  only the chapter-zero fix was left in the tree and went into `9820eb9`
+  together with the first cut of this log.
 
 ## Open Questions
 
