@@ -1,5 +1,9 @@
-.PHONY: all precommit install-git-hooks
+.PHONY: all setup precommit install-git-hooks
 all: precommit
+
+# What `.kix/hooks/session-start.sh` looks for by name, so a fresh clone
+# wires its hooks the same way whether a person or an agent opened it.
+setup: install-git-hooks
 
 precommit:
 	npm run precommit

@@ -1,0 +1,13 @@
+# BEGIN KIX CODEX HOOKS
+# Codex loads repo-local hooks when the project .codex/ layer is trusted;
+# use /hooks in Codex to review/trust them. Codex reuses the same Kix
+# SessionStart script as Claude Code so bootstrap behavior cannot drift.
+[[hooks.SessionStart]]
+matcher = "startup|resume|clear"
+
+[[hooks.SessionStart.hooks]]
+type = "command"
+command = 'bash "$(git rev-parse --show-toplevel)/.kix/hooks/session-start.sh"'
+timeout = 600
+statusMessage = "Bootstrapping Kix session"
+# END KIX CODEX HOOKS
