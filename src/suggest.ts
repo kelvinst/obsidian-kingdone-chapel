@@ -689,9 +689,15 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
       // A version and nothing else. The note's own passage is the reference,
       // and its book alone when what the note is about is a book — which is
       // what a chapter of 0, a book's introduction, says.
+      //
+      // What was typed is the version's name, and that is a label worth having
+      // on its own: a note already saying which passage it is about says the
+      // rest by naming the version, `as NVI has it`.
       const said = here.chapter ? [here.chapter] : [];
-      const one = await rows(said, [], this.bareLabels(said, []));
-      return [one.full].filter((row): row is RefSuggestion => row !== null);
+      const one = await rows(said, [], name ? [name] : []);
+      return [one.bare, one.full].filter(
+        (row): row is RefSuggestion => row !== null,
+      );
     }
 
     const typed = numbers.map(String);
