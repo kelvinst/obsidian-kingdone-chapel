@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { chapter, harness } from '../test/harness';
 import type { Harness } from '../test/harness';
+import { DEFAULT_SETTINGS } from './types';
+import type { KingdoneChapelSettings } from './types';
 import { KingdoneChapelSettingTab } from './settings';
 
 /** The block of one setting, found by the name written above it. */
@@ -97,8 +99,15 @@ describe('the Bible folder', () => {
   });
 });
 
+/** A setting a switch stands for, which is to say one of the boolean ones. */
+type Switch = {
+  [K in keyof KingdoneChapelSettings]: KingdoneChapelSettings[K] extends boolean
+    ? K
+    : never;
+}[keyof KingdoneChapelSettings];
+
 describe('the switches', () => {
-  const switches: [string, keyof typeof world.plugin.settings][] = [
+  const switches: [string, Switch][] = [
     ['Open in new tab', 'openInNewTab'],
     ['Chapter breadcrumbs', 'showBreadcrumbs'],
     ['Group books by category', 'bookCategories'],
@@ -109,9 +118,12 @@ describe('the switches', () => {
 
   for (const [name, key] of switches) {
     it(`opens ${name} on the setting in force`, () => {
-      expect(toggle(containerEl, name).checked).toBe(
-        world.plugin.settings[key],
-      );
+      // Drawn from a setting that is not the default, so a switch reading the
+      // wrong one cannot pass by the two of them happening to agree.
+      const wanted = !DEFAULT_SETTINGS[key];
+      world.plugin.settings[key] = wanted;
+      tab.display();
+      expect(toggle(containerEl, name).checked).toBe(wanted);
     });
 
     it(`saves ${name} when it is flipped`, async () => {

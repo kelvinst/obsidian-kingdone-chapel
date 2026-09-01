@@ -537,10 +537,32 @@ describe('where a list is placed', () => {
     });
   }
 
+  /**
+   * What `size` and `measure` overwrite. jsdom lays nothing out, but it does
+   * answer for all four, and deleting its accessors rather than putting them
+   * back would leave every later measurement `undefined` — and the window at
+   * whatever width the last test here happened to want.
+   */
+  const overwritten: [object, string][] = [
+    [HTMLElement.prototype, 'offsetWidth'],
+    [HTMLElement.prototype, 'offsetHeight'],
+    [window, 'innerWidth'],
+    [window, 'innerHeight'],
+  ];
+  let before: (PropertyDescriptor | undefined)[] = [];
+
+  beforeEach(() => {
+    before = overwritten.map(([on, name]) =>
+      Object.getOwnPropertyDescriptor(on, name),
+    );
+  });
+
   afterEach(() => {
-    for (const name of ['offsetWidth', 'offsetHeight']) {
-      Reflect.deleteProperty(HTMLElement.prototype, name);
-    }
+    overwritten.forEach(([on, name], i) => {
+      const was = before[i];
+      if (was) Object.defineProperty(on, name, was);
+      else Reflect.deleteProperty(on, name);
+    });
   });
 
   it('hangs under the crumb it belongs to', () => {
