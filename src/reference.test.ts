@@ -8,6 +8,7 @@ import {
   passageLabel,
   referenceLabels,
   verseSpec,
+  booklessPassageLabel,
 } from './reference';
 
 /** No word names a version, so a leading word is always part of the book. */
@@ -513,6 +514,26 @@ describe('passageId', () => {
   it('answers the same passage with the same id, however it was asked for', () => {
     expect(passageId('NVI', 'JHN', 1, [1, 2, 3])).toBe(
       passageId('nvi', 'jhn', 1, [1, 2, 3]),
+    );
+  });
+});
+
+describe('booklessPassageLabel', () => {
+  it('reads a carried run as the verses alone', () => {
+    expect(booklessPassageLabel({ chapter: null, verses: [1, 2, 3] }, 3)).toBe(
+      '1-3',
+    );
+  });
+
+  it('says the chapter the carried reference named itself', () => {
+    expect(booklessPassageLabel({ chapter: 3, verses: [1, 2, 3] }, 3)).toBe(
+      '3.1-3',
+    );
+  });
+
+  it('lists verses that are not a run, as they were written', () => {
+    expect(booklessPassageLabel({ chapter: null, verses: [1, 4] }, 3)).toBe(
+      '1,4',
     );
   });
 });

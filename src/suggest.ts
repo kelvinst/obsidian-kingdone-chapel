@@ -19,6 +19,7 @@ import {
 } from './books';
 import {
   booklessLabels,
+  booklessPassageLabel,
   parseBookless,
   parseReference,
   passageId,
@@ -447,6 +448,30 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
         return (await this.embeds([target], parsed, anchors, from)).map(
           (row) => ({ ...base, ...row }),
         );
+      }
+
+      // A carried run of verses is one reference as much as a spelled-out one
+      // is, and is written the same way: one link, to a quote of the passage
+      // kept under the note's own heading.
+      if (bookless.verses.length > 1) {
+        const id = passageId(here.version, here.book, chapter, bookless.verses);
+        const callout = this.callout(
+          passageLabel(name, chapter, bookless.verses, here.version),
+          this.embedLines(target, anchors, from),
+          id,
+        );
+        const quoted = (label: string): RefSuggestion => ({
+          ref: label,
+          book: name,
+          note: 'quote at the end',
+          preview,
+          markdown: `[[#^${id}|${label}]]`,
+          passage: { id, callout },
+        });
+        return [
+          quoted(booklessPassageLabel(bookless, chapter)),
+          quoted(passageLabel(name, chapter, bookless.verses)),
+        ];
       }
 
       const row = (labels: string[]): RefSuggestion => ({
