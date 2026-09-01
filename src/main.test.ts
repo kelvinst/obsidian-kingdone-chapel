@@ -805,9 +805,13 @@ describe('promptVersion', () => {
 
     expect(open).toHaveBeenCalledTimes(1);
     // Opened on the passage in front, holding the versions that carry it.
-    const picker = open.mock.instances[0] as unknown as VersionSuggestModal;
+    const picker = open.mock.contexts[0] as unknown as VersionSuggestModal;
     expect(picker.placeholder).toBe('Gênesis 1 — pick a version');
     expect(picker.getSuggestions('').map((i) => i.version)).toEqual(['ARA']);
+    // The spy is on the prototype, so it outlives this test unless it is put
+    // back — and the next one to reach for it would be handed this one's
+    // call history rather than a fresh spy.
+    open.mockRestore();
   });
 });
 
