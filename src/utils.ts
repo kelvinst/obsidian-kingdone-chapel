@@ -134,3 +134,143 @@ export function parseVerseLine(line: string): VerseLine | null {
   if (marker) text = text.slice(marker[0].length);
   return { verse, text: text.trim() };
 }
+
+/**
+ * Whether `text` already carries the block id `id` — whether, that is, some
+ * line of it ends in `^id`.
+ *
+ * Read line by line rather than by a pattern built around the id: an id is
+ * made of whatever a version folder is named, and a name is not a pattern.
+ *
+ * An id inside a fenced code block is an id being shown, and names nothing:
+ * Obsidian reads no block ids in there, so a note holding an example of one is
+ * a note that does not carry it.
+ */
+export function hasBlockId(text: string, id: string): boolean {
+  const lines = text.split('\n');
+  const outside = outsideFences(lines);
+  return lines.some(
+    (line, i) => outside[i] && line.trimEnd().endsWith(`^${id}`),
+  );
+}
+
+/** Where a quote goes in a note, and what has to be written there. */
+export interface QuotePlacement {
+  line: number;
+  ch: number;
+  /** The quote, with the blank lines — and the heading — it needs around it. */
+  text: string;
+}
+
+/** A heading of the level the quotes are kept under, or of the one above it. */
+const SECTION = /^#{1,2}\s/;
+/** The name a second-level heading carries, whatever it is. */
+const HEADING = /^##\s+(.+?)\s*$/;
+/** The line that opens a fenced code block, and the one that closes it. */
+const FENCE = /^\s*(```|~~~)/;
+
+/**
+ * Where the next quote belongs in `text`, and what to write there for it to
+ * land under the heading a note keeps its quotes under.
+ *
+ * The quotes are a section of their own, at the foot of the note, so that a
+ * reference written in the middle of a sentence leaves the sentence alone. A
+ * note that has the section already gets the quote at the end of it — before
+ * whatever section follows, which is someone else's writing and not the place
+ * for it — and one that has not gets the section itself, written after
+ * everything else the note says.
+ *
+ * `headings` names the section: any of them is recognised as the one already
+ * there, and the first is the one written when there is none.
+ */
+export function quotePlacement(
+  text: string,
+  headings: string[],
+  quote: string,
+): QuotePlacement {
+  const lines = text.split('\n');
+  const wanted = headings.map((heading) => heading.toLowerCase());
+  // A heading inside a fenced code block is a heading being shown, not one the
+  // note is written under — a note explaining how the quotes are kept would
+  // otherwise have its own quotes filed into the example.
+  const outside = outsideFences(lines);
+  const at = lines.findIndex((line, i) => {
+    if (!outside[i]) return false;
+    const named = line.match(HEADING);
+    return named !== null && wanted.includes(named[1].toLowerCase());
+  });
+
+  if (at < 0) {
+    const last = beforeFence(outside, lines.length - 1);
+    return {
+      line: last,
+      ch: lines[last].length,
+      text: `${gapAt(lines, last)}## ${headings[0]}\n\n${quote}${tailAt(lines, last)}`,
+    };
+  }
+
+  // The section runs to the heading that ends it, and the blank lines in front
+  // of that heading separate the two rather than belonging to the section.
+  let end = lines.length - 1;
+  for (let i = at + 1; i < lines.length; i++) {
+    if (outside[i] && SECTION.test(lines[i])) {
+      end = i - 1;
+      break;
+    }
+  }
+  while (end > at && !lines[end].trim()) end--;
+  end = beforeFence(outside, end);
+
+  return {
+    line: end,
+    ch: lines[end].length,
+    text: `${gapAt(lines, end)}${quote}${tailAt(lines, end)}`,
+  };
+}
+
+/**
+ * The line to write at, backed out of a code block someone left open: a quote
+ * written inside a fence is a quote nothing reads, since Obsidian keeps no
+ * block ids in there. So a line that landed in one retreats to the last line
+ * before the fence opened.
+ */
+function beforeFence(outside: boolean[], line: number): number {
+  let at = line;
+  while (at > 0 && !outside[at]) at--;
+  return at;
+}
+
+/**
+ * Which lines sit outside a fenced code block — the lines, that is, where a
+ * `#` opens a heading rather than being part of what the fence is showing.
+ *
+ * A fence that opens one belongs to what follows it and is inside; the one
+ * that closes it is the end of the block and is out again, so that a quote may
+ * be written after a block without being written into it.
+ */
+function outsideFences(lines: string[]): boolean[] {
+  let fenced = false;
+  return lines.map((line) => {
+    if (!FENCE.test(line)) return !fenced;
+    fenced = !fenced;
+    return !fenced;
+  });
+}
+
+/**
+ * The blank line a quote needs behind it. A quote written at the very end
+ * closes the file; one written into the middle of a note is followed by what
+ * was already there, and needs a line of its own only where the note leaves
+ * none — which is what a quote backed out of an open fence, with the fence
+ * itself next in line, is written against.
+ */
+function tailAt(lines: string[], line: number): string {
+  if (line === lines.length - 1) return '\n';
+  return lines[line + 1].trim() ? '\n' : '';
+}
+
+/** The blank line a quote needs in front of it, however the note reads there. */
+function gapAt(lines: string[], line: number): string {
+  if (lines[line].trim()) return '\n\n';
+  return line > 0 && lines[line - 1].trim() ? '\n' : '';
+}

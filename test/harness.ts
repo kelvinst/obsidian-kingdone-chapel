@@ -277,6 +277,10 @@ export class FakeEditor {
     return this.lines.join('\n');
   }
 
+  getValue(): string {
+    return this.text;
+  }
+
   getLine(line: number): string {
     return this.lines[line] ?? '';
   }
@@ -294,7 +298,8 @@ export class FakeEditor {
     this.cursor = pos;
   }
 
-  replaceRange(text: string, from: EditorPosition, to: EditorPosition) {
+  /** `to` is the editor's own optional: left off, the text is inserted. */
+  replaceRange(text: string, from: EditorPosition, to: EditorPosition = from) {
     const head = this.getLine(from.line).slice(0, from.ch);
     const tail = this.getLine(to.line).slice(to.ch);
     const written = (head + text + tail).split('\n');

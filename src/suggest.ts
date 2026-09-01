@@ -15,14 +15,17 @@ import {
   matchBooks,
   nameLang,
   plain,
+  quoteHeadings,
 } from './books';
 import {
   booklessLabels,
   parseBookless,
   parseReference,
+  passageId,
+  passageLabel,
   referenceLabels,
 } from './reference';
-import { parseChapterName } from './utils';
+import { hasBlockId, parseChapterName, quotePlacement } from './utils';
 import type { BookMatch } from './books';
 import type { BooklessRef, ParsedRef } from './reference';
 import type { ChapterTarget } from './types';
@@ -80,6 +83,27 @@ const MAX_ROWS = 12;
 const MAX_BOOKS = 6;
 
 /**
+ * The quote a passage link points at, and the name it is filed under. A run of
+ * verses is written as one link to a quote at the end of the note rather than
+ * as a link per verse, so the row carries the quote it will need alongside the
+ * link that reads it.
+ */
+export interface Passage {
+  /** Block id the link points at, and the one the quote is closed with. */
+  id: string;
+  /** The whole callout, written out, ready to sit at the end of the note. */
+  callout: string;
+}
+
+/** Where a quote was written, for the cursor to be read back against. */
+interface QuoteWrite {
+  /** Line the quote was written at the end of. */
+  line: number;
+  /** Lines it added there. */
+  lines: number;
+}
+
+/**
  * The popup's own list of rows, which holds which of them is highlighted.
  * Obsidian does not expose it, but Tab has to reach the very row Enter would.
  */
@@ -104,6 +128,8 @@ export interface RefSuggestion {
   preview: string;
   /** The links to insert, ready to go. */
   markdown: string;
+  /** The quote `markdown` points at, for a row that writes one. */
+  passage?: Passage;
 }
 
 export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
@@ -246,6 +272,51 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
             const base = { ref: labels.join(','), book: name, preview };
             for (const row of await this.embeds(found, parsed, anchors, from)) {
               out.push({ ...base, ...row });
+            }
+            continue;
+          }
+
+          // A run of verses reads as one reference and is written as one
+          // link, to a quote of the whole passage kept at the end of the note.
+          // The verse-by-verse links are still there, inside the quote, as the
+          // embeds it is made of. Verses all sit in the one chapter, so the
+          // passage is the first target the run found.
+          if (head.chapter !== null && parsed.verses.length > 1) {
+            const id = passageId(
+              version,
+              match.book.code,
+              head.chapter,
+              parsed.verses,
+            );
+            // The quote stands on its own at the foot of the note, so it names
+            // the version it quotes whether or not the reference asked for one,
+            // and names the book in full however the reference was written.
+            const title = passageLabel(
+              name,
+              head.chapter,
+              parsed.verses,
+              version,
+            );
+            const callout = this.callout(
+              title,
+              this.embedLines(head, anchors, from),
+              id,
+            );
+            for (const form of this.forms(match, name)) {
+              const label = passageLabel(
+                form,
+                head.chapter,
+                parsed.verses,
+                named ? version : null,
+              );
+              out.push({
+                ref: label,
+                book: name,
+                note: 'quote at the end',
+                preview,
+                markdown: `[[#^${id}|${label}]]`,
+                passage: { id, callout },
+              });
             }
             continue;
           }
@@ -528,6 +599,21 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
     return `![[${this.linktext(target, from)}${anchor ? '#^' + anchor : ''}]]`;
   }
 
+  /**
+   * The quote a passage link points at: the passage under its own name, made
+   * of the same one-embed-per-verse the `!@` form writes, and closed with the
+   * block id the link reads it by. The id sits at the end of the last line so
+   * that it names the callout as a whole, which is what makes the link show
+   * the whole passage at once — on hover as much as when it is followed.
+   */
+  callout(title: string, embeds: string, id: string): string {
+    const lines = embeds.split('\n');
+    lines[lines.length - 1] += ` ^${id}`;
+    return [`> [!quote]+ ${title}`, ...lines.map((line) => `> ${line}`)].join(
+      '\n',
+    );
+  }
+
   /** `[[NVI-43-JHN-001#^nvi-jhn-1-1|João 1.1]]`, with the link the vault expects. */
   link(
     target: ChapterTarget,
@@ -589,6 +675,17 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
     const ctx = this.context;
     if (!ctx) return;
     ctx.editor.replaceRange(item.markdown, ctx.start, ctx.end);
+    // A passage link points at a quote, which is written into the note as
+    // well. A note whose quotes are not the last thing in it takes that quote
+    // above the line the reference was written on, which moves that line down
+    // — and everything read off it with it.
+    const wrote = item.passage
+      ? this.appendPassage(ctx.editor, item.passage)
+      : null;
+    const start =
+      wrote && wrote.line < ctx.start.line
+        ? { line: ctx.start.line + wrote.lines, ch: ctx.start.ch }
+        : ctx.start;
     // Tab asks to rename what it just wrote, so it leaves the label selected
     // and the next thing typed replaces it. Markdown carrying no label —
     // every embed — has nothing to rename, and lands the cursor as Enter does.
@@ -598,14 +695,12 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
       'key' in evt && evt.key === 'Tab' ? this.labelSpan(item.markdown) : null;
     if (label) {
       ctx.editor.setSelection(
-        this.at(item.markdown, label[0], ctx.start),
-        this.at(item.markdown, label[1], ctx.start),
+        this.at(item.markdown, label[0], start),
+        this.at(item.markdown, label[1], start),
       );
       return;
     }
-    ctx.editor.setCursor(
-      this.at(item.markdown, item.markdown.length, ctx.start),
-    );
+    ctx.editor.setCursor(this.at(item.markdown, item.markdown.length, start));
   }
 
   /**
@@ -633,5 +728,28 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
       line: start.line + lines.length - 1,
       ch: lines.length > 1 ? last.length : start.ch + last.length,
     };
+  }
+
+  /**
+   * Put the quote at the end of the note, out of the way of the line being
+   * written: a reference in the middle of a sentence is there to be read as a
+   * reference, and the passage it stands for belongs at the foot of the page.
+   *
+   * A passage already quoted is left as it is, so referring to it a second
+   * time writes a second link to the one quote rather than a second copy of it.
+   * The quote is found by reading the lines rather than by a pattern built
+   * from the id: the id is only ever asked whether it closes a line, and a
+   * pattern would have to be written around whatever a version is named.
+   */
+  appendPassage(editor: Editor, passage: Passage): QuoteWrite | null {
+    if (hasBlockId(editor.getValue(), passage.id)) return null;
+
+    const at = quotePlacement(
+      editor.getValue(),
+      quoteHeadings(this.plugin.settings.language),
+      passage.callout,
+    );
+    editor.replaceRange(at.text, { line: at.line, ch: at.ch });
+    return { line: at.line, lines: at.text.split('\n').length - 1 };
   }
 }

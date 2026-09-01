@@ -250,3 +250,97 @@ export function referenceLabels(
   if (version) labels[labels.length - 1] += ` - ${version}`;
   return labels;
 }
+
+/**
+ * Verses written back the way they were asked for: `47-56`, `1,3-5`. Runs of
+ * consecutive verses close back up into the dash they were probably typed as,
+ * and everything else stays a list, in the order it was written — a reference
+ * to `1.5,1` reads `5,1`, because that is what it says.
+ */
+export function verseSpec(verses: number[]): string {
+  const parts: string[] = [];
+  for (let i = 0; i < verses.length;) {
+    let end = i;
+    while (end + 1 < verses.length && verses[end + 1] === verses[end] + 1)
+      end++;
+    // Two verses in a row are a pair, not a run: `1-2` says nothing `1,2` does
+    // not, and is a word longer to read.
+    parts.push(
+      end > i + 1
+        ? `${verses[i]}-${verses[end]}`
+        : verses.slice(i, end + 1).join(','),
+    );
+    i = end + 1;
+  }
+  return parts.join(',');
+}
+
+/**
+ * A whole passage as one label: `Mateus 26.47-56 - NVI`. This is what a run of
+ * verses reads as when it is one link rather than a link per verse, and the
+ * version sits where `referenceLabels` puts it — at the very end, belonging to
+ * the reference rather than to its last verse.
+ */
+export function passageLabel(
+  book: string,
+  chapter: number,
+  verses: number[],
+  version: string | null = null,
+): string {
+  const label = `${book} ${chapter}.${verseSpec(verses)}`;
+  return version ? `${label} - ${version}` : label;
+}
+
+/**
+ * Block id of the quote a passage link points at, in the shape the verse
+ * anchors already use: `nvi-mat-26-47-56`. It is built from the passage alone,
+ * so the same passage referenced twice in a note finds the quote already
+ * there instead of writing a second one — whichever name the book was written
+ * under either time.
+ *
+ * A block id carries letters, numbers and dashes and nothing else, and a
+ * version is named by a folder, which may be called anything at all. So
+ * everything a block id cannot hold — the commas between verses, and the
+ * spaces, dots, brackets and accents a version like `ARA (2009)` brings with
+ * it — comes through as a dash rather than as a link that resolves to nothing.
+ *
+ * A name written in no Latin letters at all would come through as nothing,
+ * which would leave every version in such a vault sharing the one id — and a
+ * passage quoted in one of them read as the other's. `nameTag` stands in for
+ * the name there, so that the id still says which version it belongs to.
+ */
+export function passageId(
+  version: string,
+  code: string,
+  chapter: number,
+  verses: number[],
+): string {
+  const named = slug(version);
+  return `${named || nameTag(version)}-${slug(code)}-${chapter}-${slug(verseSpec(verses))}`;
+}
+
+/**
+ * As much of `raw` as a block id can carry: accents folded into the letters
+ * they sit on, everything else a dash, and no dash left hanging off an end.
+ */
+function slug(raw: string): string {
+  return raw
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+/**
+ * A name reduced to something a block id can carry, for the names that reduce
+ * to nothing. It stands for one name and no other, which is all the id needs
+ * of it — it is never read back, only told apart.
+ */
+function nameTag(raw: string): string {
+  let hash = 0;
+  for (let i = 0; i < raw.length; i++) {
+    hash = (hash * 31 + raw.charCodeAt(i)) >>> 0;
+  }
+  return hash.toString(36);
+}

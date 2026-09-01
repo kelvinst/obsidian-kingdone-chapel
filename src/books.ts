@@ -502,6 +502,24 @@ export function nameLang(preferred: Lang | ''): Lang {
   return langsFor(preferred)[0];
 }
 
+/** The heading a note keeps its quotes under, in each language written here. */
+export const QUOTES: Record<Lang, string> = { pt: 'Citações', en: 'Quotes' };
+
+/**
+ * The headings a note may already be keeping its quotes under, the one to write
+ * first. A note is only ever given the heading of the language the reader
+ * writes in, but a note that already carries the other one is a note that was
+ * written before that setting was, and its quotes belong where they already
+ * are rather than under a second heading saying the same thing.
+ */
+export function quoteHeadings(preferred: Lang | ''): string[] {
+  const lang = nameLang(preferred);
+  return [
+    QUOTES[lang],
+    ...LANGS.filter((other) => other !== lang).map((other) => QUOTES[other]),
+  ];
+}
+
 /** How well a book answered a query, and which abbreviation got it there. */
 type RankIn = Pick<BookMatch, 'rank' | 'abbr'>;
 
