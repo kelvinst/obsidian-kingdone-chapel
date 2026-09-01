@@ -1,0 +1,141 @@
+---
+saved_at: 2026-09-01T12:35:36Z
+session_id: 80777d5c-e314-47eb-a4a5-b2f92b1efdbd
+transcript: transcript.jsonl.gz
+---
+
+# Tests for the modules that talk to Obsidian
+
+> **Source:** `~/.claude/projects/-Users-kelvinstinghen-Developer-worktrees-obsidian-kingdone-chapel-findings-suggested-fixes-2ab560/80777d5c-e314-47eb-a4a5-b2f92b1efdbd.jsonl` (local; not a public link).
+
+## Goal
+
+The Vitest suite from PR [#13](https://github.com/kelvinst/obsidian-kingdone-chapel/pull/13)
+covered the three pure modules and nothing else: whole-project coverage sat at
+~14% because `main.ts`, `breadcrumbs.ts`, `suggest.ts`, `view.ts`,
+`settings.ts` and `modal.ts` had no tests at all. Every one of them imports
+from `obsidian`, and the reason they were untested is that there is nothing to
+import. Build something for them to run against, then cover the behaviour that
+matters. Work happened on branch `obsidian-module-tests-7f3a91`, PR
+[#19](https://github.com/kelvinst/obsidian-kingdone-chapel/pull/19).
+
+## 2026-08-31 — update
+
+- **Branched from `test-framework-setup-6325de`, not `main`.** PR #13 was
+  still open at the time and `main` had no Vitest, no `.tool-versions`, no
+  gate — nothing to build on.
+- **The diagnosis.** `node_modules/obsidian/package.json` carries
+  `"main": ""` and `"types": "obsidian.d.ts"`: the package is declarations and
+  nothing else. The app supplies the classes at runtime and esbuild marks the
+  import external, so under Vitest there is no module to load.
+- **How to supply one — three options weighed.**
+  - `vi.mock('obsidian', ...)` — rejected: it would have to be repeated in
+    every test file, and the factory can't easily hold class identity for the
+    `instanceof MarkdownView` / `instanceof TFolder` checks the source makes.
+  - A `paths` mapping in `tsconfig.json` — rejected, and this was the
+    important one: it would point `obsidian` at the stub for **`src` as well**,
+    so `npm run typecheck` would stop answering for the plugin against the real
+    API. The whole value of the type-check would go.
+  - `resolve.alias` in `vitest.config.mts` — chosen. Runtime only. The source
+    keeps compiling against `obsidian.d.ts`; only what Vitest loads is
+    swapped.
+- **The consequence of that choice, and how it was handled.** Because the
+  alias is runtime-only, TypeScript still sees the real classes, so anything
+  the stub keeps for a test to assert on (`Plugin.commands`, `notices`,
+  `SuggestModal.placeholder`, `MarkdownView.mode`) is invisible to the
+  type-checker. Rather than casting at every use, those additions are declared
+  once in `test/obsidian-runtime.d.ts` as a `declare module 'obsidian'`
+  augmentation — class/interface declaration merging. Objects the tests build
+  themselves come from harness helpers that do the stub→real cast internally,
+  so the casts live in one file.
+- **`test/obsidian.ts`** — the stub: `Component`, `Plugin`, `View`/`ItemView`,
+  `MarkdownView`, `Modal`/`SuggestModal`, `EditorSuggest`, `PluginSettingTab`,
+  `Setting` with its four component types, `TFile`/`TFolder`/`WorkspaceLeaf`,
+  `Notice`, `setIcon`, `MarkdownRenderer`. Each records what it was asked to
+  do (`notices`, `Plugin.commands`, `MarkdownRenderer.rendered`,
+  `setIcon` writing a `data-icon` attribute), which is how a test reads back a
+  notice or a rendered verse with no app to watch.
+- **`test/dom.ts`** — the helpers Obsidian installs on the DOM prototypes
+  (`createDiv`, `createSpan`, `createEl`, `addClass`, `removeClass`,
+  `toggleClass`, `hasClass`, `empty`, `setText`, and the global `createDiv`
+  the breadcrumbs mount through). They are not part of the module, so the stub
+  alone leaves them undefined. Loaded as `setupFiles`; guarded on
+  `typeof HTMLElement !== 'undefined'` so it is a no-op under `node`, where
+  the pure modules are still tested. It also fills the two gaps jsdom leaves —
+  `Element.prototype.scrollIntoView` and `navigator.clipboard`.
+- **Choosing the environment per file.** `environmentMatchGlobs` was rejected:
+  deprecated in Vitest 3 and this repo is on Vitest 4. Went with a per-file
+  `// @vitest-environment jsdom` docblock on the six new test files, leaving
+  `books`/`reference`/`utils` in `node`. `jsdom` added as a dev dependency.
+- **`test/harness.ts`** — `FakeVault` (a real folder tree, `mtime` that moves
+  on a write, `cachedRead` that _throws_ for a file that has gone away, since
+  the plugin is written to expect that rather than an empty string),
+  `FakeWorkspace` (leaves, `openLinkText` recorded, `onLayoutReady` that can
+  be held back), `FakeMetadataCache`, `FakeEditor` (cursor, selection, a
+  `broken` flag for the pane that has been torn down), plus `pane()` and
+  `chapter()` builders.
+- Six test files written against the behaviour worth keeping: the index and
+  what it does with two files claiming one chapter, the verse under the cursor
+  and the one being read in reading mode, the jumps and the notices when there
+  is nowhere to jump to, the bars and their dropdowns, the reference popup,
+  the sidebar, the settings tab.
+
+## 2026-09-01 — update
+
+- **PR #13 had merged while the work was going on**, as a rebase-merge — the
+  24 commits are on `main` under new SHAs. `git rebase origin/main` matched
+  them by patch-id and dropped all 24, leaving the one commit. Pushed; opened
+  PR [#19](https://github.com/kelvinst/obsidian-kingdone-chapel/pull/19).
+- **`/kix:rebase!` immediately afterwards found `main` had moved again** —
+  `66d2774 feat: link a run of chapters the way a run of verses links` and
+  `c319006 fix: link a chapter to itself, written or not`.
+- **The conflict was in `vitest.config.mts`,** both sides having raised the
+  global floor. Kept ours; that floor is the point of the commit. The per-file
+  block above it auto-merged to `main`'s newer wording.
+- **The real breakage was not in the conflict.** `66d2774` changed
+  `embed`/`link`/`embedLines` to take a `ChapterTarget` (`{chapter, file,
+path}`) rather than a `TFile`, and `ParsedRef.chapter` to
+  `chapters: number[]`. Three tests failed at runtime — a `TFile` has a
+  `.path`, so `linktext` fell through to it and wrote the full vault path —
+  and five more failed only under `tsc`, since Vitest does not type-check.
+  Both fixed.
+- **Covered what the feature added,** rather than lowering the bar to it:
+  `chapterTargets` (a run naming a chapter the version has yet to write, a
+  book with no example file to copy a name from, a version that is not there),
+  `linktext` for a target with no file, and the link/embed rows for a bare
+  book reference and for a missing chapter.
+- **Floor moved 98.17% → 98.12% on branches**, and deliberately: the new
+  `chapterTargets` carries `if (name)` around `chapterFileName`, whose null
+  side is unreachable from there — the example basename always comes out of
+  the chapter index, so it always ends in `-<digits>`.
+- Final: 446 tests, 100% statements / functions / lines, 98.12% branches.
+  Commit `84ce9e0`, force-pushed with `--force-with-lease`; PR #19 body
+  updated to say what the rebase changed.
+- Saved a memory: `git commit` in this repo needs `mise exec --`, because the
+  shell's Homebrew Node (25.8.1) does not match the `.tool-versions` pin
+  (25.6.1) the pre-commit hook enforces.
+
+## Open Questions
+
+- [ ] Thirteen branches are still uncovered, all of them fallbacks a stubbed
+      Obsidian cannot be put into — a pane with no parent element
+      (`breadcrumbs.ts:129`), an event whose target is not a `Node`
+      (`breadcrumbs.ts:439,451`), `view.ts:101`, the unreachable
+      `chapterFileName` guard in `main.ts`. Mark them with `/* v8 ignore */`
+      the way `reference.ts` already does and take the floor to 100%, or leave
+      it honest at 98.12%?
+- [ ] The stub is checked only by the source compiling against the real
+      `obsidian.d.ts` — nothing asserts the stub's own shape matches it. An
+      Obsidian API change that the plugin does not use could drift silently.
+      Worth a type-level check, or is the compile-time split enough?
+
+## Action Items
+
+- [x] Rebase onto `main` and open a PR against it.
+  - Commit `84ce9e0`, PR
+    [#19](https://github.com/kelvinst/obsidian-kingdone-chapel/pull/19).
+- [x] Re-cover the code `main` added while the branch was open.
+  - `chapterTargets`, `linktext` with no file, book and missing-chapter rows.
+- [ ] Merge PR #19 once `Check` is green — `main` carries a ruleset requiring
+      it with `strict: true`, so rebase again rather than merge if `main`
+      moves first.
