@@ -584,6 +584,11 @@ describe('parseContextRef', () => {
       expect(read('1-3.2')).toBeNull();
     });
 
+    it('refuses a chapter no book has', () => {
+      expect(read('0.1')).toBeNull();
+      expect(read('0.')).toBeNull();
+    });
+
     it('says so when the verses reach too far', () => {
       expect(read('1.1-99')).toMatchObject({ chapter: 1, numbers: null });
     });
