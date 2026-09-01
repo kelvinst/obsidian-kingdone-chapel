@@ -1,5 +1,5 @@
 ---
-saved_at: 2026-09-01T12:45:00Z
+saved_at: 2026-09-01T13:05:00Z
 session_id: fe9efe60-3c0e-466d-9fb3-ab13db813937
 ---
 
@@ -163,6 +163,41 @@ session.
   artifacts removed from both checkouts.
 - Committed as `ebeef9d`.
 
+## 2026-09-01T13:05:00Z — update
+
+Section body written with the `caveman` compression skill (ultra), active all
+session.
+
+- Third review pass, over the whole PR now that the stamped backup had landed.
+- Re-probed npm's forwarding rather than reusing the earlier reading of it, and
+  the earlier reading was wrong: npm treats `--checkout ../x` as a boolean. It
+  sets `npm_config_checkout=true` and leaves `../x` in argv as a bare
+  positional — `argv=[../other-worktree] checkout=[true]`. The value does not
+  go into the variable, which is what had been assumed when the path options
+  were left out of the `npm_config_*` fix.
+- That correction is what surfaced the finding. `--checkout <path>` produces
+  two positionals as a matter of course, and the `*)` case at
+  `scripts/obsidian-link.sh:63` overwrites `VAULT` for each one instead of
+  refusing the second, so the first path is dropped in silence.
+- Reproduced it: `npm run vault --checkout <main-checkout> <vault> -- --no-build`
+  linked this worktree into the vault rather than the main checkout that was
+  named. The plain typo `npm run vault ~/A ~/B` loses the first path the same
+  way. Suggested fix is a `VAULT_SEEN` guard that errors on the second
+  positional, with a hint keyed off `npm_config_checkout=true` so the message
+  names the real cause.
+- Two consequences of the boolean behaviour, both acceptable as they stand:
+  `npm run vault --vault ~/X` is accidentally correct, because npm drops the
+  flag and `~/X` lands in the positional slot which is now the vault; and
+  `npm run vault --checkout ~/X` on its own fails loudly with `not an Obsidian
+vault: ~/X`. Only the two-path form is silent.
+- Cleared on the newest hunk: the stamped `BAK` is safe under `set -u` and
+  `set -e` (a failing `date` aborts the assignment), `data.json.*.bak` really
+  does match the stamped names, nothing else in the repo depends on the single
+  `data.json.bak` name, and the per-vault `$BACKUP` at line 131 is a separate
+  mechanism whose single-name overwrite is right for what it does. Same-second
+  name collisions would need three switches inside one second, so they were
+  left alone.
+
 ## Open Questions
 
 - [ ] Should the positional auto-detect instead (a directory holding
@@ -172,9 +207,10 @@ session.
   - No. A branch rewrite is blocked by `main`'s ruleset, and even with it
     lifted the blobs stay reachable through `refs/pull/*`, which GitHub serves
     read-only and keeps indefinitely. Only GitHub Support can purge them.
-- [ ] Should `--vault` and `--checkout` also be recovered from `npm_config_*`?
-      Left out of the review fix as a guess at a path npm may have normalised;
-      the usage text documents the `--` separator instead.
+- [x] Should `--vault` and `--checkout` also be recovered from `npm_config_*`?
+  - The question was built on a wrong premise. npm sets those to the boolean
+    `true` and leaves the path in argv, so there is no value to recover. What
+    it exposed instead is the silent second-positional overwrite at line 63.
 
 ## Action Items
 
@@ -184,6 +220,10 @@ session.
   - `d38b27a` on PR #21.
 - [ ] Merge PR #21 before PR #20, or rebase #20 after, so the branch stops
       carrying the inherited 687 KB blob.
+- [ ] Apply the third review's finding: reject a second positional at
+      `scripts/obsidian-link.sh:63` instead of overwriting `VAULT`, so
+      `npm run vault --checkout <path> <vault>` stops silently linking the
+      wrong checkout.
 - [x] `data.json` in this worktree was overwritten with the main checkout's
       copy by a verification run of the link script (its `data.json.bak` is an
       unrelated Aug 30 snapshot, so the original is not recoverable from it).
