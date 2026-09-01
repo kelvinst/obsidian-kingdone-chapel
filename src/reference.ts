@@ -320,8 +320,12 @@ export function parseContextRef(
   return { version, versionPrefix: taken.versionPrefix, chapter, numbers };
 }
 
-/** A query written as numbers alone, whatever they come to. */
-const NUMBERS = /^[\d\s,-]+$/;
+/**
+ * A query written as numbers alone, whatever they come to. Space is only ever
+ * room around a separator: a gap between two numbers is not a run at all, and
+ * reading it as one would drop the half of it that would not parse.
+ */
+const NUMBERS = /^\d+(?:\s*[,-]\s*\d*)*$/;
 
 /** Whether a run is short enough to be read as chapters as well as verses. */
 export function fitsChapters(numbers: number[]): boolean {
