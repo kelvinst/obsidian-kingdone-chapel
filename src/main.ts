@@ -26,6 +26,7 @@ import {
 } from './utils';
 import { bookName, bookNameAt, nameLang, translationsName } from './books';
 import { VersionSuggestModal } from './modal';
+import { CreateVersionModal } from './create-modal';
 import { ReferenceSuggest } from './suggest';
 import { KingdoneChapelSettingTab } from './settings';
 import { KingdoneChapelView } from './view';
@@ -126,6 +127,19 @@ export default class KingdoneChapelPlugin extends Plugin {
       id: 'open-verse-in-another-version',
       name: 'Open this verse in another version',
       callback: () => this.promptVersion(),
+    });
+
+    this.addCommand({
+      id: 'create-version',
+      name: 'Create a Bible version from a translation',
+      callback: () => {
+        const sources = this.listSources();
+        if (!sources.length) {
+          new Notice('No version to write one from yet.');
+          return;
+        }
+        new CreateVersionModal(this.app, this, sources).open();
+      },
     });
 
     this.addCommand({

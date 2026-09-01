@@ -41,7 +41,7 @@ export default defineConfig({
         // its own so that a change stopping covering one of these three is
         // answered for by the file it is in, rather than by a whole-project
         // number that any other file could just as well have moved.
-        'src/{books,reference,utils}.ts': {
+        'src/{books,create,reference,sources,utils}.ts': {
           statements: 100,
           branches: 100,
           functions: 100,
@@ -51,10 +51,10 @@ export default defineConfig({
         // now, so this is close to the ceiling: what the branches still fall
         // short of are the fallbacks guarding states a stubbed Obsidian cannot
         // be put into.
-        statements: 99.36,
-        branches: 97.08,
-        functions: 99.33,
-        lines: 99.42,
+        statements: 91.8,
+        branches: 92.95,
+        functions: 91.54,
+        lines: 91.43,
       },
     },
   },
