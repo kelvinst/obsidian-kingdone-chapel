@@ -222,6 +222,20 @@ export function booklessLabels(
 }
 
 /**
+ * A carried run of verses as one label, the way the passage link reads it:
+ * `1-3` where the verses are counted in the chapter being carried, `3.1-3`
+ * where the carried reference named a chapter of its own. The book is left out
+ * of both — the reference before the semicolon said it.
+ */
+export function booklessPassageLabel(
+  bookless: BooklessRef,
+  chapter: number,
+): string {
+  const spec = verseSpec(bookless.verses);
+  return bookless.chapter === null ? spec : `${chapter}.${spec}`;
+}
+
+/**
  * How a reference reads in a note, one label per link. The first carries the
  * whole reference and the rest only their own number, joined the way they were
  * typed and the way they are written by hand: `João 1.1,2,3` for a run of

@@ -749,12 +749,13 @@ describe('a reference carried on after a semicolon', () => {
     expect(rows[0].markdown).toBe('[[NVI-01-GEN-002#^nvi-gen-2-1|2.1]]');
   });
 
-  it('carries a run of verses, numbered from the first', async () => {
+  it('carries a run of verses as one link, to a quote of the passage', async () => {
     const rows = await suggest.getSuggestions(carried(after('1-2'), '1-2'));
     expect(rows[0].ref).toBe('1,2');
-    expect(rows[0].markdown).toBe(
-      '[[NVI-01-GEN-001#^nvi-gen-1-1|1]],[[NVI-01-GEN-001#^nvi-gen-1-2|2]]',
-    );
+    // The same id the spelled-out reference writes, so a carried run finds the
+    // quote that is already there rather than writing a second one.
+    expect(rows[0].markdown).toBe('[[#^nvi-gen-1-1-2|1,2]]');
+    expect(rows[0].passage?.id).toBe('nvi-gen-1-1-2');
   });
 
   it('names the chapter alone where the reference gave no verse', async () => {
