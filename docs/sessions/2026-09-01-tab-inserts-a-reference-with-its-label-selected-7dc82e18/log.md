@@ -1,5 +1,5 @@
 ---
-saved_at: 2026-09-01T09:40:00Z
+saved_at: 2026-09-01T09:50:00Z
 session_id: 7dc82e18-7d41-41c8-80c1-15627cbd4e76
 transcript: transcript.jsonl.gz
 ---
@@ -79,6 +79,24 @@ is highlighted inside the link, ready to become anything else.
   a runtime stand-in at all, and that none of it has been run inside a real
   vault yet.
 
+## 2026-09-01T09:50:00Z — update
+
+- `/code-review` over `main...HEAD`. One finding, in the test config rather
+  than in the feature: the `obsidian` alias is built with
+  `new URL(...).pathname`, which leaves percent-escapes in place. A checkout
+  under a path holding a space resolves the stub to a literal `%20` that is
+  not on disk, and every test in `src/suggest.test.ts` fails at import;
+  Windows breaks the same way on the leading-slash drive letter. Confirmed by
+  running the expression against a `file:///Users/x/My%20Docs/...` URL rather
+  than reasoning about it. Fix is `fileURLToPath(new URL(...))` — not applied
+  yet.
+- Everything the feature itself turns on was checked and came out clean: the
+  label regex against embeds (no `|`, so no match, so the cursor path) and
+  against a verse run (first link only), the offset-to-position math on both
+  single-line links and multi-line embeds, `'key' in evt` letting a row click
+  fall through to the cursor, and `this.scope` already existing by the time
+  the constructor body runs.
+
 ## Open Questions
 
 - [ ] Should Tab select the label of the link the cursor would land nearest,
@@ -86,6 +104,9 @@ is highlighted inside the link, ready to become anything else.
 
 ## Action Items
 
+- [ ] Apply the review's fix: `fileURLToPath(new URL(...))` for the `obsidian`
+      alias in `vitest.config.mts`, so a checkout path with a space still runs
+      the suite.
 - [ ] Try the popup in the vault — the change is untested in a running
       Obsidian, since the vault loads the plugin from the main checkout rather
       than this worktree.
