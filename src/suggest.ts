@@ -186,6 +186,16 @@ const TOO_MANY: HintSuggestion = {
   hint: 'More verses than one reference can carry — ask for fewer',
 };
 
+/**
+ * Said when a run of numbers is short enough to be verses and too long to be
+ * chapters, so only the one reading answered. The rows below say verses
+ * without saying they are only verses, and a reading dropped in silence
+ * answers something other than what was asked.
+ */
+const TOO_MANY_CHAPTERS: HintSuggestion = {
+  hint: 'More chapters than one reference can carry — read as verses',
+};
+
 export class ReferenceSuggest extends EditorSuggest<Row> {
   plugin: KingdoneChapelPlugin;
 
@@ -290,6 +300,15 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
               )),
             );
           }
+        }
+        // The numbers were read as verses alone, the run being longer than a
+        // run of chapters may be.
+        if (
+          asked.chapter === null &&
+          asked.numbers &&
+          !fitsChapters(asked.numbers)
+        ) {
+          hints.push(TOO_MANY_CHAPTERS);
         }
       }
     }
