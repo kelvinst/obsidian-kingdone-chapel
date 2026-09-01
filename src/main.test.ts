@@ -58,6 +58,11 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  // Every spy here is made inside the test that wants it, so none should
+  // outlive it — and one on a prototype would, taking its call history into
+  // the next test to reach for it. Unwound here rather than at the end of a
+  // body, which a failing assertion never reaches.
+  vi.restoreAllMocks();
 });
 
 describe('index', () => {
@@ -808,10 +813,6 @@ describe('promptVersion', () => {
     const picker = open.mock.contexts[0] as unknown as VersionSuggestModal;
     expect(picker.placeholder).toBe('Gênesis 1 — pick a version');
     expect(picker.getSuggestions('').map((i) => i.version)).toEqual(['ARA']);
-    // The spy is on the prototype, so it outlives this test unless it is put
-    // back — and the next one to reach for it would be handed this one's
-    // call history rather than a fresh spy.
-    open.mockRestore();
   });
 });
 
