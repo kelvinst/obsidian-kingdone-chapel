@@ -49,9 +49,16 @@ if [ ! -e "${beads_dir}/dolt" ] && [ ! -e "${beads_dir}/embeddeddolt" ]; then
 fi
 
 cd "$beads_root"
-bd bootstrap --yes >/dev/null 2>&1 || {
-  printf 'bootstrap-bd: bd bootstrap failed (continuing)\n' >&2
-}
+
+# Only when there is no database yet: `bd bootstrap` clones from the remote and
+# refuses once `okc` exists, so running it unconditionally would report a
+# failure on every session start after the first and teach everyone to ignore
+# the one time it means something.
+if [ ! -d "${beads_dir}/embeddeddolt" ]; then
+  bd bootstrap --yes >/dev/null 2>&1 || {
+    printf 'bootstrap-bd: bd bootstrap failed (continuing)\n' >&2
+  }
+fi
 
 # The remote lives in the Dolt database, which is runtime state and not in git,
 # so a fresh clone has none however it was configured. `sync.remote` in the
@@ -64,3 +71,8 @@ if [ -n "$remote_url" ] && ! bd dolt remote list 2>/dev/null | grep -q '^origin[
     printf 'bootstrap-bd: could not register the Dolt remote (continuing)\n' >&2
   }
 fi
+
+# `beads.role` lives in .git/config, which no clone inherits, so every bd
+# command in a fresh checkout leads with a "not configured" warning. Default it
+# once, and leave an explicit choice — `contributor` on a fork — alone.
+git config --get beads.role >/dev/null 2>&1 || git config beads.role maintainer
