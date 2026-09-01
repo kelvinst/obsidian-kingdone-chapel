@@ -253,9 +253,13 @@ describe('a card', () => {
     const copy = vi
       .spyOn(navigator.clipboard, 'writeText')
       .mockResolvedValue(undefined);
+    // The jump is watched where it is called rather than where it opens:
+    // it reads the file for an anchor first, so nothing has been opened yet
+    // whether or not the copy went on to make one.
+    const jump = vi.spyOn(world.plugin, 'jumpTo');
     card().dispatchEvent(new MouseEvent('click', { altKey: true }));
     expect(copy).toHaveBeenCalledWith('No princípio, criou Deus');
-    expect(world.workspace.opened).toHaveLength(0);
+    expect(jump).not.toHaveBeenCalled();
     expect(notices.at(-1)?.message).toBe('Copied Almeida Revista e Atualizada');
   });
 });
