@@ -16,7 +16,6 @@
  *   @1.1             a chapter and a verse of the book that passage is in
  *   @ARA 1           the same in a named version, as do `@1 ARA`, `@1 -ara`
  *                    and `@ARA` on its own
- *   @1               numbers alone, read against the passage the note is about
  *
  * The text is still being typed, so half-written references (`@Joao 1.`,
  * `@Joao 1-`, `@Joao 1.1-`) have to parse into the most complete thing they
@@ -64,12 +63,6 @@ export interface ParsedRef {
 }
 
 /**
- * Split `query` (everything after the `@`) into its parts. `isVersion` says
- * whether an outer word names a version, which is the only way to tell
- * `@ARA Joao` from a two-word book name, or `@Joao ARA` from one whose name
- * carries on. A marked version says so itself, and is not asked.
- */
-/**
  * Take the version out of `query`, wherever it was written, and hand back what
  * is left to be read as the reference. Both parses share it, a version being
  * written the same way whether or not a book was written with it.
@@ -107,6 +100,12 @@ function takeVersion(
   return { version: null, versionPrefix: false, text: query };
 }
 
+/**
+ * Split `query` (everything after the `@`) into its parts. `isVersion` says
+ * whether an outer word names a version, which is the only way to tell
+ * `@ARA Joao` from a two-word book name, or `@Joao ARA` from one whose name
+ * carries on. A marked version says so itself, and is not asked.
+ */
 export function parseReference(
   query: string,
   isVersion: (word: string) => boolean,
