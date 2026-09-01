@@ -8,6 +8,15 @@ VAULT="${OBSIDIAN_VAULT:-$HOME/Developer/Stingdom}"
 TARGET=""
 DO_BUILD=1
 
+# npm keeps any option that is not behind a `--` for itself, exporting it as an
+# npm_config_* variable and dropping it from the arguments this script sees, so
+# `npm run vault --main` arrives with nothing to parse. Seed the defaults from those
+# variables; the loop below runs afterwards, so an option that did come through wins.
+# npm normalises `--no-build` to an empty npm_config_build, which is why this tests for
+# set-but-empty rather than for a value.
+if [ "${npm_config_main:-}" = "true" ]; then TARGET="__MAIN__"; fi
+if [ "${npm_config_build-unset}" = "" ]; then DO_BUILD=0; fi
+
 usage() {
   cat <<'USAGE'
 Usage: scripts/obsidian-link.sh [options] [vault-path]
@@ -30,10 +39,12 @@ Options:
   --no-build        skip the production build
   -h, --help        show this help
 
-Through npm the positional argument passes straight through, but options need a `--`
-separator or npm eats them as its own:
+Through npm the positional argument passes straight through, and --main and --no-build
+are recovered from npm's own environment. The options that take a path still need a
+`--` separator, or npm keeps them:
   npm run vault ~/Developer/OtherVault
-  npm run vault -- --main --no-build
+  npm run vault --main --no-build
+  npm run vault -- --checkout ../other-worktree
 USAGE
 }
 
