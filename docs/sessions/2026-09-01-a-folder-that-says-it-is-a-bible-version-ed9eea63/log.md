@@ -1,5 +1,5 @@
 ---
-saved_at: 2026-09-01T12:30:40Z
+saved_at: 2026-09-01T12:43:05Z
 session_id: ed9eea63-4eb0-40de-af81-0a16bc32462d
 transcript: transcript.jsonl.gz
 ---
@@ -133,15 +133,49 @@ breadcrumb, reachable by `@`. Work happened on branch
 - Both fixes are uncovered lines, so the project floors were lowered to what
   the run reaches (`autoUpdate` only ever raises).
 
+## 2026-09-01T12:43:05Z — update (second review pass, clean but for the README)
+
+- Ran `/code-review` again over the whole branch diff, now that both earlier
+  findings were fixed and `main` had been merged twice. One finding, and it is
+  in the docs rather than the code.
+- **The README overstates the ordering rule.** It says flatly that "versions
+  naming no heading are listed first, under none", but `sortSources` ranks the
+  no-heading bucket by its own lowest `order` exactly like a named heading. A
+  vault that declares `bible-source: true, order: 50` on a notes folder and
+  `bible-source: Translations, order: 10` on ARA gets the Translations block
+  first and the heading-less folder last — the opposite of the promise. The
+  claim only holds because implicit Bible-folder children are always created
+  with `order: 0`, which is every version in a vault that declares none.
+- Two ways to settle it, not yet decided: reword the README to the real rule
+  (a heading sits where its earliest version's `order` puts it, the no-heading
+  bucket included), or make the promise true in `sortSources` with a
+  `(a.group === '' ? 0 : 1)` term ahead of the rank comparison, plus a test.
+- Verified the two earlier fixes are genuinely closed rather than edited
+  around: traced `declaredBy` through key-removal, rename, delete, and the
+  two-declaring-notes-in-one-folder case, and the index invalidates in each.
+- Four things were examined and deliberately **not** reported, so they don't
+  get re-litigated next pass: `sourceCodes` / `declaringNotes` can never be
+  read stale (`bibleIndex` and `sourceFolders` are nulled together, and
+  `index()` only caches after calling `sources()`); `sourceOf`'s walk
+  terminates because `TAbstractFile.parent` is `TFolder | null` with a null
+  root; group headings cannot duplicate, since same-group sources share an
+  identical sort key and stay contiguous under a stable sort; and `CrumbMenu`
+  collects rows by `.kcp-crumb-item`, so its search still works with headings
+  interleaved.
+
 ## Open Questions
 
 - [ ] Should the `bible-source` frontmatter key name itself be a setting? It is
       hardcoded for now; raised as a possible follow-up for maximum
       customizability, not decided.
-- [ ] Ordering reads oddly while only some versions declare a heading:
+- [x] Ordering reads oddly while only some versions declare a heading:
       ungrouped ones sort first, so a lone declared `Traduções` puts ARA
       _below_ the undeclared ACF/MENS/NTLH/NVI. Intended behaviour, but worth
       re-checking once every translation declares.
+  - Answered by the second review pass: it is what `sortSources` means, since
+    the no-heading bucket is ranked by its own lowest `order` like any other.
+    What is wrong is the README, which states it as an absolute — see the
+    update above and the action item below.
 - [ ] Is `Shedd-41-MRK-014-verses.md` meant to exist? It fails the chapter
       regex and so is being indexed as Mark's _book note_.
 
@@ -157,6 +191,9 @@ breadcrumb, reachable by `@`. Work happened on branch
       `^shedd-psa-3-3` block ids. It is `-000`-per-book today, so it answers at
       book granularity only; splitting makes it verse-exact with no further
       code.
+- [ ] Settle README.md:188 — either reword the ordering rule to what
+      `sortSources` does, or make "no heading first" unconditional in
+      `sortSources` and cover it with a test. Raised by the second review pass.
 - [ ] Come back to Kelvin (personal studies). Deferred deliberately. Its
       sections are anchored by embeds of other versions' verses; stamping
       `^kelvin-psa-3-3` on them makes `parseVerseLine` and `verseIn` work with
