@@ -60,7 +60,23 @@ while [ $# -gt 0 ]; do
     --no-build) DO_BUILD=0; shift ;;
     -h|--help) usage; exit 0 ;;
     -*) echo "unknown option: $1" >&2; usage >&2; exit 2 ;;
-    *) VAULT="$1"; shift ;;
+    *)
+      # A second path is never meaningful, and npm makes one easy to arrive at by
+      # accident: it reads --checkout as a boolean, so `npm run vault --checkout X V`
+      # keeps the flag and hands this loop X and V as two plain positionals. Taking the
+      # last would drop the checkout the caller named and link a different one in
+      # silence.
+      if [ -n "${VAULT_SEEN:-}" ]; then
+        if [ "${npm_config_checkout:-}" = "true" ]; then
+          echo "npm kept --checkout for itself; rerun as:" >&2
+          echo "  npm run vault -- --checkout $VAULT_SEEN $1" >&2
+        else
+          echo "only one vault path may be given: $VAULT_SEEN and $1" >&2
+        fi
+        usage >&2
+        exit 2
+      fi
+      VAULT="$1"; VAULT_SEEN="$1"; shift ;;
   esac
 done
 
