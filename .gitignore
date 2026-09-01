@@ -6,3 +6,5 @@ data.json
 .hotreload
 data.json.bak
 coverage/
+transcript.jsonl
+transcript.jsonl.gz

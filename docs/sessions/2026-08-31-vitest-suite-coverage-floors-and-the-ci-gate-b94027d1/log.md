@@ -1,7 +1,6 @@
 ---
 saved_at: 2026-08-31T18:45:00Z
 session_id: b94027d1-7d14-47e7-bfe6-70594b821584
-transcript: transcript.jsonl.gz
 ---
 
 # Vitest suite, coverage floors, and the CI that guards them
