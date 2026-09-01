@@ -1,5 +1,5 @@
 ---
-saved_at: 2026-09-01T12:35:36Z
+saved_at: 2026-09-01T12:46:57Z
 session_id: 80777d5c-e314-47eb-a4a5-b2f92b1efdbd
 transcript: transcript.jsonl.gz
 ---
@@ -115,6 +115,63 @@ path}`) rather than a `TFile`, and `ParsedRef.chapter` to
   shell's Homebrew Node (25.8.1) does not match the `.tool-versions` pin
   (25.6.1) the pre-commit hook enforces.
 
+## 2026-09-01T12:46:57Z — update
+
+A code review over the whole branch diff (~4,600 added lines: the stub, the
+DOM setup, the harness, six test files, the config and the README). Four
+findings, all of them tests that cannot fail rather than source bugs — which
+is the failure mode a suite this size actually has.
+
+- **`src/view.test.ts:258`** — the Alt-click test asserts
+  `world.workspace.opened` is empty _synchronously_. But `jumpTo` awaits
+  `findAnchor` before it calls `openLinkText`, so deleting the `return` in
+  `view.ts`'s `evt.altKey` branch leaves the assertion passing. Its two
+  siblings already had to use `await vi.waitFor(...)` for that very reason.
+  The fix is a spy on `plugin.jumpTo` with `not.toHaveBeenCalled()` — exact
+  and synchronous, unlike the observable it watches now.
+- **`src/main.test.ts:803`** — `'opens the picker on the versions that do'`
+  asserts only that no notice was raised. Delete the
+  `new VersionSuggestModal(...).open()` from `promptVersion` and it still
+  passes. Spy on `SuggestModal.prototype.open` instead.
+- **`src/settings.test.ts:111`** — `opens <name> on the setting in force`
+  compares the rendered checkbox against the same settings field it was
+  rendered from. Swapping `setValue(settings.showBreadcrumbs)` and
+  `setValue(settings.followCursor)` in `settings.ts` passes this test _and_
+  its `onChange` sibling, because both default to `true`. The same hole
+  covers the four fields that share `false`. Render a non-default value and
+  assert the literal.
+- **`src/breadcrumbs.test.ts:540`** — the teardown calls
+  `Reflect.deleteProperty` on `offsetWidth`/`offsetHeight`, which removes
+  jsdom's native getters rather than restoring them, and never restores the
+  `window.innerWidth`/`innerHeight` that `size()` overwrote (left at 100).
+  Any `describe` added below gets `left: NaNpx` out of `CrumbMenu.place`.
+  Save the descriptors and put them back.
+
+What was checked and cleared, since knowing what did _not_ turn up is worth as
+much as the list above:
+
+- **Missing `await`s across every async call in the tests.** The distinction
+  that matters: `openChapter` reaches `openLinkText` before its first `await`,
+  so the arrow and book/chapter-menu tests may assert synchronously and are
+  correct; `jumpTo` awaits `findAnchor` first, so the version-crumb and
+  card-click tests must use `vi.waitFor`, and do. Only `view.test.ts:258` got
+  the distinction wrong.
+- **Class identity through the alias.** `instanceof MarkdownView` /
+  `instanceof TFolder` in the source and `new stub.MarkdownView(...)` in the
+  harness resolve to the same module, so the checks are real.
+  `Plugin.addCommand` replacing by id matches Obsidian, so the test that calls
+  `registerVersionCommands` twice is honest.
+- **Cross-test leakage.** `clearNotices()` and `MarkdownRenderer.rendered = []`
+  are reset wherever asserted; `breadcrumbs.test.ts` clears `document.body`;
+  `view.unload()` stops the polling interval. The `document` click listener
+  that `main.test.ts` leaks by never unloading the plugins it loads is inert
+  today — `lockPreviewVerse` is called directly there, and a
+  `document`-dispatched event has a non-Element target — so it was left off
+  the list rather than reported as a bug that does not bite.
+- **The reading-mode fixtures.** The `getBoundingClientRect` stubs give the
+  binary search in `previewVerse` real, distinguishing geometry rather than
+  jsdom's uniform zeros, so those tests measure what they claim to.
+
 ## Open Questions
 
 - [ ] Thirteen branches are still uncovered, all of them fallbacks a stubbed
@@ -128,6 +185,10 @@ path}`) rather than a `TFile`, and `ParsedRef.chapter` to
       `obsidian.d.ts` — nothing asserts the stub's own shape matches it. An
       Obsidian API change that the plugin does not use could drift silently.
       Worth a type-level check, or is the compile-time split enough?
+- [ ] The review turned up three tests that pass whatever the source does. Is
+      that a sign to add a mutation-testing pass (Stryker) over `src`, rather
+      than trusting coverage percentages, which were 100% across all three of
+      those files?
 
 ## Action Items
 
@@ -139,3 +200,8 @@ path}`) rather than a `TFile`, and `ParsedRef.chapter` to
 - [ ] Merge PR #19 once `Check` is green — `main` carries a ruleset requiring
       it with `strict: true`, so rebase again rather than merge if `main`
       moves first.
+- [ ] Fix the four review findings before merging: the synchronous negative
+      assertion at `view.test.ts:258`, the picker that is never asserted at
+      `main.test.ts:803`, the self-referential toggle check at
+      `settings.test.ts:111`, and the teardown at `breadcrumbs.test.ts:540`
+      that deletes jsdom's layout accessors instead of restoring them.
