@@ -7,7 +7,16 @@
 # Idempotent: safe to invoke on every SessionStart.
 set -euo pipefail
 
-beads_dir="${CLAUDE_PROJECT_DIR}/.beads"
+# Only `session-start.sh` exports CLAUDE_PROJECT_DIR, so fall back the way it
+# does — otherwise a hand-run of this script aborts on the unset variable
+# before reaching the guards that were meant to make it a no-op.
+# The `|| true` keeps `set -e` out of it: outside a git repo `rev-parse` exits
+# 128, and an assignment carries its substitution's status.
+project_dir="${CLAUDE_PROJECT_DIR:-}"
+[ -n "$project_dir" ] || project_dir="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+[ -n "$project_dir" ] || exit 0
+
+beads_dir="${project_dir}/.beads"
 
 [ -d "$beads_dir" ] || exit 0
 chmod 700 "$beads_dir" 2>/dev/null || true  # bd warns on group/other-readable .beads
@@ -21,7 +30,7 @@ if [ ! -e "${beads_dir}/dolt" ] && [ ! -e "${beads_dir}/embeddeddolt" ]; then
   ln -s embeddeddolt "${beads_dir}/dolt"
 fi
 
-cd "$CLAUDE_PROJECT_DIR"
+cd "$project_dir"
 bd bootstrap --yes >/dev/null 2>&1 || {
   printf 'bootstrap-bd: bd bootstrap failed (continuing)\n' >&2
 }
