@@ -59,7 +59,12 @@ Turn the bar off under **Chapter breadcrumbs**.
 Type `@` and a reference anywhere in a note to link to it. The suggestion list shows the
 books you could have meant with the opening verse of the passage, and picking one replaces
 what you typed with ordinary internal links. Each row reads as the reference it will write,
-so what you pick is what the note ends up saying.
+so what you pick is what the note ends up saying. Enter inserts it; Tab inserts the same
+thing and leaves the label selected, so the next thing you type renames the link — `@Sl 1.1`
+then Tab writes `[[ARA-19-Salmos-001#^ara-psa-1-1|Sl 1.1]]` with `Sl 1.1` highlighted, ready
+to become `Salmo 1` or anything else. A run of verses writes a link each and Tab selects the
+first label, the only one spelling the reference out; embeds carry no label, so there Tab
+inserts the way Enter does.
 
 | You type      | You get                                                                                             |
 | ------------- | --------------------------------------------------------------------------------------------------- |
