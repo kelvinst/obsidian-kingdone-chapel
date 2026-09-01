@@ -2,6 +2,13 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    // `obsidian` publishes types and no code, so anything importing it by
+    // value — every module that extends one of the app's classes — cannot be
+    // loaded outside the app. Point it at a stand-in holding the parts of the
+    // app that the plugin's own code touches.
+    alias: {
+      obsidian: new URL('./test/obsidian.ts', import.meta.url).pathname,
+    },
     coverage: {
       provider: 'v8',
       // Every source file, not only the ones a test happened to import — a
@@ -36,10 +43,10 @@ export default defineConfig({
         },
         // And what the project as a whole has to hold, which is low because
         // most of it has no tests yet. It is here to be climbed.
-        statements: 14.91,
-        branches: 20.86,
-        functions: 14.34,
-        lines: 14.03,
+        statements: 17.28,
+        branches: 22.87,
+        functions: 16.25,
+        lines: 16.52,
       },
     },
   },

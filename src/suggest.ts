@@ -68,6 +68,7 @@ const INSTRUCTIONS: Instruction[] = [
   { command: ';@3.1', purpose: 'same book again' },
   { command: '!@', purpose: 'to embed' },
   { command: '↵', purpose: 'to insert' },
+  { command: '⇥', purpose: 'to insert and rename' },
 ];
 
 /** Rows a whole popup may hold, so a query naming no version and matching
@@ -77,6 +78,14 @@ const MAX_ROWS = 12;
 /** Books one version is offered under. A query reaching for several versions
  * splits this between them rather than growing the popup. */
 const MAX_BOOKS = 6;
+
+/**
+ * The popup's own list of rows, which holds which of them is highlighted.
+ * Obsidian does not expose it, but Tab has to reach the very row Enter would.
+ */
+interface SuggestionList {
+  useSelectedItem(evt: KeyboardEvent): boolean;
+}
 
 /** One way the query could be linked: a book the reader may have meant, in one
  * version, under one of the names they may want it written as. */
@@ -107,6 +116,16 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
     // it is discoverable from the rows themselves — a reader who never learns
     // the dash simply never asks for another version.
     this.setInstructions(INSTRUCTIONS);
+    // Enter takes the row as it reads; Tab takes the same row and leaves its
+    // label selected, for when the wording wants a word of your own. Only a
+    // Tab that took a row answers false — the key goes on indenting the line
+    // when the popup had nothing to give it, which is what Obsidian's own
+    // link popup does with it.
+    this.scope.register([], 'Tab', (evt) => {
+      const list = (this as unknown as { suggestions?: SuggestionList })
+        .suggestions;
+      if (!evt.isComposing && list?.useSelectedItem(evt)) return false;
+    });
   }
 
   onTrigger(
@@ -566,17 +585,53 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
       el.createEl('small', { text: item.preview, cls: 'kcp-preview' });
   }
 
-  selectSuggestion(item: RefSuggestion) {
+  selectSuggestion(item: RefSuggestion, evt: MouseEvent | KeyboardEvent) {
     const ctx = this.context;
     if (!ctx) return;
     ctx.editor.replaceRange(item.markdown, ctx.start, ctx.end);
-    // Embeds run a line per verse, so the cursor lands at the end of the last
-    // of them rather than that far along the line it started on.
-    const lines = item.markdown.split('\n');
+    // Tab asks to rename what it just wrote, so it leaves the label selected
+    // and the next thing typed replaces it. Markdown carrying no label —
+    // every embed — has nothing to rename, and lands the cursor as Enter does.
+    // Read off the event rather than its class: a popped-out window carries a
+    // `KeyboardEvent` of its own, which is not this window's.
+    const label =
+      'key' in evt && evt.key === 'Tab' ? this.labelSpan(item.markdown) : null;
+    if (label) {
+      ctx.editor.setSelection(
+        this.at(item.markdown, label[0], ctx.start),
+        this.at(item.markdown, label[1], ctx.start),
+      );
+      return;
+    }
+    ctx.editor.setCursor(
+      this.at(item.markdown, item.markdown.length, ctx.start),
+    );
+  }
+
+  /**
+   * Where the label of the first link sits in the markdown, as offsets into
+   * it. A run of verses writes a link each, and only the first of them carries
+   * the reference spelled out — the rest are the bare verse numbers under it —
+   * so the first label is the one worth handing over to be rewritten.
+   */
+  labelSpan(markdown: string): [number, number] | null {
+    const m = markdown.match(/\[\[[^\]\n]*\|([^\]\n]*)\]\]/);
+    if (!m || m.index === undefined) return null;
+    const start = m.index + m[0].indexOf('|') + 1;
+    return [start, start + m[1].length];
+  }
+
+  /**
+   * Where an offset into the written markdown lands in the note. Embeds run a
+   * line per verse, so anything past the first line sits at its own start
+   * rather than that far along the line the reference was typed on.
+   */
+  at(markdown: string, offset: number, start: EditorPosition): EditorPosition {
+    const lines = markdown.slice(0, offset).split('\n');
     const last = lines[lines.length - 1];
-    ctx.editor.setCursor({
-      line: ctx.start.line + lines.length - 1,
-      ch: lines.length > 1 ? last.length : ctx.start.ch + last.length,
-    });
+    return {
+      line: start.line + lines.length - 1,
+      ch: lines.length > 1 ? last.length : start.ch + last.length,
+    };
   }
 }
