@@ -773,8 +773,6 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
       .map((f) => f.chapter)
       .filter((c): c is number => c !== null);
     const spelled = referenceLabels(here.book, asked, verses, name);
-    // An embed writes no label at all, so there is nothing to choose between
-    // and the one row stands for both.
     // Every shape the passage embeds as, which is the choice `!@` offers in
     // place of the labels it does not write.
     const shapes = embed
