@@ -8,19 +8,19 @@
  * translation it is based on.
  *
  * So a folder says so itself, in the note it already keeps. Any note sitting
- * directly in a folder with `bible-source` in its frontmatter makes that folder
+ * directly in a folder with a `bible-` key in its frontmatter makes that folder
  * a version, wherever in the vault it is and however deeply it is buried:
  *
  *     ---
- *     bible-source: Editions
- *     code: Shedd
- *     name: Bíblia Shedd
- *     order: 20
+ *     bible-group: Editions
+ *     bible-code: Shedd
+ *     bible-name: Bíblia Shedd
+ *     bible-order: 20
  *     ---
  *
- * The key's own value is the heading the version is listed under, so the
- * grouping is the vault's to name — `Translations`, `Editions`, `Comentários`,
- * anything — rather than a set of kinds this plugin decides on.
+ * `bible-group` is the heading it is listed under, so the grouping is the
+ * vault's to name — `Translations`, `Editions`, `Comentários`, anything —
+ * rather than a set of kinds this plugin decides on.
  *
  * Declaring is not required. The direct subfolders of the translations folder
  * are still versions on their own, headed as translations, so a vault that only
@@ -30,8 +30,22 @@
 import { TFolder } from 'obsidian';
 import type { App, TAbstractFile, TFile } from 'obsidian';
 
-/** Frontmatter key a note uses to say the folder it sits in is a version. */
-export const SOURCE_KEY = 'bible-source';
+/**
+ * What every frontmatter key this plugin reads begins with.
+ *
+ * The prefix is the whole of the marker: a note carrying any key under it says
+ * the folder it sits in is a version, and there is nothing to write twice. It
+ * has to be a prefix and not a bare name, because presence is what declares
+ * and every note in the vault is asked — `type`, `group` and `name` are among
+ * the most written keys there are, and any of them would have vaults growing
+ * versions they never asked for.
+ */
+export const SOURCE_PREFIX = 'bible-';
+
+/** Whether a note's frontmatter says the folder it sits in is a version. */
+export function declaresSource(front: Record<string, unknown>): boolean {
+  return Object.keys(front).some((key) => key.startsWith(SOURCE_PREFIX));
+}
 
 /** A folder holding one version's notes, and how it is named and listed. */
 export interface Source {
@@ -81,7 +95,7 @@ export function collectSources(
 
   for (const file of files) {
     const front = app.metadataCache.getFileCache(file)?.frontmatter;
-    if (!front || !(SOURCE_KEY in front)) continue;
+    if (!front || !declaresSource(front)) continue;
     const folder = file.parent;
     if (!folder || out.has(folder.path)) continue;
     out.set(folder.path, declared(folder, front, file.path));
@@ -105,21 +119,27 @@ export function collectSources(
   return out;
 }
 
-/** Read a declaring note's frontmatter, filling in what it leaves out. */
+/**
+ * Read a declaring note's frontmatter, filling in what it leaves out.
+ *
+ * Every key is optional — the folder's own name is a code, and a code is a
+ * label — so the least a folder can say is one of them, whichever it had a
+ * reason to write. A folder naming no `bible-group` is listed under no
+ * heading, the same as one in no folder the settings name.
+ */
 function declared(
   folder: TFolder,
   front: Record<string, unknown>,
   declaredBy: string,
 ): Source {
-  // `bible-source: true` is a folder that says it is a version and nothing
-  // more; anything written out is the heading it wants to be listed under.
-  const code = text(front.code) || folder.name;
+  const order = front[SOURCE_PREFIX + 'order'];
+  const code = text(front[SOURCE_PREFIX + 'code']) || folder.name;
   return {
     path: folder.path,
     code,
-    label: text(front.name) || code,
-    group: text(front[SOURCE_KEY]),
-    order: typeof front.order === 'number' ? front.order : 0,
+    label: text(front[SOURCE_PREFIX + 'name']) || code,
+    group: text(front[SOURCE_PREFIX + 'group']),
+    order: typeof order === 'number' ? order : 0,
     declaredBy,
   };
 }

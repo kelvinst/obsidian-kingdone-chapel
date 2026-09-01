@@ -215,30 +215,37 @@ as they are not: a study Bible is a version verse for verse, but it belongs with
 commentaries rather than with the translation it is built on.
 
 So a folder can say it is a version itself. Any note sitting **directly in the folder** — the
-one it probably already keeps — with `bible-source` in its frontmatter makes that folder a
+one it probably already keeps — with a `bible-` key in its frontmatter makes that folder a
 version, wherever in the vault it is and however deeply it is buried:
 
 ```yaml
 ---
-bible-source: Editions
-code: Shedd
-name: Bíblia Shedd
-order: 20
+bible-group: Editions
+bible-code: Shedd
+bible-name: Bíblia Shedd
+bible-order: 20
 ---
 ```
 
-| Key            |                                                                                                                                                                                                            |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bible-source` | Marks the folder, and names the heading the version is listed under. `true` for no heading.                                                                                                                |
-| `code`         | What the version's file names start with, and what `@ARA Joao 1.1` calls it. The folder's name when left out, so a folder may be called `Almeida Revista e Atualizada` and still hold `ARA-01-GEN-001.md`. |
-| `name`         | Name to show wherever the version is named. The code when left out.                                                                                                                                        |
-| `order`        | Where it sits among the versions sharing its heading — and where that heading sits, which is its earliest version's. Alphabetical when left out.                                                           |
+| Key           |                                                                                                                                                                                                            |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bible-group` | The heading the version is listed under. No heading when left out.                                                                                                                                         |
+| `bible-code`  | What the version's file names start with, and what `@ARA Joao 1.1` calls it. The folder's name when left out, so a folder may be called `Almeida Revista e Atualizada` and still hold `ARA-01-GEN-001.md`. |
+| `bible-name`  | Name to show wherever the version is named. The code when left out.                                                                                                                                        |
+| `bible-order` | Where it sits among the versions sharing its heading — and where that heading sits, which is its earliest version's. Alphabetical when left out.                                                           |
+
+Every one of them is optional, and carrying any one of them is what declares the folder — so
+the shortest declaration is the one key you had a reason to write, usually `bible-group`. The
+prefix is not decoration: presence is what declares, every note in the vault is asked, and
+`name`, `group` and `order` are among the most written frontmatter keys there are. A bare one
+would have vaults growing versions they never asked for, and would read whatever a note
+already used those keys for.
 
 The heading is the vault's to name, not the plugin's: `Editions`, `Comentários`, anything —
 except the one the translations folder gives its own, which the plugin writes in the language
 book names are read in (**Traduções**, **Translations**). Naming none is a heading of its own,
 ordered like the rest: those versions are listed together, under no heading, wherever the
-lowest `order` among them puts them.
+lowest `bible-order` among them puts them.
 
 Declaring is optional and adds to the translations folder rather than replacing it, so a vault
 that keeps every version in one place needs none of it:

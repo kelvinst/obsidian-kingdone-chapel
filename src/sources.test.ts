@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { TFolder } from 'obsidian';
 import type { App, TAbstractFile } from 'obsidian';
 
-import { SOURCE_KEY, collectSources, sortSources, sourceOf } from './sources';
+import { collectSources, sortSources, sourceOf } from './sources';
 import type { Source } from './sources';
 
 type Folder = TFolder;
@@ -83,7 +83,7 @@ describe('collectSources', () => {
     const found = collect(
       vault([
         note('Igreja/Comentarios/Shedd/Shedd.md', shedd, {
-          [SOURCE_KEY]: 'Editions',
+          'bible-group': 'Editions',
         }),
       ]),
       'Igreja/Biblias',
@@ -104,10 +104,10 @@ describe('collectSources', () => {
     const found = collect(
       vault([
         note('Bibles/Almeida Revista e Atualizada/index.md', ara, {
-          [SOURCE_KEY]: ' Translations ',
-          code: ' ARA ',
-          name: ' Almeida Revista e Atualizada ',
-          order: 10,
+          'bible-group': ' Translations ',
+          'bible-code': ' ARA ',
+          'bible-name': ' Almeida Revista e Atualizada ',
+          'bible-order': 10,
         }),
       ]),
       'Bibles',
@@ -126,8 +126,8 @@ describe('collectSources', () => {
     const found = collect(
       vault([
         note('Notes/Shedd/Shedd.md', shedd, {
-          [SOURCE_KEY]: true,
-          order: 'soon',
+          'bible-name': 'Shedd',
+          'bible-order': 'soon',
         }),
       ]),
       'Bibles',
@@ -151,7 +151,7 @@ describe('collectSources', () => {
 
   it('ignores a declaring note that is in no folder at all', () => {
     const found = collect(
-      vault([note('loose.md', null, { [SOURCE_KEY]: 'Editions' })]),
+      vault([note('loose.md', null, { 'bible-group': 'Editions' })]),
       'Bibles',
     );
 
@@ -162,8 +162,8 @@ describe('collectSources', () => {
     const shedd = folder('Notes/Shedd');
     const found = collect(
       vault([
-        note('Notes/Shedd/Shedd.md', shedd, { [SOURCE_KEY]: 'Editions' }),
-        note('Notes/Shedd/also.md', shedd, { [SOURCE_KEY]: 'Notes' }),
+        note('Notes/Shedd/Shedd.md', shedd, { 'bible-group': 'Editions' }),
+        note('Notes/Shedd/also.md', shedd, { 'bible-group': 'Notes' }),
       ]),
       'Bibles',
     );
@@ -201,7 +201,7 @@ describe('collectSources', () => {
     const ara = folder('Bibles/ARA', bibles);
     const found = collect(
       vault(
-        [note('Bibles/ARA/ARA.md', ara, { [SOURCE_KEY]: 'Translations' })],
+        [note('Bibles/ARA/ARA.md', ara, { 'bible-group': 'Translations' })],
         bibles,
       ),
       'Bibles',
