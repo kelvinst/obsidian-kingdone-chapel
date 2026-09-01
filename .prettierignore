@@ -2,3 +2,6 @@
 main.js
 package-lock.json
 coverage/
+
+# Managed by beads — rewriting these would fight `bd`'s own generators.
+.beads/

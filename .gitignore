@@ -7,3 +7,12 @@ data.json
 data.json.bak
 data.json.*.bak
 coverage/
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
+
+# Symlink created by .kix/hooks/bootstrap-bd.sh to redirect the auto-started
+# Dolt server's data dir into bd bootstrap's embedded layout (bd 1.0.3 quirk).
+.beads/dolt
