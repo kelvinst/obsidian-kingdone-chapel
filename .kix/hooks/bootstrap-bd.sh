@@ -16,7 +16,10 @@ project_dir="${CLAUDE_PROJECT_DIR:-}"
 [ -n "$project_dir" ] || project_dir="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 [ -n "$project_dir" ] || exit 0
 
-cd "$project_dir"
+# Fail soft like every other guard here: a resumed session can name a checkout
+# that has since been renamed or removed, and that is nothing to do, not an
+# error to report.
+cd "$project_dir" 2>/dev/null || exit 0
 
 # `bd` keeps one .beads/ per repository, at the primary checkout — a worktree
 # shares it rather than getting its own. Anchor on the same directory it does,
