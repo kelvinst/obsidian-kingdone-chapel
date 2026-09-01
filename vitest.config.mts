@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url';
+
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
@@ -7,7 +9,7 @@ export default defineConfig({
     // loaded outside the app. Point it at a stand-in holding the parts of the
     // app that the plugin's own code touches.
     alias: {
-      obsidian: new URL('./test/obsidian.ts', import.meta.url).pathname,
+      obsidian: fileURLToPath(new URL('./test/obsidian.ts', import.meta.url)),
     },
     coverage: {
       provider: 'v8',
