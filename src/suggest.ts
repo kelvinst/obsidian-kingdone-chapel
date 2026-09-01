@@ -706,6 +706,9 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
     from: TFile | null,
     name: string | null,
   ): Promise<RefSuggestion[]> {
+    // `getSuggestions` answers a null run with `TOO_MANY` and never gets
+    // here, so the fallback is for the type rather than for a caller.
+    /* v8 ignore next */
     const numbers = asked.numbers || [];
     const rows = (chapters: number[], verses: number[], bare: string[]) =>
       this.passageRows(here, chapters, verses, bare, embed, from, name).catch(
@@ -729,6 +732,9 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
       // on its own: a note already saying which passage it is about says the
       // rest by naming the version, `as NVI has it`.
       const said = here.chapter ? [here.chapter] : [];
+      // Nothing but a version can leave the numbers empty, and a version
+      // that was written is a version to name, so the label is always there.
+      /* v8 ignore next */
       const one = await rows(said, [], name ? [name] : []);
       return [one.bare, ...one.full].filter(
         (row): row is RefSuggestion => row !== null,

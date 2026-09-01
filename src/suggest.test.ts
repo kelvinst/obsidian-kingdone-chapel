@@ -11,7 +11,7 @@ import { FakeEditor, chapter, chapterPath, harness } from '../test/harness';
 import type { Harness } from '../test/harness';
 import { ReferenceSuggest } from './suggest';
 import type { RefSuggestion } from './suggest';
-import type { ChapterTarget } from './types';
+import type { ChapterTarget, KingdoneChapelSettings } from './types';
 import type KingdoneChapelPlugin from './main';
 
 const vault = {
@@ -38,6 +38,28 @@ function context(query: string, file: TFile | null = null) {
     start: { line: 0, ch: 0 },
     end: { line: 0, ch: query.length },
   } as unknown as EditorSuggestContext;
+}
+
+/**
+ * The rows a query offers as links. A hint is a row that says why a query
+ * found nothing rather than something to insert, so it is not one of these —
+ * `hinted` below is what reads that kind.
+ */
+async function offered(
+  ctx: EditorSuggestContext,
+  from: ReferenceSuggest = suggest,
+): Promise<RefSuggestion[]> {
+  const rows = await from.getSuggestions(ctx);
+  return rows.filter((row): row is RefSuggestion => !('hint' in row));
+}
+
+/** What a query said about itself, where it had nothing to offer. */
+async function hinted(
+  ctx: EditorSuggestContext,
+  from: ReferenceSuggest = suggest,
+): Promise<string[]> {
+  const rows = await from.getSuggestions(ctx);
+  return rows.flatMap((row) => ('hint' in row ? [row.hint] : []));
 }
 
 /** A line, with the cursor at its end — which is where typing leaves it. */
@@ -298,24 +320,26 @@ describe('onTrigger', () => {
 
 describe('getSuggestions', () => {
   it('offers the abbreviation that was typed, then the name spelled out', async () => {
-    const rows = await suggest.getSuggestions(context('Gn 1.1'));
+    const rows = await offered(context('Gn 1.1'));
     expect(rows.map((r) => r.ref)).toEqual(['Gn 1.1', 'Gênesis 1.1']);
-    expect(rows[0].book).toBe('Gênesis');
+    // The chip beside an abbreviation spells the whole reference out, not
+    // only the book: `Gn 1.1` says as little about the passage as the book.
+    expect(rows[0].book).toBe('Gênesis 1.1');
     expect(rows[0].markdown).toBe('[[NVI-01-GEN-001#^nvi-gen-1-1|Gn 1.1]]');
   });
 
   it('offers one row where the name is what was written', async () => {
-    const rows = await suggest.getSuggestions(context('Gênesis 1'));
+    const rows = await offered(context('Gênesis 1'));
     expect(rows.map((r) => r.ref)).toEqual(['Gênesis 1']);
   });
 
   it('shows the opening verse of the passage', async () => {
-    const [row] = await suggest.getSuggestions(context('Gn 1.2'));
+    const [row] = await offered(context('Gn 1.2'));
     expect(row.preview).toBe('Era a terra sem forma e vazia.');
   });
 
   it('writes a run of verses as one link, to a quote of the passage', async () => {
-    const [row] = await suggest.getSuggestions(context('Gn 1.1-2'));
+    const [row] = await offered(context('Gn 1.1-2'));
     expect(row.ref).toBe('Gn 1.1,2');
     expect(row.markdown).toBe('[[#^nvi-gen-1-1-2|Gn 1.1,2]]');
     // The verse-by-verse references are not lost: they are the embeds the
@@ -330,21 +354,21 @@ describe('getSuggestions', () => {
     });
   });
 
+  it('names the version in the label only when it was asked for', async () => {
+    const plain = await offered(context('Gn 1'));
+    expect(plain[0].ref).toBe('Gn 1');
+    const named = await offered(context('NVI Gn 1'));
+    expect(named[0].ref).toBe('Gn 1 - NVI');
+  });
+
   it('names the version in a passage label too, when it was asked for', async () => {
-    const [row] = await suggest.getSuggestions(context('NVI Gn 1.1-2'));
+    const [row] = await offered(context('NVI Gn 1.1-2'));
     expect(row.ref).toBe('Gn 1.1,2 - NVI');
     expect(row.markdown).toBe('[[#^nvi-gen-1-1-2|Gn 1.1,2 - NVI]]');
   });
 
-  it('names the version in the label only when it was asked for', async () => {
-    const plain = await suggest.getSuggestions(context('Gn 1'));
-    expect(plain[0].ref).toBe('Gn 1');
-    const named = await suggest.getSuggestions(context('NVI Gn 1'));
-    expect(named[0].ref).toBe('Gn 1 - NVI');
-  });
-
   it('splits the popup between the versions a half-written one reaches', async () => {
-    const rows = await suggest.getSuggestions(context('Gn 1 -nv'));
+    const rows = await offered(context('Gn 1 -nv'));
     expect(rows.map((r) => r.ref)).toEqual([
       'Gn 1 - NVI',
       'Gênesis 1 - NVI',
@@ -354,24 +378,24 @@ describe('getSuggestions', () => {
   });
 
   it('offers nothing for a query that is not a reference', async () => {
-    expect(await suggest.getSuggestions(context('-nvi'))).toEqual([]);
+    expect(await offered(context('-nvi'))).toEqual([]);
   });
 
   it('offers nothing when the vault holds no version at all', async () => {
     const empty = harness();
     const bare = new ReferenceSuggest(empty.plugin);
-    expect(await bare.getSuggestions(context('Gn 1'))).toEqual([]);
+    expect(await offered(context('Gn 1'), bare)).toEqual([]);
   });
 
   it('leaves out a book the version does not carry', async () => {
-    const rows = await suggest.getSuggestions(context('Ap 1'));
+    const rows = await offered(context('Ap 1'));
     expect(rows).toEqual([]);
   });
 
   it('leaves out a book whose file has gone away since it was indexed', async () => {
     world.plugin.index();
     world.vault.contents.delete(chapterPath('NVI', 1, 'GEN', 1));
-    expect(await suggest.getSuggestions(context('Gn 1'))).toEqual([]);
+    expect(await offered(context('Gn 1'))).toEqual([]);
   });
 
   it('writes the link from the note it is being typed in', async () => {
@@ -379,7 +403,7 @@ describe('getSuggestions', () => {
       chapterPath('NVI', 43, 'JHN', 1),
     ) as TFile;
     const linktext = vi.spyOn(world.metadataCache, 'fileToLinktext');
-    await suggest.getSuggestions(context('Gn 1.1', from));
+    await offered(context('Gn 1.1', from));
     expect(linktext).toHaveBeenCalledWith(expect.anything(), from.path, true);
   });
 
@@ -393,8 +417,9 @@ describe('getSuggestions', () => {
       );
     }
     const many = harness(crowded, { language: 'pt' });
-    const rows = await new ReferenceSuggest(many.plugin).getSuggestions(
+    const rows = await offered(
       context('Jo 1 -'),
+      new ReferenceSuggest(many.plugin),
     );
     expect(rows).toHaveLength(12);
   });
@@ -402,7 +427,7 @@ describe('getSuggestions', () => {
 
 describe('an embed', () => {
   it('offers the whole file, and then a verse at a time', async () => {
-    const rows = await suggest.getSuggestions(context('!Gn 1'));
+    const rows = await offered(context('!Gn 1'));
     expect(rows.map((r) => r.note)).toEqual(['whole file', 'verse by verse']);
     expect(rows[0].markdown).toBe('![[NVI-01-GEN-001]]');
     expect(rows[1].markdown).toBe(
@@ -413,26 +438,26 @@ describe('an embed', () => {
   });
 
   it('names the passage rather than writing a label of its own', async () => {
-    const [row] = await suggest.getSuggestions(context('!Gn 1'));
+    const [row] = await offered(context('!Gn 1'));
     expect(row.ref).toBe('Gênesis 1');
     expect(row.markdown).not.toContain('|');
   });
 
   it('offers the one row for the verses that were asked for', async () => {
-    const rows = await suggest.getSuggestions(context('!Gn 1.1,2'));
+    const rows = await offered(context('!Gn 1.1,2'));
     expect(rows.map((r) => r.markdown)).toEqual([
       '![[NVI-01-GEN-001#^nvi-gen-1-1]]\n![[NVI-01-GEN-001#^nvi-gen-1-2]]',
     ]);
   });
 
   it('embeds the note listing a book when no chapter was named', async () => {
-    const rows = await suggest.getSuggestions(context('!Gn'));
+    const rows = await offered(context('!Gn'));
     expect(rows.map((r) => r.markdown)).toEqual(['![[NVI-01-Gênesis]]']);
     expect(rows[0].preview).toBe('');
   });
 
   it('names the version in the row where it was asked for', async () => {
-    const rows = await suggest.getSuggestions(context('!Gn 1 -nvi'));
+    const rows = await offered(context('!Gn 1 -nvi'));
     expect(rows[0].ref).toBe('Gênesis 1 - NVI');
   });
 
@@ -441,13 +466,13 @@ describe('an embed', () => {
       chapterPath('NVI', 43, 'JHN', 1),
     ) as TFile;
     const linktext = vi.spyOn(world.metadataCache, 'fileToLinktext');
-    await suggest.getSuggestions(context('!Gn 1', from));
+    await offered(context('!Gn 1', from));
     expect(linktext).toHaveBeenCalledWith(expect.anything(), from.path, true);
   });
 
   it('leaves the verse-by-verse row off a file carrying no anchors', async () => {
     world.vault.write(chapterPath('NVI', 1, 'GEN', 1), '1. Sem âncoras');
-    const rows = await suggest.getSuggestions(context('!Gn 1'));
+    const rows = await offered(context('!Gn 1'));
     expect(rows.map((r) => r.note)).toEqual(['whole file']);
   });
 });
@@ -459,9 +484,6 @@ describe('versionsFor', () => {
         {
           version: 'n',
           versionPrefix: true,
-          book: 'Gn',
-          chapters: [1],
-          verses: [],
         },
         null,
       ),
@@ -474,9 +496,6 @@ describe('versionsFor', () => {
         {
           version: '',
           versionPrefix: true,
-          book: 'Gn',
-          chapters: [1],
-          verses: [],
         },
         null,
       ),
@@ -489,9 +508,6 @@ describe('versionsFor', () => {
         {
           version: 'ntlh',
           versionPrefix: false,
-          book: 'Gn',
-          chapters: [1],
-          verses: [],
         },
         null,
       ),
@@ -504,9 +520,6 @@ describe('versionsFor', () => {
         {
           version: null,
           versionPrefix: false,
-          book: 'Gn',
-          chapters: [1],
-          verses: [],
         },
         null,
       ),
@@ -519,9 +532,6 @@ describe('versionsFor', () => {
         {
           version: 'vulgata',
           versionPrefix: false,
-          book: 'Gn',
-          chapters: [1],
-          verses: [],
         },
         null,
       ),
@@ -548,7 +558,7 @@ describe('forms', () => {
 
 describe('a reference naming no chapter', () => {
   it('links the note listing the book’s chapters', async () => {
-    const rows = await suggest.getSuggestions(context('Gênesis'));
+    const rows = await offered(context('Gênesis'));
     expect(rows[0]).toMatchObject({
       ref: 'Gênesis',
       preview: '',
@@ -557,23 +567,23 @@ describe('a reference naming no chapter', () => {
   });
 
   it('embeds that note whole', async () => {
-    const rows = await suggest.getSuggestions(context('!Gênesis'));
+    const rows = await offered(context('!Gênesis'));
     expect(rows[0].markdown).toBe('![[NVI-01-Gênesis]]');
   });
 
   it('falls back to the opening chapter where there is no such note', async () => {
-    const rows = await suggest.getSuggestions(context('João'));
+    const rows = await offered(context('João'));
     expect(rows[0].markdown).toBe('[[NVI-43-JHN-001|João]]');
   });
 
   it('offers nothing for a book the version does not carry', async () => {
-    expect(await suggest.getSuggestions(context('Levítico'))).toEqual([]);
+    expect(await offered(context('Levítico'))).toEqual([]);
   });
 });
 
 describe('a chapter the version has yet to write', () => {
   it('links it by name, with no anchor and no preview', async () => {
-    const rows = await suggest.getSuggestions(context('Gn 40.2'));
+    const rows = await offered(context('Gn 40.2'));
     expect(rows[0]).toMatchObject({
       ref: 'Gn 40.2',
       preview: '',
@@ -582,12 +592,12 @@ describe('a chapter the version has yet to write', () => {
   });
 
   it('embeds it by name too', async () => {
-    const rows = await suggest.getSuggestions(context('!Gn 40.2'));
+    const rows = await offered(context('!Gn 40.2'));
     expect(rows[0].markdown).toBe('![[NVI-01-GEN-040]]');
   });
 
   it('has no verses to offer it one at a time, so embeds it whole', async () => {
-    const rows = await suggest.getSuggestions(context('!Gn 40'));
+    const rows = await offered(context('!Gn 40'));
     expect(rows.map((r) => r.note)).toEqual(['whole file']);
     expect(rows[0].markdown).toBe('![[NVI-01-GEN-040]]');
   });
@@ -735,7 +745,7 @@ describe('a reference carried on after a semicolon', () => {
   }
 
   it('counts a bare number as a verse of the chapter carried from', async () => {
-    const rows = await suggest.getSuggestions(carried(after('3'), '3'));
+    const rows = await offered(carried(after('3'), '3'));
     expect(rows.map((r) => r.ref)).toEqual(['3', 'Gênesis 1.3']);
     expect(rows[0].markdown).toBe('[[NVI-01-GEN-001#^nvi-gen-1-3|3]]');
     expect(rows[0].book).toBe('Gênesis');
@@ -744,13 +754,13 @@ describe('a reference carried on after a semicolon', () => {
 
   it('takes the chapter from the reference when it names one', async () => {
     const { suggest } = twoChapters();
-    const rows = await suggest.getSuggestions(carried(after('2.1'), '2.1'));
+    const rows = await offered(carried(after('2.1'), '2.1'), suggest);
     expect(rows.map((r) => r.ref)).toEqual(['2.1', 'Gênesis 2.1']);
     expect(rows[0].markdown).toBe('[[NVI-01-GEN-002#^nvi-gen-2-1|2.1]]');
   });
 
   it('carries a run of verses as one link, to a quote of the passage', async () => {
-    const rows = await suggest.getSuggestions(carried(after('1-2'), '1-2'));
+    const rows = await offered(carried(after('1-2'), '1-2'));
     expect(rows[0].ref).toBe('1,2');
     // The same id the spelled-out reference writes, so a carried run finds the
     // quote that is already there rather than writing a second one.
@@ -760,12 +770,12 @@ describe('a reference carried on after a semicolon', () => {
 
   it('names the chapter alone where the reference gave no verse', async () => {
     const { suggest } = twoChapters();
-    const rows = await suggest.getSuggestions(carried(after('2.'), '2.'));
+    const rows = await offered(carried(after('2.'), '2.'), suggest);
     expect(rows.map((r) => r.ref)).toEqual(['2', 'Gênesis 2']);
   });
 
   it('embeds the carried passage', async () => {
-    const rows = await suggest.getSuggestions(carried(after('!3'), '!3'));
+    const rows = await offered(carried(after('!3'), '!3'));
     expect(rows[0].markdown).toBe('![[NVI-01-GEN-001#^nvi-gen-1-3]]');
     expect(rows[0].ref).toBe('Gênesis 1.3');
   });
@@ -775,28 +785,28 @@ describe('a reference carried on after a semicolon', () => {
       chapterPath('NVI', 43, 'JHN', 1),
     ) as TFile;
     const place = vi.spyOn(world.metadataCache, 'getFirstLinkpathDest');
-    await suggest.getSuggestions(carried(after('3'), '3', from));
+    await offered(carried(after('3'), '3', from));
     expect(place).toHaveBeenCalledWith('NVI-01-GEN-001', from.path);
   });
 
   it('carries nothing where no link comes before the semicolon', async () => {
-    expect(await suggest.getSuggestions(carried('Veja ; @2', '2'))).toEqual([]);
+    expect(await offered(carried('Veja ; @2', '2'))).toEqual([]);
   });
 
   it('carries nothing from a link to something that is no chapter', async () => {
     const line = 'Veja [[NVI-01-Gênesis]]; @2';
-    expect(await suggest.getSuggestions(carried(line, '2'))).toEqual([]);
+    expect(await offered(carried(line, '2'))).toEqual([]);
   });
 
   it('carries nothing from a link the vault cannot place', async () => {
     const line = 'Veja [[Não existe]]; @2';
-    expect(await suggest.getSuggestions(carried(line, '2'))).toEqual([]);
+    expect(await offered(carried(line, '2'))).toEqual([]);
   });
 
   it('carries nothing from a version the vault does not hold', async () => {
     const line = 'Veja [[ACF-01-GEN-001]]; @2';
     world.vault.write('Outros/ACF-01-GEN-001.md', '1. No princípio ^a');
-    expect(await suggest.getSuggestions(carried(line, '2'))).toEqual([]);
+    expect(await offered(carried(line, '2'))).toEqual([]);
   });
 
   it('carries nothing from a note that only reads like a chapter', async () => {
@@ -804,7 +814,7 @@ describe('a reference carried on after a semicolon', () => {
     // thing that tells a chapter from a note named to look like one.
     world.vault.write('Estudos/NVI-01-GEN-009.md', 'Uma nota.');
     const line = 'Veja [[Estudos/NVI-01-GEN-009]]; @2';
-    expect(await suggest.getSuggestions(carried(line, '2'))).toEqual([]);
+    expect(await offered(carried(line, '2'))).toEqual([]);
   });
 
   it('leaves a bare verse to the books where the book is one file', async () => {
@@ -814,18 +824,261 @@ describe('a reference carried on after a semicolon', () => {
     );
     const suggest = new ReferenceSuggest(mens.plugin);
     const line = 'Veja [[MENS-01-GEN-000]]; @2';
-    expect(await suggest.getSuggestions(carried(line, '2'))).toEqual([]);
+    expect(await offered(carried(line, '2'), suggest)).toEqual([]);
   });
 
   it('carries nothing where the version has no such chapter', async () => {
-    const rows = await suggest.getSuggestions(carried(after('40.1'), '40.1'));
+    const rows = await offered(carried(after('40.1'), '40.1'));
     expect(rows).toEqual([]);
   });
 
   it('leaves the passage out where the file has gone away', async () => {
     world.plugin.index();
     world.vault.contents.delete(chapterPath('NVI', 1, 'GEN', 1));
-    expect(await suggest.getSuggestions(carried(after('3'), '3'))).toEqual([]);
+    expect(await offered(carried(after('3'), '3'))).toEqual([]);
+  });
+});
+
+describe('a number read against the passage the note is about', () => {
+  /**
+   * A note that links one chapter, and the popup for a query typed in it. The
+   * link is what the numbers are counted from — a note says which passage it
+   * is about once, and goes on writing about it.
+   */
+  function about(
+    target: string,
+    files: Record<string, string> = vault,
+    settings: Partial<KingdoneChapelSettings> = {},
+  ) {
+    const world = harness(files, {
+      language: 'pt',
+      defaultVersion: 'NVI',
+      ...settings,
+    });
+    const from = world.vault.write('Estudos/Nota.md', 'Um estudo.');
+    world.metadataCache.links.set(from.path, [target]);
+    return { world, from, suggest: new ReferenceSuggest(world.plugin) };
+  }
+
+  it('offers the verse of the chapter, then the chapter of the book', async () => {
+    const { from, suggest } = about('NVI-01-GEN-001');
+    const rows = await offered(context('2', from), suggest);
+    expect(rows.map((r) => r.ref)).toEqual([
+      '2',
+      '2',
+      'Gênesis 1.2',
+      'Gênesis 2',
+    ]);
+  });
+
+  it('says beside each what the number was counted as', async () => {
+    const { from, suggest } = about('NVI-01-GEN-001');
+    const [verse, chapter] = await offered(context('2', from), suggest);
+    expect(verse.book).toBe('Gênesis 1.2');
+    expect(chapter.book).toBe('Gênesis 2');
+  });
+
+  it('writes the numbers back as the label they were typed as', async () => {
+    const { from, suggest } = about('NVI-01-GEN-001');
+    const [verse] = await offered(context('2', from), suggest);
+    expect(verse.markdown).toBe('[[NVI-01-GEN-001#^nvi-gen-1-2|2]]');
+  });
+
+  it('reads a run both ways, and says each the short way', async () => {
+    const { from, suggest } = about('NVI-01-GEN-001');
+    const rows = await offered(context('1-3', from), suggest);
+    expect(rows.map((r) => r.ref)).toEqual([
+      '1,2,3',
+      '1,2,3',
+      'Gênesis 1.1,2,3',
+      'Gênesis 1,2,3',
+    ]);
+    // The label spells every number, the way the links read once written;
+    // the chip beside it closes the run up, the way it is said.
+    expect(rows[0].book).toBe('Gênesis 1.1-3');
+    expect(rows[1].book).toBe('Gênesis 1-3');
+  });
+
+  it('takes a chapter written in front of the numbers as its own', async () => {
+    const { from, suggest } = about('NVI-01-GEN-001', {
+      ...vault,
+      ...chapter('NVI', 1, 'GEN', 2, ['Assim foram concluídos os céus.']),
+    });
+    const rows = await offered(context('2.1', from), suggest);
+    expect(rows.map((r) => r.ref)).toEqual(['2.1', 'Gênesis 2.1']);
+    expect(rows[0].markdown).toBe('[[NVI-01-GEN-002#^nvi-gen-2-1|2.1]]');
+  });
+
+  it('links a verse of a chapter the version has yet to write', async () => {
+    const { from, suggest } = about('NVI-01-GEN-001');
+    const rows = await offered(context('40.2', from), suggest);
+    // No file to read, so no anchor to stop at and no verse to show — the
+    // link lands on the name the chapter would be written under.
+    expect(rows.map((r) => r.ref)).toEqual(['40.2', 'Gênesis 40.2']);
+    expect(rows[0].markdown).toBe('[[NVI-01-GEN-040|40.2]]');
+    expect(rows[0].preview).toBe('');
+  });
+
+  it('asks for the note own passage again when only a version is named', async () => {
+    const { from, suggest } = about('NVI-01-GEN-001');
+    const rows = await offered(context('ntlh', from), suggest);
+    expect(rows.map((r) => r.ref)).toEqual(['NTLH', 'Gênesis 1 - NTLH']);
+    expect(rows[0].markdown).toBe('[[NTLH-01-GEN-001|NTLH]]');
+  });
+
+  it('offers the passage in every version a half-written name reaches', async () => {
+    const { from, suggest } = about('NVI-01-GEN-001');
+    const rows = await offered(context('1 -nv', from), suggest);
+    expect(rows.map((r) => r.book)).toEqual([
+      'Gênesis 1.1 - NVI',
+      'Gênesis 1 - NVI',
+      'Gênesis 1.1 - NVI',
+      'Gênesis 1 - NVI',
+      'Gênesis 1.1 - NVT',
+      'Gênesis 1 - NVT',
+      'Gênesis 1.1 - NVT',
+      'Gênesis 1 - NVT',
+    ]);
+  });
+
+  it('embeds the passage rather than labelling it', async () => {
+    const { from, suggest } = about('NVI-01-GEN-001');
+    const rows = await offered(context('!1', from), suggest);
+    expect(rows.map((r) => r.markdown)).toEqual([
+      '![[NVI-01-GEN-001#^nvi-gen-1-1]]',
+      '![[NVI-01-GEN-001]]',
+      '![[NVI-01-GEN-001#^nvi-gen-1-1]]\n![[NVI-01-GEN-001#^nvi-gen-1-2]]' +
+        '\n![[NVI-01-GEN-001#^nvi-gen-1-3]]',
+    ]);
+  });
+
+  it('leaves the books to answer under the rows it offers', async () => {
+    const { from, suggest } = about('NVI-01-GEN-001');
+    const rows = await offered(context('1', from), suggest);
+    expect(rows.some((r) => r.ref === 'Gênesis 1')).toBe(true);
+  });
+
+  it('says so where the note holds no passage to read a number against', async () => {
+    const bare = harness(vault, { language: 'pt', defaultVersion: 'NVI' });
+    const from = bare.vault.write('Estudos/Solta.md', 'Sem links.');
+    const alone = new ReferenceSuggest(bare.plugin);
+    expect(await hinted(context('2', from), alone)).toEqual([
+      'No link in this note to read a book from — write one',
+    ]);
+  });
+
+  it('says so where the run reaches past what a reference may carry', async () => {
+    const { from, suggest } = about('NVI-01-GEN-001');
+    expect(await hinted(context('1-99', from), suggest)).toEqual([
+      'More verses than one reference can carry — ask for fewer',
+    ]);
+    expect(await offered(context('1-99', from), suggest)).toEqual([]);
+  });
+
+  it('says so where a run is too long to be chapters but not verses', async () => {
+    const { from, suggest } = about('NVI-01-GEN-001');
+    expect(await hinted(context('1-26', from), suggest)).toEqual([
+      'More chapters than one reference can carry — read as verses',
+    ]);
+  });
+
+  it('counts no verse against a book that opens with no chapter', async () => {
+    const { from, suggest } = about(
+      'MENS-01-GEN-000',
+      {
+        'Bibles/MENS/MENS-01-GEN-000.md': '1. Todo o livro ^mens-gen-0-1',
+      },
+      { defaultVersion: 'MENS' },
+    );
+    const rows = await offered(context('1', from), suggest);
+    expect(rows.map((r) => r.ref)).toEqual(['1', 'Gênesis 1']);
+  });
+
+  it('says nothing about verses where none were read', async () => {
+    const { from, suggest } = about(
+      'MENS-01-GEN-000',
+      {
+        'Bibles/MENS/MENS-01-GEN-000.md': '1. Todo o livro ^mens-gen-0-1',
+      },
+      { defaultVersion: 'MENS' },
+    );
+    expect(await hinted(context('1-26', from), suggest)).toEqual([]);
+  });
+
+  it('drops the verses where the file they sit in has gone away', async () => {
+    const { world, from, suggest } = about('NVI-01-GEN-001');
+    world.plugin.index();
+    world.vault.contents.delete(chapterPath('NVI', 1, 'GEN', 1));
+    // The chapter the note is about can no longer be read, so nothing is
+    // counted in it — but the same number still names a chapter of the book.
+    const rows = await offered(context('2', from), suggest);
+    expect(rows.map((r) => r.book)).toEqual(['Gênesis 2', 'Gênesis 2']);
+  });
+
+  it('asks for the book itself where the note is about a whole book', async () => {
+    const { from, suggest } = about(
+      'MENS-01-GEN-000',
+      { 'Bibles/MENS/MENS-01-GEN-000.md': '1. Todo o livro ^mens-gen-0-1' },
+      { defaultVersion: 'MENS' },
+    );
+    // A chapter of 0 is the book's introduction, so naming a version alone
+    // asks for the book, not for a chapter of it.
+    const rows = await offered(context('mens', from), suggest);
+    expect(rows.map((r) => r.ref)).toEqual(['MENS', 'Gênesis - MENS']);
+  });
+
+  it('offers nothing in a version that does not carry the book', async () => {
+    const { from, suggest } = about('NVI-43-JHN-001');
+    expect(await offered(context('ntlh', from), suggest)).toEqual([]);
+  });
+
+  it('writes no bare row where nothing was typed to label it', async () => {
+    const { world, suggest } = about('NVI-01-GEN-001');
+    const here = world.plugin.locationOf(
+      world.vault.getAbstractFileByPath(
+        chapterPath('NVI', 1, 'GEN', 1),
+      ) as TFile,
+      null,
+    );
+    if (!here) throw new Error('no passage to read against');
+    const rows = await suggest.passageRows(
+      here,
+      [1],
+      [],
+      [],
+      false,
+      null,
+      null,
+    );
+    expect(rows.bare).toBeNull();
+    expect(rows.full.map((r) => r.ref)).toEqual(['Gênesis 1']);
+  });
+
+  it('stops reading versions once the popup has no room left', async () => {
+    const crowded: Record<string, string> = {};
+    for (const version of ['NVA', 'NVB', 'NVC', 'NVD']) {
+      Object.assign(crowded, chapter(version, 1, 'GEN', 1, ['No princípio']));
+    }
+    const { from, suggest } = about('NVA-01-GEN-001', crowded, {
+      defaultVersion: 'NVA',
+    });
+    // Four rows a version, and four versions the dash reaches: the popup
+    // fills before the last of them, and the books are left no room at all.
+    const rows = await offered(context('1 -nv', from), suggest);
+    expect(rows).toHaveLength(12);
+    expect(rows.every((r) => r.book.startsWith('Gênesis'))).toBe(true);
+  });
+
+  it('renders a hint as the word it is, with nothing to insert', () => {
+    const el = document.createElement('div');
+    suggest.renderSuggestion({ hint: 'Nada por aqui' }, el);
+    expect(el.textContent).toBe('Nada por aqui');
+    const editor = new FakeEditor('@2');
+    suggest.selectSuggestion(
+      { hint: 'Nada por aqui' },
+      new MouseEvent('click'),
+    );
+    expect(editor.getLine(0)).toBe('@2');
   });
 });
 

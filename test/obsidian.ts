@@ -178,6 +178,15 @@ export function normalizePath(path: string): string {
   return path.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
 }
 
+/**
+ * The file part of a link, without the heading or block it goes on to name:
+ * `NVI-43-JHN-001#^nvi-jhn-1-1` points at the chapter, and it is the chapter
+ * that has to be looked up.
+ */
+export function getLinkpath(linktext: string): string {
+  return linktext.split('#')[0];
+}
+
 export class MarkdownRenderer {
   /** Every render since the last reset, so a test can see what was drawn. */
   static rendered: { markdown: string; path: string }[] = [];
