@@ -382,7 +382,9 @@ export default class KingdoneChapelPlugin extends Plugin {
   /** The files claiming `loc` in `version`, when more than one does. */
   conflictFor(version: string, loc: Location): TFile[] | null {
     this.index(); // conflicts are a by-product of building it
-    for (const chapter of [loc.chapter, 0]) {
+    // The same pair `referenceFile` would have resolved through, so a version
+    // refused for a clash is named for the file the reader would have got.
+    for (const chapter of [loc.chapter, loc.chapter === 0 ? 1 : 0]) {
       const clash = this.chapterConflicts.get(
         `${version}/${chapterKey(loc.bookIndex, chapter)}`,
       );
@@ -854,10 +856,14 @@ export default class KingdoneChapelPlugin extends Plugin {
       );
     }
     if (!chapters) return null;
-    // Commentaries keep a single -000 file per book.
+    // A commentary keeps a single `-000` for the whole book where a translation
+    // keeps a file per chapter, so whichever of the two the reader is in, the
+    // other answers with the one it has: the book's own file for a chapter it
+    // never split, and the chapter the book opens on for a book it never
+    // gathered. Either way the version is offered rather than passed over.
     return (
       chapters.get(chapterKey(bookIndex, chapter)) ||
-      chapters.get(chapterKey(bookIndex, 0)) ||
+      chapters.get(chapterKey(bookIndex, chapter === 0 ? 1 : 0)) ||
       null
     );
   }
