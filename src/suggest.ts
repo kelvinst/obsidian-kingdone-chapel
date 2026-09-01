@@ -268,7 +268,13 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
           const versions = named
             ? this.versionsFor(asked, ctx.file)
             : [here.version];
+          // A half-written version stands for every version starting with it,
+          // and a lone dash for every version there is — each of them reading
+          // the vault for rows the popup has no room to show. Stop at the room
+          // there is, rather than filling it several times over.
+          const room = MAX_ROWS - hints.length;
           for (const version of versions) {
+            if (out.length >= room) break;
             out.push(
               ...(await this.contextSuggestions(
                 { ...here, version },
@@ -294,7 +300,7 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
         MAX_ROWS - out.length - hints.length,
       )),
     );
-    return [...out, ...hints];
+    return [...out.slice(0, MAX_ROWS - hints.length), ...hints];
   }
 
   /**
