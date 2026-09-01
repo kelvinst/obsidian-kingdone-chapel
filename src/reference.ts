@@ -205,6 +205,23 @@ export function parseBookless(query: string): BooklessRef | null {
 }
 
 /**
+ * A carried reference written as the numbers alone, the way it was typed:
+ * `3.1,2` keeps its chapter, `9,10` stays verses of the chapter it was counted
+ * from, and a chapter still missing its verse is the number itself. The book
+ * is left out of all of them — the reference before the semicolon said it.
+ */
+export function booklessLabels(
+  bookless: BooklessRef,
+  chapter: number,
+): string[] {
+  if (!bookless.verses.length) return [String(chapter)];
+  if (bookless.chapter === null) return bookless.verses.map(String);
+  return bookless.verses.map((v, i) =>
+    i === 0 ? `${chapter}.${v}` : String(v),
+  );
+}
+
+/**
  * How a reference reads in a note, one label per link. The first carries the
  * whole reference and the rest only their own number, joined the way they were
  * typed and the way they are written by hand: `João 1.1,2,3` for a run of

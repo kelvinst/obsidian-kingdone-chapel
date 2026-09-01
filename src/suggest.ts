@@ -16,7 +16,12 @@ import {
   nameLang,
   plain,
 } from './books';
-import { parseBookless, parseReference, referenceLabels } from './reference';
+import {
+  booklessLabels,
+  parseBookless,
+  parseReference,
+  referenceLabels,
+} from './reference';
 import { parseChapterName } from './utils';
 import type { BookMatch } from './books';
 import type { BooklessRef, ParsedRef } from './reference';
@@ -362,26 +367,13 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
           .map((label, i) => this.link(target, anchors[i] || null, label, from))
           .join(','),
       });
-      return [row(this.carriedLabels(bookless, chapter)), row(full)];
+      return [row(booklessLabels(bookless, chapter)), row(full)];
     } catch (e) {
       // The read goes to the file the index named, which may have gone away
       // since it was indexed. Leave the passage out rather than taking the
       // whole popup down with it.
       return [];
     }
-  }
-
-  /**
-   * The carried reference written as the numbers alone, the way it was typed:
-   * `3.1,2` keeps its chapter, `9,10` stays verses of the chapter it was
-   * counted from, and a chapter still missing its verse is the number itself.
-   */
-  carriedLabels(bookless: BooklessRef, chapter: number): string[] {
-    if (!bookless.verses.length) return [String(chapter)];
-    if (bookless.chapter === null) return bookless.verses.map(String);
-    return bookless.verses.map((v, i) =>
-      i === 0 ? `${chapter}.${v}` : String(v),
-    );
   }
 
   /**
