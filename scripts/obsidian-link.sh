@@ -68,8 +68,18 @@ while [ $# -gt 0 ]; do
       # silence.
       if [ -n "${VAULT_SEEN:-}" ]; then
         if [ "${npm_config_checkout:-}" = "true" ]; then
+          # Nothing in the order says which path was meant as which, so read them the
+          # way the checks further down do rather than assuming the checkout came
+          # first: a vault holds .obsidian. With neither path saying so there is no
+          # answer worth guessing, and the shape of the command is the honest reply.
           echo "npm kept --checkout for itself; rerun as:" >&2
-          echo "  npm run vault -- --checkout $VAULT_SEEN $1" >&2
+          if [ -d "$1/.obsidian" ]; then
+            echo "  npm run vault -- --checkout $VAULT_SEEN $1" >&2
+          elif [ -d "$VAULT_SEEN/.obsidian" ]; then
+            echo "  npm run vault -- --checkout $1 $VAULT_SEEN" >&2
+          else
+            echo "  npm run vault -- --checkout <checkout> <vault>" >&2
+          fi
         else
           echo "only one vault path may be given: $VAULT_SEEN and $1" >&2
         fi
