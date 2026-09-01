@@ -1,5 +1,5 @@
 ---
-saved_at: 2026-09-01T12:52:39Z
+saved_at: 2026-09-01T12:55:33Z
 session_id: 80777d5c-e314-47eb-a4a5-b2f92b1efdbd
 transcript: transcript.jsonl.gz
 ---
@@ -204,6 +204,35 @@ this branch. The other two findings — the self-referential toggle check in
 `settings.test.ts` and the teardown in `breadcrumbs.test.ts` that deletes
 jsdom's layout accessors — are still open.
 
+## 2026-09-01T12:55:33Z — update
+
+The last two review findings applied, each confirmed the same way: make the
+regression the finding describes, watch the test fail, revert.
+
+- **`src/settings.test.ts`** — the initial-value test for each switch now
+  renders from `!DEFAULT_SETTINGS[key]` and asserts that literal, rather than
+  comparing the checkbox to the same field it was drawn from. Assigning
+  through the key needed a real boolean-key type, so the `switches` table is
+  typed `[string, Switch][]`, where `Switch` is the boolean members of
+  `KingdoneChapelSettings` — the union that the whole settings key type would
+  otherwise widen to `never` on assignment. Verified by swapping the
+  `setValue` arguments for 'Chapter breadcrumbs' and 'Follow cursor' in
+  `settings.ts`: both tests fail now, where both passed before, because both
+  fields are `true` by default and agreed by accident.
+- **`src/breadcrumbs.test.ts`** — `where a list is placed` now captures the
+  four descriptors it overwrites (`HTMLElement.prototype.offsetWidth` and
+  `offsetHeight`, `window.innerWidth` and `innerHeight`) in a `beforeEach` and
+  puts them back in the `afterEach`, deleting only what had no descriptor to
+  start with. The old teardown called `Reflect.deleteProperty`, which removes
+  jsdom's own accessors rather than restoring them. Verified with a temporary
+  probe `describe` appended after the block: with the fix it sees jsdom's
+  `offsetWidth === 0` and `innerWidth === 1024`; with the old teardown it
+  failed on `expected undefined to be +0`. The probe was removed.
+
+All four findings from the review are now fixed, and `src/` itself is
+unchanged by any of them — every mutation was reverted. 446 tests,
+100 / 98.12 / 100 / 100.
+
 ## Open Questions
 
 - [ ] Thirteen branches are still uncovered, all of them fallbacks a stubbed
@@ -235,7 +264,8 @@ jsdom's layout accessors — are still open.
 - [x] Fix the synchronous negative assertion at `view.test.ts:258` and the
       picker that is never asserted at `main.test.ts:803`.
   - Both replaced with spies and confirmed by mutating the source they guard.
-- [ ] Fix the two review findings still open: the self-referential toggle
+- [x] Fix the two review findings still open: the self-referential toggle
       check at `settings.test.ts:111`, and the teardown at
       `breadcrumbs.test.ts:540` that deletes jsdom's layout accessors instead
       of restoring them.
+  - Both confirmed by mutation, the same way as the first two.
