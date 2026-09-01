@@ -1,40 +1,29 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 // `collectSources` asks `instanceof TFolder` to tell a folder from a note, so
-// it needs a TFolder to measure against. That is the whole of Obsidian these
-// functions touch — the rest of a vault reaches them as the plain shapes below.
-vi.mock('obsidian', () => {
-  class TFolder {
-    children: unknown[] = [];
-    parent: TFolder | null = null;
-    path: string;
-    name: string;
-    constructor(path: string) {
-      this.path = path;
-      this.name = path.split('/').pop() as string;
-    }
-  }
-  return { TFolder };
-});
-
+// these run against the stand-in `obsidian` resolves to under test. The rest
+// of a vault reaches them as the plain shapes below.
 import { TFolder } from 'obsidian';
 import type { App, TAbstractFile } from 'obsidian';
 
 import { SOURCE_KEY, collectSources, sortSources, sourceOf } from './sources';
 import type { Source } from './sources';
 
-type Folder = TFolder & { children: unknown[]; parent: Folder | null };
+type Folder = TFolder;
 type Note = {
   path: string;
   parent: Folder | null;
   front?: Record<string, unknown>;
 };
 
-const Ctor = TFolder as unknown as new (path: string) => Folder;
-
-/** A folder at `path`, filed under `parent` the way a vault files one. */
+/**
+ * A folder at `path`, filed under `parent` the way a vault files one. The
+ * app's own is built empty and filled in by the vault, so this fills it.
+ */
 function folder(path: string, parent: Folder | null = null): Folder {
-  const made = new Ctor(path);
+  const made = new TFolder();
+  made.path = path;
+  made.name = path.split('/').pop() as string;
   made.parent = parent;
   if (parent) parent.children.push(made);
   return made;
@@ -47,7 +36,9 @@ function note(
   front?: Record<string, unknown>,
 ): Note {
   const made: Note = { path, parent, front };
-  if (parent) parent.children.push(made);
+  // A note is only ever read for its path, its folder and its frontmatter, so
+  // it is written as those three rather than as the whole of a `TFile`.
+  if (parent) parent.children.push(made as unknown as TAbstractFile);
   return made;
 }
 
