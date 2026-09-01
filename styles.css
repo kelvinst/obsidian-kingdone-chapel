@@ -103,6 +103,21 @@
   margin: 0;
 }
 
+/* A version written as embeds of another brings that note's own type size in
+   with it — the embed renders as a note, and a note is not read at the size a
+   sidebar card is. Hand the card's own size back down through every part of
+   Obsidian's embed, which sets it at more than one of them. */
+.kcp-text .markdown-embed,
+.kcp-text .markdown-embed-content,
+.kcp-text .markdown-preview-view,
+.kcp-text .markdown-preview-sizer,
+.kcp-text .markdown-rendered,
+.kcp-text .markdown-rendered p,
+.kcp-text .markdown-rendered li {
+  font-size: inherit;
+  line-height: inherit;
+}
+
 .kcp-empty {
   padding: var(--size-4-4);
   color: var(--text-muted);
