@@ -306,6 +306,12 @@ export class ReferenceSuggest extends EditorSuggest<RefSuggestion> {
     embed: boolean,
     from: TFile | null,
   ): Promise<RefSuggestion[]> {
+    // A commentary keeps one file for the whole book, indexed as chapter zero,
+    // and there is no chapter there for a bare verse number to be counted in.
+    // Such a reference has to name its own chapter, and one that does not is
+    // left to the books below.
+    if (bookless.chapter === null && here.chapter === 0) return [];
+
     const chapter = bookless.chapter === null ? here.chapter : bookless.chapter;
     const file = this.plugin.referenceFile(
       here.version,
