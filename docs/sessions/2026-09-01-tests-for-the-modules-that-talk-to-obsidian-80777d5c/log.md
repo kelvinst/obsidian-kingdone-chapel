@@ -1,5 +1,5 @@
 ---
-saved_at: 2026-09-01T12:46:57Z
+saved_at: 2026-09-01T12:52:39Z
 session_id: 80777d5c-e314-47eb-a4a5-b2f92b1efdbd
 transcript: transcript.jsonl.gz
 ---
@@ -172,6 +172,38 @@ much as the list above:
   binary search in `previewVerse` real, distinguishing geometry rather than
   jsdom's uniform zeros, so those tests measure what they claim to.
 
+## 2026-09-01T12:52:39Z — update
+
+Two of the four review findings applied, each verified by mutation rather than
+by the suite going green — a test written to catch a regression is worth only
+what it catches, and the whole point of both findings was that the old
+assertions caught nothing.
+
+- **`src/view.test.ts`** — the Alt-click test now takes
+  `const jump = vi.spyOn(world.plugin, 'jumpTo')` and asserts
+  `not.toHaveBeenCalled()`, in place of the synchronous
+  `expect(world.workspace.opened).toHaveLength(0)`. A comment says why the
+  observable was the wrong one: the jump reads the file for an anchor before
+  it opens anything, so nothing is open yet either way. Verified by deleting
+  the `return;` from `view.ts`'s `evt.altKey` branch — the test now fails with
+  `expected "jumpTo" to not be called at all, but actually been called 1
+times`, where before it passed.
+- **`src/main.test.ts`** — `'opens the picker on the versions that do'` now
+  spies on `SuggestModal.prototype.open` from the stub and asserts it was
+  called once, then reads the instance back out of `open.mock.instances[0]` to
+  check the picker was opened on the right passage
+  (`'Gênesis 1 — pick a version'` — no verse, since the pane the test builds
+  has no editor) holding the right versions (`['ARA']`). That last part is why
+  the spy is left calling through rather than mocked out: the constructed
+  modal is the assertion. Verified by deleting the
+  `new VersionSuggestModal(...).open()` line from `promptVersion` — the test
+  now fails with `expected "open" to be called 1 times, but got 0 times`.
+
+Both mutations were reverted; `src/view.ts` and `src/main.ts` are untouched by
+this branch. The other two findings — the self-referential toggle check in
+`settings.test.ts` and the teardown in `breadcrumbs.test.ts` that deletes
+jsdom's layout accessors — are still open.
+
 ## Open Questions
 
 - [ ] Thirteen branches are still uncovered, all of them fallbacks a stubbed
@@ -200,8 +232,10 @@ much as the list above:
 - [ ] Merge PR #19 once `Check` is green — `main` carries a ruleset requiring
       it with `strict: true`, so rebase again rather than merge if `main`
       moves first.
-- [ ] Fix the four review findings before merging: the synchronous negative
-      assertion at `view.test.ts:258`, the picker that is never asserted at
-      `main.test.ts:803`, the self-referential toggle check at
-      `settings.test.ts:111`, and the teardown at `breadcrumbs.test.ts:540`
-      that deletes jsdom's layout accessors instead of restoring them.
+- [x] Fix the synchronous negative assertion at `view.test.ts:258` and the
+      picker that is never asserted at `main.test.ts:803`.
+  - Both replaced with spies and confirmed by mutating the source they guard.
+- [ ] Fix the two review findings still open: the self-referential toggle
+      check at `settings.test.ts:111`, and the teardown at
+      `breadcrumbs.test.ts:540` that deletes jsdom's layout accessors instead
+      of restoring them.

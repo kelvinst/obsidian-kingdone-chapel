@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TFile } from 'obsidian';
 
-import { clearNotices, notices } from '../test/obsidian';
+import { SuggestModal, clearNotices, notices } from '../test/obsidian';
 import {
   FakeEditor,
   chapter,
@@ -14,6 +14,7 @@ import {
 import type { Harness } from '../test/harness';
 import { VIEW_TYPE } from './types';
 import type { Location } from './types';
+import { VersionSuggestModal } from './modal';
 import { KingdoneChapelView } from './view';
 
 const GEN_1 = [
@@ -799,8 +800,14 @@ describe('promptVersion', () => {
         chapterPath('NVI', 1, 'GEN', 1),
       ) as TFile,
     });
+    const open = vi.spyOn(SuggestModal.prototype, 'open');
     await world.plugin.promptVersion();
-    expect(notices).toHaveLength(0);
+
+    expect(open).toHaveBeenCalledTimes(1);
+    // Opened on the passage in front, holding the versions that carry it.
+    const picker = open.mock.instances[0] as unknown as VersionSuggestModal;
+    expect(picker.placeholder).toBe('Gênesis 1 — pick a version');
+    expect(picker.getSuggestions('').map((i) => i.version)).toEqual(['ARA']);
   });
 });
 
