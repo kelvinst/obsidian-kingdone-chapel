@@ -73,10 +73,13 @@ while [ $# -gt 0 ]; do
           # first: a vault holds .obsidian. With neither path saying so there is no
           # answer worth guessing, and the shape of the command is the honest reply.
           echo "npm kept --checkout for itself; rerun as:" >&2
+          # %q, so a vault under "My Vault" or an iCloud path comes back out as a line
+          # that survives being pasted: printed raw, the space would split it into two
+          # positionals and land the reader on this same error again.
           if [ -d "$1/.obsidian" ]; then
-            echo "  npm run vault -- --checkout $VAULT_SEEN $1" >&2
+            printf '  npm run vault -- --checkout %q %q\n' "$VAULT_SEEN" "$1" >&2
           elif [ -d "$VAULT_SEEN/.obsidian" ]; then
-            echo "  npm run vault -- --checkout $1 $VAULT_SEEN" >&2
+            printf '  npm run vault -- --checkout %q %q\n' "$1" "$VAULT_SEEN" >&2
           else
             echo "  npm run vault -- --checkout <checkout> <vault>" >&2
           fi
