@@ -119,8 +119,9 @@ back into the commit they were run for.
 ## Beads & Dolt Bootstrap
 
 Beads data lives in a Dolt database that is **not** in git — the DoltHub remote
-`kelvinst/obsidian-kingdone-chapel` is the source of truth. Only the config
-(`.beads/config.yaml`, `.beads/metadata.json`) is versioned.
+`kelvinst/obsidian-kingdone-chapel` is the source of truth. Only the config and
+the ignore rules are versioned — `.beads/config.yaml`, `.beads/metadata.json`,
+`.beads/README.md`, and `.beads/.gitignore`; the database itself is not.
 
 `.kix/hooks/session-start.sh` makes a fresh clone self-sufficient: it installs
 the git hooks, downloads pinned `dolt` and `bd` binaries into `~/.local/bin`
