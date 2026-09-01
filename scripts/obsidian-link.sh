@@ -102,11 +102,14 @@ fi
 
 if [ -n "$CURRENT" ] && [ "$CURRENT" != "$TARGET" ] && [ -f "$CURRENT/data.json" ]; then
   # The vault's settings win, but keep whatever the target had so it is recoverable.
-  # Never overwrite an existing .bak: on a second switch back it would hold the copy
-  # this script wrote, not the settings the checkout started with.
-  if [ -f "$TARGET/data.json" ] && [ ! -f "$TARGET/data.json.bak" ]; then
-    cp "$TARGET/data.json" "$TARGET/data.json.bak"
-    echo "settings: saved the target's own data.json as data.json.bak"
+  # The backup is stamped with the time it was taken, so each switch into a checkout
+  # keeps the settings it replaced instead of writing over an earlier copy. Guarding a
+  # single data.json.bak kept the checkout's original but lost every state after it,
+  # which is the one that had just been in use.
+  if [ -f "$TARGET/data.json" ]; then
+    BAK="data.json.$(date -u +%Y%m%dT%H%M%SZ).bak"
+    cp "$TARGET/data.json" "$TARGET/$BAK"
+    echo "settings: saved the target's own data.json as $BAK"
   fi
   cp "$CURRENT/data.json" "$TARGET/data.json"
   echo "settings: copied data.json from $CURRENT"
