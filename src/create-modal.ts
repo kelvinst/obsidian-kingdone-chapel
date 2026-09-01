@@ -130,7 +130,12 @@ export class CreateVersionModal extends Modal {
   refuse(): string | null {
     if (!this.code) return 'Give the version a code.';
     if (/[\\/:]/.test(this.code)) return 'A code cannot carry / \\ or :.';
-    if (this.plugin.source(this.code)) {
+    // Asked the way the rest of the plugin asks it. A code is looked up by the
+    // name it is written under, but matched without case everywhere it is
+    // read, so `ara` beside `ARA` is one version twice over: they claim the
+    // one command id, `@ara` reaches whichever is listed first, and on a vault
+    // whose filesystem keeps no case they are the same folder.
+    if (this.plugin.findVersion(this.code)) {
       return `${this.code} is already a version in this vault.`;
     }
     const at = this.target();

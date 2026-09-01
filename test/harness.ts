@@ -133,6 +133,18 @@ export class FakeVault extends Emitter {
     return (this.byPath.get(path) || null) as TFile | TFolder | null;
   }
 
+  /** Write a file that is not there yet, refusing one that is. */
+  async create(path: string, content: string): Promise<TFile> {
+    if (this.byPath.has(path)) throw new Error(`already exists: ${path}`);
+    return this.write(path, content);
+  }
+
+  /** Make a folder that is not there yet, refusing one that is. */
+  async createFolder(path: string): Promise<TFolder> {
+    if (this.byPath.has(path)) throw new Error(`already exists: ${path}`);
+    return this.folder(path);
+  }
+
   async cachedRead(file: TFile): Promise<string> {
     const content = this.contents.get(file.path);
     // A file the index named can have gone away since; the plugin is written
