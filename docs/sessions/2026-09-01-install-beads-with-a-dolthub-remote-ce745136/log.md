@@ -1,5 +1,5 @@
 ---
-saved_at: 2026-09-01T12:55:00Z
+saved_at: 2026-09-01T13:22:00Z
 session_id: ce745136-1681-4d15-a513-2998b2dbc40e
 ---
 
@@ -106,25 +106,54 @@ taking the bd, dolt, and gitignore configuration from there.
   as a round-trip marker), `make setup` installing all five hooks,
   `prettier --check .` clean.
 
+## 2026-09-01 — the remote goes live
+
+- User created `kelvinst/obsidian-kingdone-chapel` on DoltHub. Confirmed by the
+  API error moving from `"no such repository"` to `"branch not found"` — the
+  repo exists and is empty.
+- They asked for `bd remote add origin kelvinst/obsidian-kingdone-chapel`.
+  There is no `bd remote` command — `bd` answers
+  `unknown command "remote"` and suggests `promote`. The verb is
+  `bd dolt remote add`, and `origin` was already registered in the previous
+  turn with the full `https://doltremoteapi.dolthub.com/...` URL, which is the
+  form it takes rather than a short `owner/repo`. Nothing to redo.
+- `bd dolt push` → `Push complete.` Verified from DoltHub's side rather than
+  taking bd's word for it: the SQL API over `main` returns `okc-8gc` in the
+  `issues` table. `bd dolt pull` is clean too, so the trip works both ways.
+- Closed `okc-8gc`, pushed again, and re-queried: DoltHub shows
+  `status: closed`, `closed_at: 2026-09-01 13:19:47`. That is the round trip
+  the issue existed to prove.
+
 ## Open Questions
 
 - [ ] Does `bd bootstrap` read `sync.remote` from `.beads/config.yaml` and
       register the Dolt remote on a fresh clone, or does every clone need a
       manual `bd dolt remote add origin <url>`? kix-agents has both set, so its
       behavior doesn't disambiguate.
-- [ ] `bd` printed `auto-export: git add failed: exit status 1` and
+- [x] `bd` printed `auto-export: git add failed: exit status 1` and
       `failed to commit config change: exit status 1` on write commands — the
       expected consequence of `issues.jsonl` now being gitignored, but worth
       confirming kix-agents shows the same and that nothing else is failing
       behind that message.
+  - Confirmed harmless. Running the add by hand in the primary checkout
+    reproduces it exactly: `git add .beads/issues.jsonl` →
+    `The following paths are ignored by one of your .gitignore files`, exit 1.
+    That is the `issues.jsonl` rule doing its job; bd just reports the refusal
+    rather than swallowing it. Nothing else hides behind the message.
 
 ## Action Items
 
-- [ ] Create `kelvinst/obsidian-kingdone-chapel` on
+- [x] Create `kelvinst/obsidian-kingdone-chapel` on
       https://www.dolthub.com/repositories/new, then run `bd dolt push`. The
       `origin` remote is already registered locally.
-- [ ] Close `okc-8gc` ("Verify DoltHub remote round-trip") once that push
+  - Repo created by the user; `bd dolt push` complete and verified against the
+    DoltHub SQL API.
+- [x] Close `okc-8gc` ("Verify DoltHub remote round-trip") once that push
       lands.
-- [ ] Add this session's `transcript.jsonl.gz` — copying it out of
-      `~/.claude/projects/` was refused by the permission classifier, so this
-      archive is the log only.
+  - `bd close okc-8gc`, pushed; DoltHub reflects `status: closed`.
+- [ ] Add this session's `transcript.jsonl.gz`. Retried after the remote work
+      and refused again — the permission classifier blocks reading
+      `~/.claude/projects/…/ce745136-*.jsonl`, so `gzip -c … > …` never runs.
+      Needs a Bash permission rule allowing reads under `~/.claude/projects/`;
+      until then this archive is the log only. Every re-save of this session
+      hits the same wall, so fix the rule rather than retrying.
