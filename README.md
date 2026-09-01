@@ -170,13 +170,13 @@ Planned additions, all sharing the same vault-native, no-lock-in approach:
 
 Used by the Bible version features. Only two things are structural:
 
-1. A **version** is a folder — each direct subfolder of the Bible folder, plus any folder
-   anywhere in the vault that [says so itself](#versions-kept-somewhere-else).
+1. A **version** is a folder — each direct subfolder of the translations folder, plus any
+   folder anywhere in the vault that [says so itself](#versions-kept-somewhere-else).
 2. Chapter files are named `<VERSION>-<NN>-<Book>-<CCC>.md` — version, book number, book name,
    chapter.
 
 ```
-<bibleFolder>/<VERSION>/<any folders you like>/<VERSION>-<NN>-<Book>-<CCC>.md
+<translationsFolder>/<VERSION>/<any folders you like>/<VERSION>-<NN>-<Book>-<CCC>.md
 ```
 
 Everything between the version folder and the file is ignored, so each version can be laid out
@@ -210,8 +210,8 @@ like two files claiming one chapter.
 
 ### Versions kept somewhere else
 
-Filing every version under the Bible folder is fine while they are all translations, and wrong
-as soon as they are not: a study Bible is a version verse for verse, but it belongs with the
+Filing every version in one folder is fine while they are all translations, and wrong as soon
+as they are not: a study Bible is a version verse for verse, but it belongs with the
 commentaries rather than with the translation it is built on.
 
 So a folder can say it is a version itself. Any note sitting **directly in the folder** — the
@@ -234,14 +234,14 @@ order: 20
 | `name`         | Name to show wherever the version is named. The code when left out.                                                                                                                                        |
 | `order`        | Where it sits among the versions sharing its heading — and where that heading sits, which is its earliest version's. Alphabetical when left out.                                                           |
 
-The heading is the vault's to name, not the plugin's: `Translations`, `Editions`,
-`Comentários`, anything. Naming none is a heading of its own, ordered like the rest —
-those versions are listed together, under no heading, wherever the lowest `order`
-among them puts them. Which is first in a vault that numbers nothing, since a version
-that is one by sitting in the Bible folder is an `order` of 0 and names no heading.
+The heading is the vault's to name, not the plugin's: `Editions`, `Comentários`, anything —
+except the one the translations folder gives its own, which the plugin writes in the language
+book names are read in (**Traduções**, **Translations**). Naming none is a heading of its own,
+ordered like the rest: those versions are listed together, under no heading, wherever the
+lowest `order` among them puts them.
 
-Declaring is optional and adds to the Bible folder rather than replacing it, so a vault that
-keeps every version in one place needs none of it:
+Declaring is optional and adds to the translations folder rather than replacing it, so a vault
+that keeps every version in one place needs none of it:
 
 ```
 Igreja/Biblias/ARA/…                        a version by where it sits
@@ -257,7 +257,7 @@ breadcrumbs, the same sidebar, the same `@` references.
 | Setting                          | Default       | What it does                                          |
 | -------------------------------- | ------------- | ----------------------------------------------------- |
 | Language                         | No preference | Language book names are read and written in           |
-| Bible folder                     | `Bibles`      | Folder holding the version folders                    |
+| Translations folder              | `Bibles`      | Folder holding one folder per translation             |
 | Default version for @ references | Automatic     | Version `@` references link to                        |
 | Open in new tab                  | off           | Off replaces the current tab                          |
 | Chapter breadcrumbs              | on            | The `Version > Book > Chapter` bar above each chapter |
@@ -266,8 +266,8 @@ breadcrumbs, the same sidebar, the same `@` references.
 | Show the version you are reading | off           | Include the current version in the list               |
 | Open sidebar on startup          | off           |                                                       |
 
-Versions are the subfolders of the Bible folder that hold chapter files. Use **Reload version
-list** after adding one.
+Versions are the subfolders of the translations folder that hold chapter files, plus every
+folder that declares itself one. Use **Reload version list** after adding one.
 
 ## Install
 
