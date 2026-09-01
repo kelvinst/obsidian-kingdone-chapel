@@ -1,5 +1,5 @@
 ---
-saved_at: 2026-09-01T12:43:05Z
+saved_at: 2026-09-01T12:51:10Z
 session_id: ed9eea63-4eb0-40de-af81-0a16bc32462d
 transcript: transcript.jsonl.gz
 ---
@@ -163,6 +163,20 @@ breadcrumb, reachable by `@`. Work happened on branch
   collects rows by `.kcp-crumb-item`, so its search still works with headings
   interleaved.
 
+## 2026-09-01T12:51:10Z — update (the ordering rule, settled in the docs)
+
+- Took the doc half of the choice left open above: reworded README.md:188
+  rather than changing `sortSources`.
+- The code's rule is the coherent one — naming no heading is a heading of its
+  own, ranked by its own lowest `order` like any other — so the README is what
+  was wrong for stating "listed first" as an absolute. Bending the sort to make
+  the absolute true would have added a special case to serve a sentence.
+- The reworded line says the rule and then why it still reads as "first" in
+  practice: a version that is one by sitting in the Bible folder is created
+  with `order: 0` and names no heading, so a vault that numbers nothing puts
+  every version it has in that bucket, at the front.
+- Docs only, so no test and no coverage movement.
+
 ## Open Questions
 
 - [ ] Should the `bible-source` frontmatter key name itself be a setting? It is
@@ -191,9 +205,10 @@ breadcrumb, reachable by `@`. Work happened on branch
       `^shedd-psa-3-3` block ids. It is `-000`-per-book today, so it answers at
       book granularity only; splitting makes it verse-exact with no further
       code.
-- [ ] Settle README.md:188 — either reword the ordering rule to what
+- [x] Settle README.md:188 — either reword the ordering rule to what
       `sortSources` does, or make "no heading first" unconditional in
       `sortSources` and cover it with a test. Raised by the second review pass.
+  - Reworded the README; `sortSources` left alone. See the update above.
 - [ ] Come back to Kelvin (personal studies). Deferred deliberately. Its
       sections are anchored by embeds of other versions' verses; stamping
       `^kelvin-psa-3-3` on them makes `parseVerseLine` and `verseIn` work with
