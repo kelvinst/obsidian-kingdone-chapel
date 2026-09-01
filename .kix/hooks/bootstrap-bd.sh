@@ -44,7 +44,12 @@ command -v dolt >/dev/null 2>&1 || exit 0
 # bd 1.0.3 quirk: `bd bootstrap` writes data into .beads/embeddeddolt/,
 # but the auto-started Dolt server expects data under .beads/dolt/.
 # Pre-creating a symlink makes both paths resolve to the same on-disk data.
-if [ ! -e "${beads_dir}/dolt" ] && [ ! -e "${beads_dir}/embeddeddolt" ]; then
+# `-L` as well as `-e`: a bootstrap that failed left this link pointing at an
+# `embeddeddolt` that was never created, and `-e` follows it to the missing
+# target and reports absent — so `ln` would refuse, `set -e` would abort, and
+# the retry below could never run.
+if [ ! -e "${beads_dir}/dolt" ] && [ ! -L "${beads_dir}/dolt" ] &&
+  [ ! -e "${beads_dir}/embeddeddolt" ]; then
   ln -s embeddeddolt "${beads_dir}/dolt"
 fi
 
@@ -75,4 +80,6 @@ fi
 # `beads.role` lives in .git/config, which no clone inherits, so every bd
 # command in a fresh checkout leads with a "not configured" warning. Default it
 # once, and leave an explicit choice — `contributor` on a fork — alone.
-git config --get beads.role >/dev/null 2>&1 || git config beads.role maintainer
+git config --get beads.role >/dev/null 2>&1 ||
+  git config beads.role maintainer 2>/dev/null ||
+  true
