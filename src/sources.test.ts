@@ -71,7 +71,6 @@ function source(over: Partial<Source> = {}): Source {
     code: 'c',
     label: 'c',
     group: '',
-    order: 0,
     declaredBy: '',
     ...over,
   };
@@ -94,12 +93,11 @@ describe('collectSources', () => {
       code: 'Shedd',
       label: 'Shedd',
       group: 'Editions',
-      order: 0,
       declaredBy: 'Igreja/Comentarios/Shedd/Shedd.md',
     });
   });
 
-  it('reads the name, code and order a declaring note gives', () => {
+  it('reads the name and code a declaring note gives', () => {
     const ara = folder('Bibles/Almeida Revista e Atualizada');
     const found = collect(
       vault([
@@ -107,7 +105,6 @@ describe('collectSources', () => {
           'bible-group': ' Translations ',
           'bible-code': ' ARA ',
           'bible-name': ' Almeida Revista e Atualizada ',
-          'bible-order': 10,
         }),
       ]),
       'Bibles',
@@ -117,7 +114,6 @@ describe('collectSources', () => {
       code: 'ARA',
       label: 'Almeida Revista e Atualizada',
       group: 'Translations',
-      order: 10,
     });
   });
 
@@ -127,13 +123,12 @@ describe('collectSources', () => {
       vault([
         note('Notes/Shedd/Shedd.md', shedd, {
           'bible-name': 'Shedd',
-          'bible-order': 'soon',
         }),
       ]),
       'Bibles',
     );
 
-    expect(found.get('Notes/Shedd')).toMatchObject({ group: '', order: 0 });
+    expect(found.get('Notes/Shedd')).toMatchObject({ group: '' });
   });
 
   it('ignores a note that says nothing, and one with no frontmatter at all', () => {
@@ -183,7 +178,6 @@ describe('collectSources', () => {
       code: 'ARA',
       label: 'ARA',
       group: 'Translations',
-      order: 0,
       declaredBy: '',
     });
   });
@@ -249,16 +243,7 @@ describe('sourceOf', () => {
 describe('sortSources', () => {
   const codes = (sorted: Source[]) => sorted.map((s) => s.code);
 
-  it('puts a heading where its earliest version puts it', () => {
-    const sorted = sortSources([
-      source({ code: 'Shedd', group: 'Editions', order: 20 }),
-      source({ code: 'ARA', group: 'Translations', order: 10 }),
-    ]);
-
-    expect(codes(sorted)).toEqual(['ARA', 'Shedd']);
-  });
-
-  it('names the headings apart when they start level', () => {
+  it('names the headings apart', () => {
     const sorted = sortSources([
       source({ code: 'Shedd', group: 'Editions' }),
       source({ code: 'Kelvin', group: 'Comentários' }),
@@ -276,22 +261,13 @@ describe('sortSources', () => {
     expect(codes(sorted)).toEqual(['ARA', 'Shedd']);
   });
 
-  it('orders the versions under one heading by their own number', () => {
+  it('orders the versions under one heading by their code', () => {
     const sorted = sortSources([
-      source({ code: 'NVI', group: 'Translations', order: 2 }),
-      source({ code: 'ARA', group: 'Translations', order: 1 }),
+      source({ code: 'NVI', group: 'Translations' }),
+      source({ code: 'ARA', group: 'Translations' }),
     ]);
 
     expect(codes(sorted)).toEqual(['ARA', 'NVI']);
-  });
-
-  it('falls back to the name where nothing is numbered', () => {
-    const sorted = sortSources([
-      source({ code: 'NVI' }),
-      source({ code: 'ACF' }),
-    ]);
-
-    expect(codes(sorted)).toEqual(['ACF', 'NVI']);
   });
 
   it('leaves what it was given alone', () => {

@@ -15,7 +15,6 @@
  *     bible-group: Editions
  *     bible-code: Shedd
  *     bible-name: Bíblia Shedd
- *     bible-order: 20
  *     ---
  *
  * `bible-group` is the heading it is listed under, so the grouping is the
@@ -62,8 +61,6 @@ export interface Source {
   label: string;
   /** Heading it is listed under, empty for none. */
   group: string;
-  /** Where it sits among the versions sharing its heading. */
-  order: number;
   /**
    * The note that declared this folder a version, empty for one that is a
    * version by where it sits. It is what says whether a note being edited
@@ -110,7 +107,6 @@ export function collectSources(
         code: child.name,
         label: child.name,
         group: translations,
-        order: 0,
         declaredBy: '',
       });
     }
@@ -132,14 +128,12 @@ function declared(
   front: Record<string, unknown>,
   declaredBy: string,
 ): Source {
-  const order = front[SOURCE_PREFIX + 'order'];
   const code = text(front[SOURCE_PREFIX + 'code']) || folder.name;
   return {
     path: folder.path,
     code,
     label: text(front[SOURCE_PREFIX + 'name']) || code,
     group: text(front[SOURCE_PREFIX + 'group']),
-    order: typeof order === 'number' ? order : 0,
     declaredBy,
   };
 }
@@ -167,30 +161,16 @@ export function sourceOf(
 }
 
 /**
- * Versions in the order they are listed in: by heading, then within it.
+ * Versions in the order they are listed in: by heading, then by code inside it.
  *
- * A heading sits where its earliest version puts it, so `order` alone arranges
- * both — numbering the versions numbers the headings they fall under, and a
- * vault that numbers nothing gets them alphabetically. Versions with no heading
- * come first, which is where a vault that declares none of them leaves every
- * version it has.
+ * Alphabetical both times, which needs nothing written down and reads the way
+ * a list of names is expected to. Versions naming no heading sort under the
+ * empty one, which is before every other, so they are listed first.
  */
 export function sortSources(sources: Source[]): Source[] {
-  const first = new Map<string, number>();
-  for (const source of sources) {
-    const at = first.get(source.group);
-    if (at === undefined || source.order < at)
-      first.set(source.group, source.order);
-  }
-  const rank = (source: Source) => first.get(source.group) ?? 0;
-
   return sources
     .slice()
     .sort(
-      (a, b) =>
-        rank(a) - rank(b) ||
-        a.group.localeCompare(b.group) ||
-        a.order - b.order ||
-        a.code.localeCompare(b.code),
+      (a, b) => a.group.localeCompare(b.group) || a.code.localeCompare(b.code),
     );
 }
