@@ -79,6 +79,8 @@ export default class KingdoneChapelPlugin extends Plugin {
   sourceFolders: Map<string, Source> | null = null;
   /** The same folders, by the name their files are prefixed with. */
   sourceCodes: Map<string, Source> = new Map();
+  /** The notes that declared a folder a version, by path. Built with them. */
+  declaringNotes: Set<string> = new Set();
   /** version -> book number -> the note listing that book's chapters. */
   bookNotes: Map<string, Map<number, TFile>> = new Map();
   /** version -> every chapter it holds, in reading order. Built on demand. */
@@ -159,18 +161,17 @@ export default class KingdoneChapelPlugin extends Plugin {
     // A note declaring its folder a version changes what the index holds, and
     // so does one that stops declaring it. `changed` fires on every edit to
     // every note, so only the two that could say either count: one carrying
-    // the key now, and one sitting where a version was already read from.
+    // the key now, and one the last answer was read from.
+    //
+    // The note, not its folder: a version laid out flat keeps its chapters
+    // beside the note that declares it, and every one of those saves would
+    // otherwise throw away the index and read the vault back in.
     this.registerEvent(
       this.app.metadataCache.on('changed', (file, _data, cache) => {
         const declares = cache.frontmatter
           ? SOURCE_KEY in cache.frontmatter
           : false;
-        const known = this.sourceFolders;
-        if (
-          declares ||
-          (file.parent && known !== null && known.has(file.parent.path))
-        )
-          moved();
+        if (declares || this.declaringNotes.has(file.path)) moved();
       }),
     );
     // Which folders are versions is read from the metadata cache, and on a
@@ -179,9 +180,14 @@ export default class KingdoneChapelPlugin extends Plugin {
     // the answer can be trusted, so drop whatever was decided before it and
     // stop listening: `resolved` fires again after every later edit, and by
     // then the handlers above have already said what changed.
+    // The commands go with it. Everything else reads the versions again on its
+    // next refresh, but a command is registered once and then stands, so one
+    // registered over half an answer keeps it: a version the cache had not got
+    // to yet would have no command until the list was reloaded by hand.
     const settled = this.app.metadataCache.on('resolved', () => {
       this.app.metadataCache.offref(settled);
       moved();
+      this.registerVersionCommands();
     });
     this.registerEvent(settled);
     this.register(() => this.cancelQueuedRefresh());
@@ -237,12 +243,15 @@ export default class KingdoneChapelPlugin extends Plugin {
     // version kept in two places: the index merges their files under the one
     // code, and the list names it once.
     const codes = new Map<string, Source>();
+    const declaring = new Set<string>();
     for (const source of folders.values()) {
       if (!codes.has(source.code)) codes.set(source.code, source);
+      if (source.declaredBy) declaring.add(source.declaredBy);
     }
 
     this.sourceFolders = folders;
     this.sourceCodes = codes;
+    this.declaringNotes = declaring;
     return folders;
   }
 
