@@ -30,14 +30,15 @@ in your vault, keeping chapter _and_ verse alignment.
 
 A study Bible, a commentary, a set of notes on the text — each of them is a version whose
 chapters answer a translation's chapters one for one, and none of them is worth typing out by
-hand. **Create a Bible version from a translation** asks for four things:
+hand. **Create a Bible version from a translation** asks for five things:
 
-|              |                                                                                                                  |
-| ------------ | ---------------------------------------------------------------------------------------------------------------- |
-| **Based on** | The translation it answers. Its folders, its file names and its verses are what the new version is written from. |
-| **Folder**   | Where the version folder is made. Made if it is not there.                                                       |
-| **Code**     | Names the folder, starts every file name, and opens every block id — what `@Shedd Joao 1.1` calls it.            |
-| **Name**     | What a reader sees. Follows the code until you write over it.                                                    |
+|              |                                                                                                                     |
+| ------------ | ------------------------------------------------------------------------------------------------------------------- |
+| **Based on** | The translation it answers. Its folders, its file names and its verses are what the new version is written from.    |
+| **Folder**   | Where the version folder is made. Made if it is not there.                                                          |
+| **Code**     | Names the folder, starts every file name, and opens every block id — what `@Shedd Joao 1.1` calls it.               |
+| **Name**     | What a reader sees. Follows the code until you write over it.                                                       |
+| **Heading**  | What it is listed under, beside the translations rather than among them. Left empty it is listed first, under none. |
 
 It then copies the translation's layout, renaming only the segments that carry the version —
 `5-NT-Gospels/ARA-41-MRK/ARA-41-MRK-014.md` becomes `5-NT-Gospels/Shedd-41-MRK/Shedd-41-MRK-014.md`
