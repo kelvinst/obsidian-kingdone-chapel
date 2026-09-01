@@ -156,11 +156,16 @@ type Row = RefSuggestion | HintSuggestion;
  */
 interface ContextRows {
   bare: RefSuggestion | null;
-  full: RefSuggestion | null;
+  /**
+   * More than one when the passage can be written more than one way: a chapter
+   * embeds as the whole file or a verse at a time, and those are different
+   * enough on the page to be worth choosing between.
+   */
+  full: RefSuggestion[];
 }
 
 /** A passage the vault could not answer for. */
-const NO_ROWS: ContextRows = { bare: null, full: null };
+const NO_ROWS: ContextRows = { bare: null, full: [] };
 
 /**
  * Said when numbers were written on their own in a note holding no passage to
@@ -686,7 +691,7 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
     if (asked.chapter !== null) {
       const said = [asked.chapter];
       const one = await rows(said, numbers, this.bareLabels(said, numbers));
-      return [one.bare, one.full].filter(
+      return [one.bare, ...one.full].filter(
         (row): row is RefSuggestion => row !== null,
       );
     }
@@ -701,7 +706,7 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
       // rest by naming the version, `as NVI has it`.
       const said = here.chapter ? [here.chapter] : [];
       const one = await rows(said, [], name ? [name] : []);
-      return [one.bare, one.full].filter(
+      return [one.bare, ...one.full].filter(
         (row): row is RefSuggestion => row !== null,
       );
     }
@@ -717,9 +722,12 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
       // than a run of chapters may carry.
       fitsChapters(numbers) ? rows(numbers, [], typed) : NO_ROWS,
     ]);
-    return [verses.bare, chapters.bare, verses.full, chapters.full].filter(
-      (row): row is RefSuggestion => row !== null,
-    );
+    return [
+      verses.bare,
+      chapters.bare,
+      ...verses.full,
+      ...chapters.full,
+    ].filter((row): row is RefSuggestion => row !== null);
   }
 
   /**
@@ -765,21 +773,21 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
     const spelled = referenceLabels(here.book, asked, verses, name);
     // An embed writes no label at all, so there is nothing to choose between
     // and the one row stands for both.
-    const written = embed
-      ? (
-          await this.embeds(
-            found,
-            {
-              version: null,
-              versionPrefix: false,
-              book: here.book,
-              chapters,
-              verses,
-            },
-            anchors,
-            from,
-          )
-        )[0].markdown
+    // Every shape the passage embeds as, which is the choice `!@` offers in
+    // place of the labels it does not write.
+    const shapes = embed
+      ? await this.embeds(
+          found,
+          {
+            version: null,
+            versionPrefix: false,
+            book: here.book,
+            chapters,
+            verses,
+          },
+          anchors,
+          from,
+        )
       : null;
 
     const said = shortReference(here.book, asked, verses, name);
@@ -791,22 +799,28 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
       // two ways: `João 1.2` beside `João 2`.
       book: said,
       preview,
-      markdown:
-        written ??
-        labels
-          .map((label, i) =>
-            verses.length
-              ? this.link(found[0], anchors[i] || null, label, from)
-              : this.link(found[i], null, label, from),
-          )
-          .join(','),
+      markdown: labels
+        .map((label, i) =>
+          verses.length
+            ? this.link(found[0], anchors[i] || null, label, from)
+            : this.link(found[i], null, label, from),
+        )
+        .join(','),
     });
+
+    if (shapes) {
+      const base = { ref: spelled.join(','), book: said, preview };
+      return {
+        bare: null,
+        full: shapes.map((shape) => ({ ...base, ...shape })),
+      };
+    }
 
     return {
       // What the reader typed, which is how the sentence around it reads: `as
       // verse 2 says`, not `as João 1.2 says`.
-      bare: embed || !bare.length ? null : row(bare),
-      full: row(spelled),
+      bare: bare.length ? row(bare) : null,
+      full: [row(spelled)],
     };
   }
 
