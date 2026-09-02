@@ -82,7 +82,8 @@ describe('collectSources', () => {
     const found = collect(
       vault([
         note('Igreja/Comentarios/Shedd/Shedd.md', shedd, {
-          'bible-group': 'Editions',
+          bible: true,
+          group: 'Editions',
         }),
       ]),
       'Igreja/Biblias',
@@ -102,9 +103,10 @@ describe('collectSources', () => {
     const found = collect(
       vault([
         note('Bibles/Almeida Revista e Atualizada/index.md', ara, {
-          'bible-group': ' Translations ',
-          'bible-code': ' ARA ',
-          'bible-name': ' Almeida Revista e Atualizada ',
+          bible: true,
+          group: ' Translations ',
+          code: ' ARA ',
+          name: ' Almeida Revista e Atualizada ',
         }),
       ]),
       'Bibles',
@@ -122,7 +124,8 @@ describe('collectSources', () => {
     const found = collect(
       vault([
         note('Notes/Shedd/Shedd.md', shedd, {
-          'bible-name': 'Shedd',
+          bible: true,
+          name: 'Shedd',
         }),
       ]),
       'Bibles',
@@ -144,9 +147,47 @@ describe('collectSources', () => {
     expect(found.size).toBe(0);
   });
 
+  it('ignores the three describing keys where nothing declared the folder', () => {
+    const people = folder('Pessoas');
+    const found = collect(
+      vault([
+        note('Pessoas/Maria.md', people, {
+          name: 'Maria',
+          group: 'Família',
+          code: 'MAR',
+        }),
+      ]),
+      'Bibles',
+    );
+
+    expect(found.size).toBe(0);
+  });
+
+  it('takes the key written with nothing after it', () => {
+    const shedd = folder('Notes/Shedd');
+    const found = collect(
+      vault([note('Notes/Shedd/Shedd.md', shedd, { bible: null })]),
+      'Bibles',
+    );
+
+    expect(found.get('Notes/Shedd')).toMatchObject({ code: 'Shedd' });
+  });
+
+  it('reads a note that writes the key and means no as meaning no', () => {
+    const shedd = folder('Notes/Shedd');
+    const found = collect(
+      vault([
+        note('Notes/Shedd/Shedd.md', shedd, { bible: false, name: 'Shedd' }),
+      ]),
+      'Bibles',
+    );
+
+    expect(found.size).toBe(0);
+  });
+
   it('ignores a declaring note that is in no folder at all', () => {
     const found = collect(
-      vault([note('loose.md', null, { 'bible-group': 'Editions' })]),
+      vault([note('loose.md', null, { bible: true, group: 'Editions' })]),
       'Bibles',
     );
 
@@ -157,8 +198,8 @@ describe('collectSources', () => {
     const shedd = folder('Notes/Shedd');
     const found = collect(
       vault([
-        note('Notes/Shedd/Shedd.md', shedd, { 'bible-group': 'Editions' }),
-        note('Notes/Shedd/also.md', shedd, { 'bible-group': 'Notes' }),
+        note('Notes/Shedd/Shedd.md', shedd, { bible: true, group: 'Editions' }),
+        note('Notes/Shedd/also.md', shedd, { bible: true, group: 'Notes' }),
       ]),
       'Bibles',
     );
@@ -195,7 +236,12 @@ describe('collectSources', () => {
     const ara = folder('Bibles/ARA', bibles);
     const found = collect(
       vault(
-        [note('Bibles/ARA/ARA.md', ara, { 'bible-group': 'Translations' })],
+        [
+          note('Bibles/ARA/ARA.md', ara, {
+            bible: true,
+            group: 'Translations',
+          }),
+        ],
         bibles,
       ),
       'Bibles',

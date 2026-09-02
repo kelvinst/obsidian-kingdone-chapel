@@ -99,16 +99,17 @@ describe('declaringNote', () => {
   it('says the heading, the code and the name', () => {
     expect(declaringNote('Shedd', 'Bíblia Shedd', 'Versões')).toBe(
       '---\n' +
-        'bible-group: Versões\n' +
-        'bible-code: Shedd\n' +
-        'bible-name: Bíblia Shedd\n' +
+        'bible: true\n' +
+        'group: Versões\n' +
+        'code: Shedd\n' +
+        'name: Bíblia Shedd\n' +
         '---\n',
     );
   });
 
   it('leaves the heading out rather than writing it empty', () => {
     expect(declaringNote('Shedd', 'Bíblia Shedd', '')).toBe(
-      '---\nbible-code: Shedd\nbible-name: Bíblia Shedd\n---\n',
+      '---\nbible: true\ncode: Shedd\nname: Bíblia Shedd\n---\n',
     );
   });
 });

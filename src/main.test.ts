@@ -1475,7 +1475,7 @@ describe('onload', () => {
       'changed',
       { path: 'Estudos/Shedd/Shedd.md' },
       '',
-      { frontmatter: { 'bible-group': 'Edições' } },
+      { frontmatter: { bible: true, group: 'Edições' } },
     );
 
     expect(world.plugin.bibleIndex).toBeNull();
@@ -1810,8 +1810,9 @@ describe('a version that declares itself', () => {
       '1. Um comentário ^shedd-gen-1-1',
     );
     world.metadataCache.frontmatter.set('Estudos/Shedd/Shedd.md', {
-      'bible-group': 'Edições',
-      'bible-name': 'Bíblia Shedd',
+      bible: true,
+      group: 'Edições',
+      name: 'Bíblia Shedd',
     });
     world.plugin.invalidateIndex();
   });
@@ -1847,7 +1848,8 @@ describe('a version that declares itself', () => {
   it('is named once where two folders answer to the one code', () => {
     world.vault.write('Estudos/Cópia/Cópia.md', '');
     world.metadataCache.frontmatter.set('Estudos/Cópia/Cópia.md', {
-      'bible-code': 'Shedd',
+      bible: true,
+      code: 'Shedd',
     });
     world.plugin.invalidateIndex();
 
