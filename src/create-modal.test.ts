@@ -308,6 +308,7 @@ describe('writing the version', () => {
       '---\n' +
         'bible: true\n' +
         'complete: true\n' +
+        'translation: ARA\n' +
         'group: Versões\n' +
         'code: Shedd\n' +
         'name: Bíblia Shedd\n' +

@@ -62,8 +62,24 @@ the block above it, so anything you write between the two is written inside that
 `@Shedd Mc 14.1` links straight to it. The text itself is never copied, only embedded, so the
 new version stays notes about a translation rather than another copy of one.
 
-A folder holding the code and the name is written beside the chapters, so the new version is
-[one the plugin knows](#versions-kept-somewhere-else) wherever you put it.
+A note declaring the folder is written beside the chapters, so the new version is
+[one the plugin knows](#versions-kept-somewhere-else) wherever you put it:
+
+```yaml
+---
+bible: true
+complete: true
+translation: ARA
+group: Versões
+code: Shedd
+name: Bíblia Shedd
+---
+```
+
+`complete: true` because a generated version has a file for every chapter its translation
+has, so `@Shedd Sl 1.1` links to it from the moment it exists. `translation` records what it
+was written from — the plugin does not read it back, it is there so the folder says where its
+embeds point.
 
 ### Chapter breadcrumbs
 
@@ -266,13 +282,14 @@ name: Bíblia Shedd
 ---
 ```
 
-| Key        |                                                                                                                                                                                                            |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bible`    | Declares the folder a version. Written at all is enough; `bible: false` is the one way to write it and mean no.                                                                                            |
-| `complete` | Whether the version answers for the whole Bible. Read off where the folder sits when left out — see below.                                                                                                 |
-| `group`    | The heading the version is listed under. No heading when left out.                                                                                                                                         |
-| `code`     | What the version's file names start with, and what `@ARA Joao 1.1` calls it. The folder's name when left out, so a folder may be called `Almeida Revista e Atualizada` and still hold `ARA-01-GEN-001.md`. |
-| `name`     | Name to show wherever the version is named. The code when left out.                                                                                                                                        |
+| Key           |                                                                                                                                                                                                            |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bible`       | Declares the folder a version. Written at all is enough; `bible: false` is the one way to write it and mean no.                                                                                            |
+| `complete`    | Whether the version answers for the whole Bible. Read off where the folder sits when left out — see below.                                                                                                 |
+| `group`       | The heading the version is listed under. No heading when left out.                                                                                                                                         |
+| `code`        | What the version's file names start with, and what `@ARA Joao 1.1` calls it. The folder's name when left out, so a folder may be called `Almeida Revista e Atualizada` and still hold `ARA-01-GEN-001.md`. |
+| `name`        | Name to show wherever the version is named. The code when left out.                                                                                                                                        |
+| `translation` | Which translation a generated version was written from. Recorded by the create command for the reader; the plugin does not read it back.                                                                   |
 
 Only `bible` is required — the rest are read off where the folder sits and what it is called
 when they are left out, so the shortest declaration is `bible: true` and nothing else. It is
@@ -332,9 +349,9 @@ key is for the folder that is the exception to the company it keeps — `complet
 study Bible that does run end to end, `complete: false` on a draft translation that does not
 yet — and it wins over where the folder sits, either way.
 
-**Create a Bible version from a translation** writes the key outright, matching the
-translation it was generated from: a generated version answers that translation chapter for
-chapter, so it is linkable from the moment it is written, wherever you filed it.
+**Create a Bible version from a translation** writes `complete: true` outright rather than
+leaving it to where the folder lands: a generated version has a file for every chapter its
+translation has, so it is linkable from the moment it is written, wherever you filed it.
 
 ## Settings
 
