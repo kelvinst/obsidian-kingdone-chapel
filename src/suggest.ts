@@ -267,7 +267,7 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
     } else {
       const asked = parseContextRef(
         query,
-        (word) => this.plugin.findVersion(word) !== null,
+        (word) => this.plugin.findCompleteVersion(word) !== null,
       );
       if (asked && asked.numbers === null) {
         // Numbers, and nothing wrong with them but how many they came to.
@@ -344,7 +344,7 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
     if (limit <= 0) return [];
     const parsed = parseReference(
       query,
-      (word) => this.plugin.findVersion(word) !== null,
+      (word) => this.plugin.findCompleteVersion(word) !== null,
     );
     if (!parsed) return [];
 
@@ -522,7 +522,7 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
     // The file names the version the way the file is named; the vault names it
     // the way the folder is. Take the vault's, since that is what everything
     // else here is looked up by.
-    const version = this.plugin.findVersion(name.version);
+    const version = this.plugin.findCompleteVersion(name.version);
     if (!version) return null;
 
     // A name is not a chapter: an ordinary note called `NVI-2-Notas-3` reads
@@ -651,11 +651,11 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
     if (parsed.versionPrefix) {
       const wanted = (parsed.version || '').toLowerCase();
       return this.plugin
-        .listVersions()
+        .completeVersions()
         .filter((v) => v.toLowerCase().startsWith(wanted));
     }
     const named = parsed.version
-      ? this.plugin.findVersion(parsed.version)
+      ? this.plugin.findCompleteVersion(parsed.version)
       : this.plugin.defaultVersion(from);
     return named ? [named] : [];
   }

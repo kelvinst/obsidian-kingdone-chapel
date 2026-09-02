@@ -1858,6 +1858,48 @@ describe('a version that declares itself', () => {
   });
 });
 
+describe('a version that says it is not the whole Bible', () => {
+  beforeEach(() => {
+    world.vault.write('Notas/Kelvin/Kelvin.md', '');
+    world.vault.write(
+      'Notas/Kelvin/Kelvin-01-GEN-001.md',
+      '1. O que eu penso ^kelvin-gen-1-1',
+    );
+    world.metadataCache.frontmatter.set('Notas/Kelvin/Kelvin.md', {
+      bible: true,
+      complete: false,
+    });
+    world.plugin.invalidateIndex();
+  });
+
+  it('is a version like any other, to read and to walk through', () => {
+    expect(world.plugin.listVersions()).toContain('Kelvin');
+    expect(world.plugin.findVersion('kelvin')).toBe('Kelvin');
+    expect(world.plugin.referenceFile('Kelvin', 1, 1)?.basename).toBe(
+      'Kelvin-01-GEN-001',
+    );
+  });
+
+  it('is not one a reference may point at', () => {
+    expect(world.plugin.completeVersions()).not.toContain('Kelvin');
+    expect(world.plugin.findCompleteVersion('kelvin')).toBeNull();
+  });
+
+  it('is not what a reference naming no version falls back on', () => {
+    world.plugin.settings.defaultVersion = 'Kelvin';
+
+    expect(world.plugin.defaultVersion(null)).not.toBe('Kelvin');
+  });
+
+  it('is not the default even for a note written inside it', () => {
+    const inside = world.vault.getAbstractFileByPath(
+      'Notas/Kelvin/Kelvin-01-GEN-001.md',
+    ) as TFile;
+
+    expect(world.plugin.defaultVersion(inside)).not.toBe('Kelvin');
+  });
+});
+
 describe('reading the cursor where the block cache cannot answer', () => {
   it('walks the lines of a pane that is over no file at all', () => {
     const view = pane(world.app, {

@@ -489,7 +489,14 @@ describe('a version at the top of the vault', () => {
     });
     loose.plugin.settings.translationsFolder = '';
     const modal = new CreateVersionModal(loose.app, loose.plugin, [
-      { path: 'ARA', code: 'ARA', label: 'ARA', group: '', declaredBy: '' },
+      {
+        path: 'ARA',
+        code: 'ARA',
+        label: 'ARA',
+        group: '',
+        complete: true,
+        declaredBy: '',
+      },
     ]);
 
     expect(modal.folder).toBe('');

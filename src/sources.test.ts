@@ -71,6 +71,7 @@ function source(over: Partial<Source> = {}): Source {
     code: 'c',
     label: 'c',
     group: '',
+    complete: true,
     declaredBy: '',
     ...over,
   };
@@ -94,6 +95,7 @@ describe('collectSources', () => {
       code: 'Shedd',
       label: 'Shedd',
       group: 'Editions',
+      complete: true,
       declaredBy: 'Igreja/Comentarios/Shedd/Shedd.md',
     });
   });
@@ -185,6 +187,28 @@ describe('collectSources', () => {
     expect(found.size).toBe(0);
   });
 
+  it('takes a version at its word that it is not the whole Bible', () => {
+    const notes = folder('Notas/Kelvin');
+    const found = collect(
+      vault([
+        note('Notas/Kelvin/Kelvin.md', notes, { bible: true, complete: false }),
+      ]),
+      'Bibles',
+    );
+
+    expect(found.get('Notas/Kelvin')).toMatchObject({ complete: false });
+  });
+
+  it('takes a version that says nothing about it for the whole of one', () => {
+    const shedd = folder('Notes/Shedd');
+    const found = collect(
+      vault([note('Notes/Shedd/Shedd.md', shedd, { bible: true })]),
+      'Bibles',
+    );
+
+    expect(found.get('Notes/Shedd')).toMatchObject({ complete: true });
+  });
+
   it('ignores a declaring note that is in no folder at all', () => {
     const found = collect(
       vault([note('loose.md', null, { bible: true, group: 'Editions' })]),
@@ -219,6 +243,7 @@ describe('collectSources', () => {
       code: 'ARA',
       label: 'ARA',
       group: 'Translations',
+      complete: true,
       declaredBy: '',
     });
   });

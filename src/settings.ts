@@ -2,6 +2,7 @@ import { PluginSettingTab, Setting } from 'obsidian';
 import type { App } from 'obsidian';
 
 import type { Lang } from './books';
+import type { Source } from './sources';
 import type KingdoneChapelPlugin from './main';
 
 export class KingdoneChapelSettingTab extends PluginSettingTab {
@@ -106,11 +107,14 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
       .setDesc(
         'Version `@Joao 1.1` links to. Name one in the reference itself (`@ARA Joao 1.1`) ' +
           'to override it. Automatic uses the version of the note you are writing in, ' +
-          'falling back to the first one in the vault.',
+          'falling back to the first one in the vault. Only versions answering for the ' +
+          'whole Bible are offered — one saying `complete: false` can be read and walked ' +
+          'through, but never linked to, since a link to a chapter nobody has written ' +
+          'yet is a link to nothing.',
       )
       .addDropdown((drop) => {
         drop.addOption('', 'Automatic');
-        for (const version of this.plugin.listVersions()) {
+        for (const version of this.plugin.completeVersions()) {
           drop.addOption(version, this.plugin.label(version));
         }
         drop
@@ -161,7 +165,7 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Detected versions')
-      .setDesc(this.plugin.listVersions().join(', ') || 'none')
+      .setDesc(detected(this.plugin.listSources()) || 'none')
       .addButton((b) =>
         b.setButtonText('Reload').onClick(() => {
           this.plugin.invalidateIndex();
@@ -171,7 +175,7 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
         }),
       );
 
-    // listVersions() above builds the index, so the conflicts are known by now.
+    // listSources() above builds the index, so the conflicts are known by now.
     const conflicts = this.plugin.chapterConflicts;
     if (conflicts.size) {
       const setting = new Setting(containerEl)
@@ -186,4 +190,18 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
       }
     }
   }
+}
+
+/**
+ * The versions the vault holds, saying which of them a link cannot point at.
+ *
+ * A partial version is listed with the rest — it is a version, and the point
+ * of the list is what was found — with the one thing that is different about
+ * it said beside it, rather than left to be discovered by a reference that
+ * refuses to offer it.
+ */
+function detected(sources: Source[]): string {
+  return sources
+    .map((s) => (s.complete ? s.code : `${s.code} (partial)`))
+    .join(', ');
 }

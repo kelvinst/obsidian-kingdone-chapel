@@ -22,6 +22,13 @@
  * name — `Translations`, `Editions`, `Comentários`, anything — rather than a
  * set of kinds this plugin decides on.
  *
+ * `complete: false` says the version does not answer for the whole Bible, and
+ * that is the one thing this plugin holds a version back from: it can be read
+ * beside every other and walked through like every other, but no link is
+ * written to it, because a link to a chapter nobody has written yet is a link
+ * to nothing. Left out it is complete, a version normally being the whole of
+ * one.
+ *
  * Declaring is not required. The direct subfolders of the translations folder
  * are still versions on their own, headed as translations, so a vault that only
  * holds translations needs none of this and still reads as one list.
@@ -70,6 +77,21 @@ export interface Source {
   /** Heading it is listed under, empty for none. */
   group: string;
   /**
+   * Whether the version answers for the whole Bible, and so whether a link may
+   * be written to it.
+   *
+   * A set of notes covering the four chapters someone has got to is worth
+   * reading beside a translation and worth walking through, but it is not
+   * worth linking into: `@Sl 1.1` against it writes a link to a file that was
+   * never written and may never be. So the two are separated — everything can
+   * be read, only a complete version can be pointed at — and a partial one
+   * says so once rather than being kept out of the vault's own lists.
+   *
+   * True unless a note says otherwise, because a version is normally the whole
+   * of one and the exception is the thing worth writing down.
+   */
+  complete: boolean;
+  /**
    * The note that declared this folder a version, empty for one that is a
    * version by where it sits. It is what says whether a note being edited
    * could have changed the answer, which every other note in the folder —
@@ -115,6 +137,7 @@ export function collectSources(
         code: child.name,
         label: child.name,
         group: translations,
+        complete: true,
         declaredBy: '',
       });
     }
@@ -130,7 +153,8 @@ export function collectSources(
  * label — so the least a folder can say is `bible` and nothing else, and be
  * read entirely off where it sits and what it is called. A folder naming no
  * `group` is listed under no heading, the same as one in no folder the
- * settings name.
+ * settings name. `complete: false` is the one that has to be written to be
+ * true of a folder, since a version is normally the whole of one.
  */
 function declared(
   folder: TFolder,
@@ -143,6 +167,7 @@ function declared(
     code,
     label: text(front.name) || code,
     group: text(front.group),
+    complete: front.complete !== false,
     declaredBy,
   };
 }
