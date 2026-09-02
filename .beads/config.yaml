@@ -54,3 +54,5 @@
 # - github.repo
 
 sync.remote: "https://doltremoteapi.dolthub.com/kelvinst/obsidian-kingdone-chapel"
+
+export.git-add: false
