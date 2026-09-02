@@ -33,7 +33,7 @@ import { ReferenceSuggest } from './suggest';
 import { KingdoneChapelSettingTab } from './settings';
 import { KingdoneChapelView } from './view';
 import { Breadcrumbs } from './breadcrumbs';
-import { renderSubSup } from './subsup';
+import { renderMarks } from './marks';
 import {
   collectSources,
   declaresSource,
@@ -177,9 +177,9 @@ export default class KingdoneChapelPlugin extends Plugin {
 
     this.registerEditorSuggest(new ReferenceSuggest(this));
 
-    // The note's own `~sub~` and `^sup^`, in every rendered note rather than
-    // only in a chapter: either belongs wherever one is written.
-    this.registerMarkdownPostProcessor(renderSubSup);
+    // The note's own `~sub~`, `^sup^` and `--small--`, in every rendered note
+    // rather than only in a chapter: a mark belongs wherever one is written.
+    this.registerMarkdownPostProcessor(renderMarks);
 
     // One command per version, so each can get its own hotkey.
     this.registerVersionCommands();
