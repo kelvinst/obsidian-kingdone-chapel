@@ -15,6 +15,7 @@ import type { Harness } from '../test/harness';
 import { VIEW_TYPE } from './types';
 import type { Location } from './types';
 import { VersionSuggestModal } from './modal';
+import { CreateVersionModal } from './create-modal';
 import { KingdoneChapelView } from './view';
 
 const GEN_1 = [
@@ -1436,6 +1437,80 @@ describe('onload', () => {
     world.plugin.unload();
   });
 
+  it('carries the folder over from the name it was saved under', async () => {
+    world.plugin.data = { bibleFolder: 'Textos' };
+    await world.plugin.onload();
+    expect(world.plugin.settings.translationsFolder).toBe('Textos');
+  });
+
+  it('leaves the folder alone where the new name was saved too', async () => {
+    world.plugin.data = { bibleFolder: 'Antigo', translationsFolder: 'Textos' };
+    await world.plugin.onload();
+    expect(world.plugin.settings.translationsFolder).toBe('Textos');
+  });
+
+  it('offers to write a version, and says when there is none to write from', async () => {
+    const opened = vi.spyOn(CreateVersionModal.prototype, 'open');
+    await world.plugin.onload();
+    const command = world.plugin.commands.find(
+      (c) => c.id === 'create-version',
+    );
+
+    command?.callback?.();
+    expect(opened).toHaveBeenCalled();
+
+    world.plugin.settings.translationsFolder = 'Nenhuma';
+    world.plugin.invalidateIndex();
+    clearNotices();
+    command?.callback?.();
+    expect(notices.at(-1)?.message).toBe('No version to write one from yet.');
+    opened.mockRestore();
+  });
+
+  it('reads the vault again for a note that declares a version', async () => {
+    await world.plugin.onload();
+    world.plugin.index();
+
+    world.metadataCache.trigger(
+      'changed',
+      { path: 'Estudos/Shedd/Shedd.md' },
+      '',
+      { frontmatter: { 'bible-group': 'Edições' } },
+    );
+
+    expect(world.plugin.bibleIndex).toBeNull();
+  });
+
+  it('leaves the vault alone for a note that declares nothing', async () => {
+    await world.plugin.onload();
+    world.plugin.index();
+
+    world.metadataCache.trigger(
+      'changed',
+      { path: 'Estudos/Notas.md' },
+      '',
+      {},
+    );
+
+    expect(world.plugin.bibleIndex).not.toBeNull();
+  });
+
+  it('reads the vault again once the cache has settled, and only once', async () => {
+    await world.plugin.onload();
+    world.plugin.index();
+    // The commands are registered again with it, which reads the vault back
+    // in, so the read is what says the settling was answered — not a dropped
+    // index, which is filled again before the handler returns.
+    const read = vi.spyOn(world.vault, 'getMarkdownFiles');
+
+    world.metadataCache.trigger('resolved');
+    expect(read).toHaveBeenCalled();
+
+    read.mockClear();
+    world.metadataCache.trigger('resolved');
+    expect(read).not.toHaveBeenCalled();
+  });
+
   it('reads the settings that were saved, over the defaults', async () => {
     world.plugin.data = { translationsFolder: 'Textos', followCursor: false };
     await world.plugin.onload();
@@ -1613,5 +1688,196 @@ describe('a command per version', () => {
       labelled.plugin.commands.find((c) => c.id === 'open-in-ara')?.name,
     ).toBe('Open this verse in Almeida');
     labelled.plugin.unload();
+  });
+});
+
+describe('the verse of the block the cursor is in', () => {
+  const path = chapterPath('NVI', 1, 'GEN', 1);
+
+  /** A pane over `text`, with the vault and the cache holding it too. */
+  function reading(text: string, ids: string[]) {
+    world.vault.write(path, text);
+    world.metadataCache.blocks.set(path, ids);
+    const view = pane(world.app, {
+      file: world.vault.getAbstractFileByPath(path) as TFile,
+      editor: new FakeEditor(text),
+    });
+    return { view, editor: editorOf(view) };
+  }
+
+  it('reads a verse whose id sits under what it names', () => {
+    const { view, editor } = reading(
+      '![[ARA-01-GEN-001#^ara-gen-1-1]]\n^nvi-gen-1-1\n\n' +
+        '![[ARA-01-GEN-001#^ara-gen-1-2]]\n^nvi-gen-1-2\n',
+      ['nvi-gen-1-1', 'nvi-gen-1-2'],
+    );
+
+    editor.at(3);
+
+    expect(world.plugin.cursorVerse(view)).toBe(2);
+  });
+
+  it('takes the tightest block over one holding it', () => {
+    const { view, editor } = reading(
+      '1. Um ^nvi-gen-1-1\n2. Dois ^nvi-gen-1-2\n',
+      ['nvi-gen-1-1', 'nvi-gen-1-2'],
+    );
+
+    editor.at(1);
+
+    expect(world.plugin.cursorVerse(view)).toBe(2);
+  });
+
+  it('passes over a block id that names no verse', () => {
+    const { view, editor } = reading('Uma nota solta ^a500c4\n', ['a500c4']);
+
+    editor.at(0);
+
+    expect(world.plugin.cursorVerse(view)).toBeNull();
+  });
+
+  it('walks the lines where the cache knows no blocks at all', () => {
+    world.metadataCache.blocks.delete(path);
+    const view = pane(world.app, {
+      file: world.vault.getAbstractFileByPath(path) as TFile,
+      editor: new FakeEditor('1. Um ^nvi-gen-1-1\n\nUm comentário'),
+    });
+    editorOf(view).at(2);
+
+    expect(world.plugin.cursorVerse(view)).toBe(1);
+  });
+});
+
+describe('what the plugin falls back on', () => {
+  it('starts from the defaults where nothing was ever saved', async () => {
+    world.plugin.data = null;
+    await world.plugin.onload();
+    expect(world.plugin.settings.translationsFolder).toBe('Bibles');
+    world.plugin.unload();
+  });
+
+  it('names a version the vault no longer has by its code', () => {
+    expect(world.plugin.label('Vulgata')).toBe('Vulgata');
+  });
+
+  it('looks for a clash over the chapter a book opens on', () => {
+    const loc = locationFor(world, chapterPath('NVI', 1, 'GEN', 1), {
+      chapter: 0,
+    });
+    expect(world.plugin.conflictFor('NVI', loc)).toBeNull();
+  });
+
+  it('takes a block nested inside another that holds the same line', () => {
+    const file = world.vault.getAbstractFileByPath(
+      chapterPath('NVI', 1, 'GEN', 1),
+    ) as TFile;
+    // A list carrying an id of its own, with the verse's item inside it. The
+    // stand-in writes a block per line, so the two are drawn by hand.
+    vi.spyOn(world.metadataCache, 'getFileCache').mockReturnValue({
+      blocks: {
+        'nvi-gen-1-1': {
+          position: { start: { line: 0 }, end: { line: 4 } },
+        },
+        'nvi-gen-1-3': {
+          position: { start: { line: 2 }, end: { line: 2 } },
+        },
+      },
+    });
+
+    expect(world.plugin.blockVerse(file, 2)).toBe(3);
+  });
+
+  it('keeps the first block where a wider one holds the same line', () => {
+    const path = chapterPath('NVI', 1, 'GEN', 1);
+    world.vault.write(path, 'Um ^nvi-gen-1-1\nDois ^nvi-gen-1-2\n');
+    // The narrow one first, so the wider one that follows does not take it.
+    world.metadataCache.blocks.set(path, ['nvi-gen-1-2', 'nvi-gen-1-1']);
+    const view = pane(world.app, {
+      file: world.vault.getAbstractFileByPath(path) as TFile,
+      editor: new FakeEditor('Um ^nvi-gen-1-1\nDois ^nvi-gen-1-2\n'),
+    });
+    editorOf(view).at(1);
+
+    expect(world.plugin.cursorVerse(view)).toBe(2);
+  });
+});
+
+describe('a version that declares itself', () => {
+  beforeEach(() => {
+    world.vault.write('Estudos/Shedd/Shedd.md', '');
+    world.vault.write(
+      'Estudos/Shedd/Shedd-01-GEN-001.md',
+      '1. Um comentário ^shedd-gen-1-1',
+    );
+    world.metadataCache.frontmatter.set('Estudos/Shedd/Shedd.md', {
+      'bible-group': 'Edições',
+      'bible-name': 'Bíblia Shedd',
+    });
+    world.plugin.invalidateIndex();
+  });
+
+  it('is a version wherever it sits, under the heading it names', () => {
+    expect(world.plugin.listSources()).toContainEqual(
+      expect.objectContaining({
+        code: 'Shedd',
+        label: 'Bíblia Shedd',
+        group: 'Edições',
+        declaredBy: 'Estudos/Shedd/Shedd.md',
+      }),
+    );
+  });
+
+  it('reads the vault again when its declaring note is written to', async () => {
+    await world.plugin.onload();
+    world.plugin.index();
+
+    // Nothing in the frontmatter this time: the note is known to be the one
+    // the last answer was read from, which is what says to read it again.
+    world.metadataCache.trigger(
+      'changed',
+      { path: 'Estudos/Shedd/Shedd.md' },
+      '',
+      {},
+    );
+
+    expect(world.plugin.bibleIndex).toBeNull();
+    world.plugin.unload();
+  });
+
+  it('is named once where two folders answer to the one code', () => {
+    world.vault.write('Estudos/Cópia/Cópia.md', '');
+    world.metadataCache.frontmatter.set('Estudos/Cópia/Cópia.md', {
+      'bible-code': 'Shedd',
+    });
+    world.plugin.invalidateIndex();
+
+    const found = world.plugin.listVersions().filter((v) => v === 'Shedd');
+    expect(found).toHaveLength(1);
+  });
+});
+
+describe('reading the cursor where the block cache cannot answer', () => {
+  it('walks the lines of a pane that is over no file at all', () => {
+    const view = pane(world.app, {
+      file: null,
+      editor: new FakeEditor('1. Um ^nvi-gen-1-1\n2. Dois ^nvi-gen-1-2'),
+    });
+    editorOf(view).at(1);
+
+    expect(world.plugin.cursorVerse(view)).toBe(2);
+  });
+
+  it('keeps the tighter block when a wider one comes after it', () => {
+    const file = world.vault.getAbstractFileByPath(
+      chapterPath('NVI', 1, 'GEN', 1),
+    ) as TFile;
+    vi.spyOn(world.metadataCache, 'getFileCache').mockReturnValue({
+      blocks: {
+        'nvi-gen-1-3': { position: { start: { line: 2 }, end: { line: 2 } } },
+        'nvi-gen-1-1': { position: { start: { line: 0 }, end: { line: 4 } } },
+      },
+    });
+
+    expect(world.plugin.blockVerse(file, 2)).toBe(3);
   });
 });
