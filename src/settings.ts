@@ -108,9 +108,10 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
         'Version `@Joao 1.1` links to. Name one in the reference itself (`@ARA Joao 1.1`) ' +
           'to override it. Automatic uses the version of the note you are writing in, ' +
           'falling back to the first one in the vault. Only versions answering for the ' +
-          'whole Bible are offered — one saying `complete: false` can be read and walked ' +
-          'through, but never linked to, since a link to a chapter nobody has written ' +
-          'yet is a link to nothing.',
+          'whole Bible are offered: a partial one can be read and walked through, but ' +
+          'never linked to, since a link to a chapter nobody has written yet is a link ' +
+          'to nothing. Versions in the translations folder are whole Bibles; ones ' +
+          'declared elsewhere are partial until they say `complete: true`.',
       )
       .addDropdown((drop) => {
         drop.addOption('', 'Automatic');

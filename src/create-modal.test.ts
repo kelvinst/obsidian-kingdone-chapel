@@ -307,6 +307,7 @@ describe('writing the version', () => {
     expect(wrote('Comentarios/Shedd/Shedd.md')).toBe(
       '---\n' +
         'bible: true\n' +
+        'complete: true\n' +
         'group: Versões\n' +
         'code: Shedd\n' +
         'name: Bíblia Shedd\n' +

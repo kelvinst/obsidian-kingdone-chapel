@@ -269,7 +269,7 @@ name: Bíblia Shedd
 | Key        |                                                                                                                                                                                                            |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `bible`    | Declares the folder a version. Written at all is enough; `bible: false` is the one way to write it and mean no.                                                                                            |
-| `complete` | Whether the version answers for the whole Bible. Complete when left out; `complete: false` keeps `@` off it — see below.                                                                                   |
+| `complete` | Whether the version answers for the whole Bible. Read off where the folder sits when left out — see below.                                                                                                 |
 | `group`    | The heading the version is listed under. No heading when left out.                                                                                                                                         |
 | `code`     | What the version's file names start with, and what `@ARA Joao 1.1` calls it. The folder's name when left out, so a folder may be called `Almeida Revista e Atualizada` and still hold `ARA-01-GEN-001.md`. |
 | `name`     | Name to show wherever the version is named. The code when left out.                                                                                                                                        |
@@ -303,7 +303,7 @@ breadcrumbs, the same sidebar, the same `@` references.
 
 Notes on the four chapters you have got to are worth keeping beside a translation, and a
 commentary you are still writing is a version whether or not it has reached Obadiah. Both are
-versions here, and `complete: false` says what is different about them:
+versions here, and a partial one differs in exactly one way:
 
 - They are **read and walked through like any other** — listed in the sidebar, offered by the
   breadcrumb, given their own `Open this verse in ...` command, and picked from the version
@@ -318,6 +318,23 @@ The reason is the one thing a reference does that reading does not: it writes a 
 chapter, and a version that has not written that chapter yet would be linked to a file that
 is not there. A dead link now for a note that may be written next year is worse than no link
 at all.
+
+Which versions are partial is read off **where they sit**, so most vaults never write the key:
+
+| Where the version is                | Taken as      |
+| ----------------------------------- | ------------- |
+| A folder in the translations folder | a whole Bible |
+| Declared anywhere else              | partial       |
+
+A translation is the whole of a Bible by virtue of being filed with the translations, and a
+folder declared out among the commentaries is the sort of thing written a book at a time. The
+key is for the folder that is the exception to the company it keeps — `complete: true` on a
+study Bible that does run end to end, `complete: false` on a draft translation that does not
+yet — and it wins over where the folder sits, either way.
+
+**Create a Bible version from a translation** writes the key outright, matching the
+translation it was generated from: a generated version answers that translation chapter for
+chapter, so it is linkable from the moment it is written, wherever you filed it.
 
 ## Settings
 

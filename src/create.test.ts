@@ -97,9 +97,10 @@ describe('chapterNote', () => {
 
 describe('declaringNote', () => {
   it('says the heading, the code and the name', () => {
-    expect(declaringNote('Shedd', 'Bíblia Shedd', 'Versões')).toBe(
+    expect(declaringNote('Shedd', 'Bíblia Shedd', 'Versões', true)).toBe(
       '---\n' +
         'bible: true\n' +
+        'complete: true\n' +
         'group: Versões\n' +
         'code: Shedd\n' +
         'name: Bíblia Shedd\n' +
@@ -108,8 +109,14 @@ describe('declaringNote', () => {
   });
 
   it('leaves the heading out rather than writing it empty', () => {
-    expect(declaringNote('Shedd', 'Bíblia Shedd', '')).toBe(
-      '---\nbible: true\ncode: Shedd\nname: Bíblia Shedd\n---\n',
+    expect(declaringNote('Shedd', 'Bíblia Shedd', '', true)).toBe(
+      '---\nbible: true\ncomplete: true\ncode: Shedd\nname: Bíblia Shedd\n---\n',
+    );
+  });
+
+  it('says a version is partial where the translation it answers was', () => {
+    expect(declaringNote('Shedd', 'Bíblia Shedd', '', false)).toContain(
+      'complete: false\n',
     );
   });
 });

@@ -216,7 +216,12 @@ export class CreateVersionModal extends Modal {
     await this.folderOf(root);
     await this.app.vault.create(
       `${root}/${this.code}.md`,
-      declaringNote(this.code, this.name || this.code, this.group),
+      declaringNote(
+        this.code,
+        this.name || this.code,
+        this.group,
+        source.complete,
+      ),
     );
 
     // In reading order, so a run that is stopped part way leaves the version

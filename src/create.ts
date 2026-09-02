@@ -100,12 +100,22 @@ export function chapterNote(
  * to list it under. `bible` is what declares it; the rest describe it, and a
  * version naming no heading leaves the key out rather than writing it empty,
  * which is the same answer and reads as one.
+ *
+ * `complete` is written outright rather than left to where the folder lands.
+ * A generated version answers its translation chapter for chapter — that is
+ * what generating it did — so it is as complete as the translation was,
+ * wherever it is filed, and saying so is what lets `@` link to it from the
+ * moment it is written.
  */
 export function declaringNote(
   code: string,
   name: string,
   group: string,
+  complete: boolean,
 ): string {
   const heading = group ? `group: ${group}\n` : '';
-  return `---\nbible: true\n${heading}code: ${code}\nname: ${name}\n---\n`;
+  return (
+    `---\nbible: true\ncomplete: ${complete}\n` +
+    `${heading}code: ${code}\nname: ${name}\n---\n`
+  );
 }
