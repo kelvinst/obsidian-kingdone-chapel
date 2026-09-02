@@ -113,6 +113,48 @@ Headings go with the books under them, so a search that leaves one empty takes i
 Any of them opens in the pane you clicked from; hold Ctrl/Cmd to open in a new tab instead.
 Turn the bar off under **Chapter breadcrumbs**.
 
+### Small text, subscript and superscript
+
+Obsidian has no Markdown for any of the three, so a note that wants one has to carry a raw
+tag in the middle of its prose. These write them instead:
+
+| You type       | You get                          |
+| -------------- | -------------------------------- |
+| `H~2~O`        | `H<sub>2</sub>O`                 |
+| `2^10^`        | `2<sup>10</sup>`                 |
+| `!!uma nota!!` | the run at `0.8em`, for an aside |
+
+The sub and sup delimiters are the ones Pandoc and markdown-it use, so a note carrying them
+still reads as intended outside your vault. `~~strikethrough~~` is untouched — a tilde may
+not touch another — and neither is a delimiter written as itself: no run may open or close on
+a space, so `de ~ a ~` and `Que verso!! Que salmo!!` stay exactly as typed. A single
+exclamation inside a run is kept; only a doubled one closes it.
+
+A run reaches as far as bold and italic do, and stops where they stop. It crosses a soft line
+break and the middle of a link or an emphasis, so a pair of lines is one aside:
+
+```markdown
+!!Refs: [[Sl 26.4]]; [[Jr 15.17]].
+Notas: [[n1]]; [[n2]].!!
+```
+
+But it never leaves its paragraph. For an aside of several, fence them with three
+exclamations on lines of their own — the block form, as three backticks are the block form of
+one:
+
+```markdown
+!!!
+Uma nota inteira, com [[Sl 26.4|links]] e tudo mais.
+
+E outro parágrafo dela.
+!!!
+```
+
+Code and maths are left exactly as written, and a run may reach across an inline `` `code` ``
+without its contents being read for delimiters.
+
+Reading view only for now — while editing, the delimiters still show as typed.
+
 ### `@` references
 
 Type `@` and a reference anywhere in a note to link to it. The suggestion list shows the
