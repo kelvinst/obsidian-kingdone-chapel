@@ -28,6 +28,12 @@ export interface EventRef {
   off: () => void;
 }
 
+/** The lines a block covers, as Obsidian reports them. */
+interface BlockLines {
+  start: { line: number };
+  end: { line: number };
+}
+
 /** Handlers by event name, for the vault and the workspace alike. */
 class Emitter {
   handlers = new Map<string, ((...args: never[]) => void)[]>();
@@ -159,6 +165,8 @@ export class FakeMetadataCache extends Emitter {
   blocks = new Map<string, string[]>();
   /** path -> the links the file writes, in the order it writes them. */
   links = new Map<string, string[]>();
+  /** path -> the frontmatter the cache read off it. */
+  frontmatter = new Map<string, Record<string, unknown>>();
 
   /** Reads the vault as it stands, so a file written later still resolves. */
   constructor(private vault: FakeVault) {
@@ -170,16 +178,36 @@ export class FakeMetadataCache extends Emitter {
     ref.off();
   }
 
+  /**
+   * What the cache holds for a file: its block ids, each over the lines the
+   * block covers, the links it writes, and the frontmatter it was given.
+   *
+   * The lines matter because an id may sit under what it names rather than at
+   * the end of it, and which lines a block covers is what tells the two apart.
+   * A block runs from its id back to the blank line above.
+   */
   getFileCache(file: TFile): {
-    blocks?: Record<string, unknown>;
+    blocks?: Record<string, { position: BlockLines }>;
     links?: { link: string }[];
+    frontmatter?: Record<string, unknown>;
   } | null {
     const ids = this.blocks.get(file.path);
     const links = this.links.get(file.path);
-    if (!ids && !links) return null;
+    const front = this.frontmatter.get(file.path);
+    if (!ids && !links && !front) return null;
+
+    const lines = (this.vault.contents.get(file.path) || '').split('\n');
+    const blocks: Record<string, { position: BlockLines }> = {};
+    for (const id of ids || []) {
+      const end = lines.findIndex((line) => line.trimEnd().endsWith('^' + id));
+      let start = end;
+      while (start > 0 && lines[start - 1].trim() !== '') start -= 1;
+      blocks[id] = { position: { start: { line: start }, end: { line: end } } };
+    }
     return {
-      ...(ids ? { blocks: Object.fromEntries(ids.map((id) => [id, {}])) } : {}),
+      ...(ids ? { blocks } : {}),
       ...(links ? { links: links.map((link) => ({ link })) } : {}),
+      ...(front ? { frontmatter: front } : {}),
     };
   }
 

@@ -51,10 +51,10 @@ export default defineConfig({
         // now, so this is close to the ceiling: what the branches still fall
         // short of are the fallbacks guarding states a stubbed Obsidian cannot
         // be put into.
-        statements: 98.29,
-        branches: 95.66,
-        functions: 99.1,
-        lines: 98.46,
+        statements: 100,
+        branches: 98.45,
+        functions: 100,
+        lines: 100,
       },
     },
   },
