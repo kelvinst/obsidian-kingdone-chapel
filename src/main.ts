@@ -34,6 +34,7 @@ import { KingdoneChapelSettingTab } from './settings';
 import { KingdoneChapelView } from './view';
 import { Breadcrumbs } from './breadcrumbs';
 import { renderMarks } from './marks';
+import { liveMarks } from './live';
 import {
   collectSources,
   declaresSource,
@@ -177,9 +178,12 @@ export default class KingdoneChapelPlugin extends Plugin {
 
     this.registerEditorSuggest(new ReferenceSuggest(this));
 
-    // The note's own `~sub~`, `^sup^` and `--small--`, in every rendered note
+    // The note's own `~sub~`, `^sup^` and `!!small!!`, in every rendered note
     // rather than only in a chapter: a mark belongs wherever one is written.
+    // Once for reading a note and once for writing it, the two views of a note
+    // being drawn by different halves of the app.
     this.registerMarkdownPostProcessor(renderMarks);
+    this.registerEditorExtension(liveMarks);
 
     // One command per version, so each can get its own hotkey.
     this.registerVersionCommands();

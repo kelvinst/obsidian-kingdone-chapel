@@ -1,0 +1,210 @@
+// @vitest-environment jsdom
+import { describe, expect, it } from 'vitest';
+import { EditorState } from '@codemirror/state';
+import { EditorView } from '@codemirror/view';
+
+import { LiveMarks, build, liveMarks } from './live';
+
+/**
+ * Every decoration a note asks for, as `what:text` — or `what@Ln` for the ones
+ * that dress a whole line.
+ *
+ * The cursor starts where an editor puts it, at the top of the note, so a note
+ * whose first line is plain is a note read with the cursor out of the way.
+ */
+function read(doc: string, cursor = 0): string[] {
+  const state = EditorState.create({ doc, selection: { anchor: cursor } });
+  const set = build(state, [{ from: 0, to: doc.length }]);
+  const out: string[] = [];
+  set.between(0, doc.length, (from, to, value) => {
+    const what = (value.spec.class as string | undefined) ?? 'hidden';
+    const line = state.doc.lineAt(from).number;
+    out.push(
+      from === to ? `${what}@L${line}` : `${what}:${doc.slice(from, to)}`,
+    );
+  });
+  return out;
+}
+
+/** A note whose first line keeps the cursor away from what is being read. */
+function below(...lines: string[]): string {
+  return ['Um verso.', '', ...lines].join('\n');
+}
+
+describe('build', () => {
+  it('marks a run and hides its delimiters', () => {
+    expect(read('Água é H~2~O.')).toEqual([
+      'hidden:~',
+      'kcp-sub:2',
+      'hidden:~',
+    ]);
+  });
+
+  it('marks each kind by its own class', () => {
+    expect(read('x^2^ !!nota!!')).toEqual([
+      'hidden:^',
+      'kcp-sup:2',
+      'hidden:^',
+      'hidden:!!',
+      'kcp-small:nota',
+      'hidden:!!',
+    ]);
+  });
+
+  it('gives the delimiters back when the cursor is in the run', () => {
+    expect(read('Água é H~2~O.', 9)).toEqual(['kcp-sub:2']);
+  });
+
+  it('hides them again when the cursor is elsewhere on the line', () => {
+    expect(read('Água é H~2~O.', 0)).toEqual([
+      'hidden:~',
+      'kcp-sub:2',
+      'hidden:~',
+    ]);
+  });
+
+  it('carries a run across a line break', () => {
+    expect(read(below('!!Refs: Sl 26.4', 'Notas: n1!!'))).toEqual([
+      'hidden:!!',
+      'kcp-small:Refs: Sl 26.4\nNotas: n1',
+      'hidden:!!',
+    ]);
+  });
+
+  it('does not carry a run across a blank line', () => {
+    expect(read(below('!!Refs: Sl 26.4', '', 'Notas: n1!!'))).toEqual([]);
+  });
+
+  it('leaves a code block alone', () => {
+    expect(read('```\na ~b~ c\n```')).toEqual([]);
+  });
+
+  it('leaves inline code alone, and reads a run across it', () => {
+    expect(read(below('!!rode `a ~b~ c` agora!!'))).toEqual([
+      'hidden:!!',
+      'kcp-small:rode `a ~b~ c` agora',
+      'hidden:!!',
+    ]);
+  });
+
+  it('leaves inline maths alone', () => {
+    expect(read('veja $x^2^$ ali')).toEqual([]);
+  });
+
+  it('leaves strikethrough alone', () => {
+    expect(read('um ~~riscado~~ verso')).toEqual([]);
+  });
+
+  it('reads a run written after a code block', () => {
+    expect(read('```\nx\n```\nH~2~O')).toEqual([
+      'hidden:~',
+      'kcp-sub:2',
+      'hidden:~',
+    ]);
+  });
+
+  it('reads nothing out of an empty note', () => {
+    expect(read('')).toEqual([]);
+  });
+
+  it('reads only what is on screen', () => {
+    const doc = 'H~2~O\n\n2^10^';
+    const state = EditorState.create({ doc });
+    const set = build(state, [{ from: 0, to: 5 }]);
+    const out: string[] = [];
+    set.between(0, doc.length, (_from, _to, value) => {
+      out.push((value.spec.class as string | undefined) ?? 'hidden');
+    });
+    expect(out).toEqual(['hidden', 'kcp-sub', 'hidden']);
+  });
+});
+
+describe('the !!! fence', () => {
+  const doc = ['Um verso.', '', '!!!', 'Uma nota.', '', 'E outra.', '!!!'].join(
+    '\n',
+  );
+
+  it('hides both fence lines and shrinks every line between them', () => {
+    expect(read(doc)).toEqual([
+      'kcp-fence@L3',
+      'kcp-small@L4',
+      'kcp-small@L5',
+      'kcp-small@L6',
+      'kcp-fence@L7',
+    ]);
+  });
+
+  it('gives a fence line back when the cursor is on it', () => {
+    expect(read(doc, 11)).toEqual([
+      'kcp-small@L4',
+      'kcp-small@L5',
+      'kcp-small@L6',
+      'kcp-fence@L7',
+    ]);
+  });
+
+  it('leaves a fence that was never closed as it was written', () => {
+    expect(read(below('!!!', 'Uma nota.'))).toEqual([]);
+  });
+
+  it('still marks the runs inside a fenced block', () => {
+    expect(read(below('!!!', 'Água é H~2~O.', '!!!'))).toEqual([
+      'kcp-fence@L3',
+      'kcp-small@L4',
+      'hidden:~',
+      'kcp-sub:2',
+      'hidden:~',
+      'kcp-fence@L5',
+    ]);
+  });
+});
+
+describe('LiveMarks', () => {
+  /** Enough of an editor to be decorated: what it holds and what it shows. */
+  function view(doc: string): EditorView {
+    const state = EditorState.create({ doc });
+    return {
+      state,
+      visibleRanges: [{ from: 0, to: doc.length }],
+    } as unknown as EditorView;
+  }
+
+  it('decorates what the editor opened on', () => {
+    const marks = new LiveMarks(view('H~2~O'));
+    expect(marks.decorations.size).toBe(3);
+  });
+
+  it('reads the editor again when the note changes', () => {
+    const marks = new LiveMarks(view('H~2~O'));
+    const next = view('H~2~O e 2^10^');
+    marks.update({
+      docChanged: true,
+      selectionSet: false,
+      viewportChanged: false,
+      view: next,
+    } as never);
+    expect(marks.decorations.size).toBe(6);
+  });
+
+  it('hands its decorations to the editor it is installed in', () => {
+    const view = new EditorView({
+      state: EditorState.create({ doc: 'H~2~O', extensions: [liveMarks] }),
+      parent: document.body,
+    });
+    expect(view.plugin(liveMarks)?.decorations.size).toBe(3);
+    expect(view.dom.querySelector('.kcp-sub')?.textContent).toBe('2');
+    view.destroy();
+  });
+
+  it('leaves the decorations alone when nothing that matters moved', () => {
+    const marks = new LiveMarks(view('H~2~O'));
+    const before = marks.decorations;
+    marks.update({
+      docChanged: false,
+      selectionSet: false,
+      viewportChanged: false,
+      view: view('H~2~O e 2^10^'),
+    } as never);
+    expect(marks.decorations).toBe(before);
+  });
+});
