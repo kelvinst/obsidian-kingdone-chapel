@@ -1,13 +1,52 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
+import type { MarkdownPostProcessorContext } from 'obsidian';
 
 import { renderMarks } from './marks';
 
-/** A rendered block, as the post-processor is handed one. */
+/** A section of a note: what it rendered as, and the lines it came from. */
+interface Section {
+  html: string;
+  from: number;
+  to: number;
+}
+
+/**
+ * Render a note section by section, the way reading view hands them over.
+ *
+ * Every section is its own call, and each is told the whole source and the
+ * lines it covers — which is all a fence has to go on.
+ */
+function note(source: string, sections: Section[]): HTMLElement[] {
+  const info = new Map<
+    HTMLElement,
+    { text: string; lineStart: number; lineEnd: number }
+  >();
+  const els = sections.map((section) => {
+    const el = document.createElement('div');
+    el.innerHTML = section.html;
+    info.set(el, {
+      text: source,
+      lineStart: section.from,
+      lineEnd: section.to,
+    });
+    return el;
+  });
+  const ctx = {
+    getSectionInfo: (el: HTMLElement) => info.get(el) ?? null,
+  } as unknown as MarkdownPostProcessorContext;
+  for (const el of els) renderMarks(el, ctx);
+  return els;
+}
+
+/** A rendered block of a note nothing is known about — an embed, a card. */
 function rendered(html: string): HTMLElement {
   const el = document.createElement('div');
   el.innerHTML = html;
-  renderMarks(el);
+  const ctx = {
+    getSectionInfo: () => null,
+  } as unknown as MarkdownPostProcessorContext;
+  renderMarks(el, ctx);
   return el;
 }
 
@@ -31,19 +70,34 @@ describe('renderMarks', () => {
     expect(el.textContent).toBe('210 = 1024.');
   });
 
-  it('shrinks a run written between dashes', () => {
-    const el = rendered('<p>Um verso --uma nota-- e o resto.</p>');
+  it('shrinks a run written between exclamations', () => {
+    const el = rendered('<p>Um verso !!uma nota!! e o resto.</p>');
     expect(marks(el)).toEqual(['span:uma nota']);
     expect(el.textContent).toBe('Um verso uma nota e o resto.');
   });
 
+  it('keeps a single exclamation inside a run', () => {
+    const el = rendered('<p>!!Que verso! E que salmo!!</p>');
+    expect(marks(el)).toEqual(['span:Que verso! E que salmo']);
+  });
+
+  it('leaves a sentence that only ends in exclamations alone', () => {
+    const el = rendered('<p>Que verso!! Que salmo!!</p>');
+    expect(marks(el)).toEqual([]);
+  });
+
+  it('no longer reads a dash pair as a run', () => {
+    const el = rendered('<p>Um verso --uma nota-- e o resto.</p>');
+    expect(marks(el)).toEqual([]);
+  });
+
   it('reads every kind in the order they were written', () => {
-    const el = rendered('<p>x^2^, H~2~O e --uma nota--</p>');
+    const el = rendered('<p>x^2^, H~2~O e !!uma nota!!</p>');
     expect(marks(el)).toEqual(['sup:2', 'sub:2', 'span:uma nota']);
   });
 
   it('marks a run that is the whole of the text', () => {
-    const el = rendered('<p>--tudo--</p>');
+    const el = rendered('<p>!!tudo!!</p>');
     expect(marks(el)).toEqual(['span:tudo']);
     expect(el.textContent).toBe('tudo');
   });
@@ -55,13 +109,13 @@ describe('renderMarks', () => {
   });
 
   it('carries a run across a soft line break', () => {
-    const el = rendered('<p>--Refs: Sl 26.4<br>Notas: n1--</p>');
+    const el = rendered('<p>!!Refs: Sl 26.4<br>Notas: n1!!</p>');
     expect(marks(el)).toEqual(['span:Refs: Sl 26.4', 'span:Notas: n1']);
     expect(el.querySelector('br')).not.toBeNull();
   });
 
   it('carries a run through the middle of an emphasis', () => {
-    const el = rendered('<p>--uma <em>nota</em> inteira--</p>');
+    const el = rendered('<p>!!uma <em>nota</em> inteira!!</p>');
     expect(marks(el)).toEqual(['span:uma ', 'span:nota', 'span: inteira']);
     expect(el.textContent).toBe('uma nota inteira');
   });
@@ -73,7 +127,7 @@ describe('renderMarks', () => {
   });
 
   it('does not carry a run out of its paragraph', () => {
-    const el = rendered('<p>--Refs: Sl 26.4</p><p>Notas: n1--</p>');
+    const el = rendered('<p>!!Refs: Sl 26.4</p><p>Notas: n1!!</p>');
     expect(marks(el)).toEqual([]);
   });
 
@@ -89,7 +143,7 @@ describe('renderMarks', () => {
   });
 
   it('leaves a delimiter written as itself alone', () => {
-    const el = rendered('<p>De ~ a ~, e de -- a -- também.</p>');
+    const el = rendered('<p>De ~ a ~, e de ! a ! também.</p>');
     expect(marks(el)).toEqual([]);
   });
 
@@ -100,13 +154,13 @@ describe('renderMarks', () => {
   });
 
   it('leaves inline code alone, and reads a run across it', () => {
-    const el = rendered('<p>--rode <code>a ~b~ c</code> agora--</p>');
+    const el = rendered('<p>!!rode <code>a ~b~ c</code> agora!!</p>');
     expect(marks(el)).toEqual(['span:rode ', 'span: agora']);
     expect(el.querySelector('code')?.textContent).toBe('a ~b~ c');
   });
 
   it('leaves a code block alone', () => {
-    const el = rendered('<pre><code>a ~b~ c^d^ e--f--g</code></pre>');
+    const el = rendered('<pre><code>a ~b~ c^d^ e!!f!!g</code></pre>');
     expect(marks(el)).toEqual([]);
   });
 
@@ -123,5 +177,82 @@ describe('renderMarks', () => {
   it('leaves a block holding no text at all alone', () => {
     const el = rendered('<p><img src="a.png"></p>');
     expect(el.innerHTML).toBe('<p><img src="a.png"></p>');
+  });
+});
+
+describe('the !!! fence', () => {
+  const source = [
+    'Um verso.',
+    '',
+    '!!!',
+    'Uma nota.',
+    '',
+    'E outra.',
+    '!!!',
+  ].join('\n');
+  const sections: Section[] = [
+    { html: '<p>Um verso.</p>', from: 0, to: 0 },
+    { html: '<p>!!!</p>', from: 2, to: 2 },
+    { html: '<p>Uma nota.</p>', from: 3, to: 3 },
+    { html: '<p>E outra.</p>', from: 5, to: 5 },
+    { html: '<p>!!!</p>', from: 6, to: 6 },
+  ];
+
+  it('shrinks every block between a pair, paragraphs and all', () => {
+    const [, , first, second] = note(source, sections);
+    expect(first.classList.contains('kcp-small')).toBe(true);
+    expect(second.classList.contains('kcp-small')).toBe(true);
+  });
+
+  it('empties the lines the fence is written on', () => {
+    const [, open, , , close] = note(source, sections);
+    expect(open.innerHTML).toBe('');
+    expect(close.innerHTML).toBe('');
+  });
+
+  it('leaves what lies outside the fence alone', () => {
+    const [before] = note(source, sections);
+    expect(before.classList.contains('kcp-small')).toBe(false);
+    expect(before.textContent).toBe('Um verso.');
+  });
+
+  it('reads a note it has already read without reading it again', () => {
+    const [, , first] = note(source, sections);
+    const [, , again] = note(source, sections);
+    expect(first.classList.contains('kcp-small')).toBe(true);
+    expect(again.classList.contains('kcp-small')).toBe(true);
+  });
+
+  it('finds the pair a block lies in, and not an earlier one', () => {
+    const twice = ['!!!', 'Uma.', '!!!', '', '!!!', 'Outra.', '!!!'].join('\n');
+    const [, , , inner] = note(twice, [
+      { html: '<p>!!!</p>', from: 0, to: 0 },
+      { html: '<p>Uma.</p>', from: 1, to: 1 },
+      { html: '<p>!!!</p>', from: 2, to: 2 },
+      { html: '<p>!!!</p>', from: 4, to: 4 },
+      { html: '<p>Outra.</p>', from: 5, to: 5 },
+      { html: '<p>!!!</p>', from: 6, to: 6 },
+    ]);
+    expect(inner.textContent).toBe('');
+  });
+
+  it('leaves a fence that was never closed as it was written', () => {
+    const open = ['!!!', 'Uma nota.'].join('\n');
+    const [fence, after] = note(open, [
+      { html: '<p>!!!</p>', from: 0, to: 0 },
+      { html: '<p>Uma nota.</p>', from: 1, to: 1 },
+    ]);
+    expect(fence.textContent).toBe('!!!');
+    expect(after.classList.contains('kcp-small')).toBe(false);
+  });
+
+  it('still marks the runs inside a fenced block', () => {
+    const inner = ['!!!', 'Água é H~2~O.', '!!!'].join('\n');
+    const [, block] = note(inner, [
+      { html: '<p>!!!</p>', from: 0, to: 0 },
+      { html: '<p>Água é H~2~O.</p>', from: 1, to: 1 },
+      { html: '<p>!!!</p>', from: 2, to: 2 },
+    ]);
+    expect(marks(block)).toEqual(['sub:2']);
   });
 });

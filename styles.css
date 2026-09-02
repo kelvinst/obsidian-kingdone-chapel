@@ -347,7 +347,7 @@
 
 /* --- marks --- */
 
-/* `--small--`, marked by the post-processor in `marks.ts`. Relative to
+/* `!!small!!`, marked by the post-processor in `marks.ts`. Relative to
    whatever it sits in, so an aside inside a heading steps down from the
    heading. `~sub~` and `^sup^` are left to the browser's own sizing and shift;
    they carry `.kcp-sub` and `.kcp-sup` only as something to hook a snippet on.
@@ -355,7 +355,8 @@
    None of the three touches line height. A run reaches across a soft line
    break, so it can be a whole line — or two — and the zero line height that
    suits a raised digit mid-sentence would collapse the lines of one that is
-   not. */
+   not. The class sits on the block itself between a `!!!` pair, which is the
+   same rule doing the same thing to a whole paragraph. */
 .kcp-small {
   font-size: 0.8em;
 }
