@@ -29,6 +29,14 @@ export class CreateVersionModal extends Modal {
   /** Whether the name has been written by hand, and so stopped following the code. */
   named = false;
   nameField: HTMLInputElement | null = null;
+  /**
+   * Whether the folder has been written by hand, and so stopped following the
+   * translation. The two fields answer for each other — a translation is
+   * usually filed beside the version answering it — but only until the reader
+   * says otherwise, and then the field they typed in stands.
+   */
+  foldered = false;
+  folderField: HTMLInputElement | null = null;
 
   constructor(app: App, plugin: KingdoneChapelPlugin, sources: Source[]) {
     super(app);
@@ -54,8 +62,14 @@ export class CreateVersionModal extends Modal {
         }
         drop.setValue(this.from).onChange((value) => {
           this.from = value;
+          // The folder follows the translation until it is written over, and
+          // what it followed to is shown: a folder decided here and not said
+          // is a version written somewhere the reader was never shown.
           const source = this.sources.find((s) => s.code === value);
-          if (source) this.folder = parentOf(source.path);
+          if (!this.foldered && source && this.folderField) {
+            this.folder = parentOf(source.path);
+            this.folderField.value = this.folder;
+          }
         });
       });
 
@@ -64,14 +78,16 @@ export class CreateVersionModal extends Modal {
       .setDesc(
         'Where the version folder is made. It is made if it is not there.',
       )
-      .addText((text) =>
+      .addText((text) => {
+        this.folderField = text.inputEl;
         text
           .setPlaceholder('Bibles')
           .setValue(this.folder)
           .onChange((value) => {
             this.folder = value;
-          }),
-      );
+            this.foldered = value.trim() !== '';
+          });
+      });
 
     new Setting(contentEl)
       .setName('Code')

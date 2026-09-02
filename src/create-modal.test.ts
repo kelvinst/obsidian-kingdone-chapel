@@ -51,6 +51,30 @@ beforeEach(() => {
   anchorsForVault();
 });
 
+/**
+ * Read the vault again with a version filed away from the translations, which
+ * is the only way the folder a version is offered ever moves: two translations
+ * sitting side by side answer with the folder holding both of them.
+ *
+ * Headed after the translations so the list still opens on ARA, and the folder
+ * the modal shows is the one the reader has yet to move off.
+ */
+function elsewhere() {
+  world = harness(
+    {
+      ...vault,
+      ...chapter('Shedd', 1, 'GEN', 1, ['No princípio.'], 'Estudos'),
+      'Estudos/Shedd/Shedd.md': '',
+    },
+    { language: 'pt' },
+  );
+  world.metadataCache.frontmatter.set('Estudos/Shedd/Shedd.md', {
+    'bible-group': 'Versões',
+    'bible-code': 'Shedd',
+  });
+  anchorsForVault();
+}
+
 describe('the fields it opens with', () => {
   it('starts on the first version, in the folder that version sits in', () => {
     const modal = modalOn();
@@ -97,6 +121,50 @@ describe('the fields it opens with', () => {
 
     expect(modal.from).toBe('Outra');
     expect(modal.folder).toBe('Bibles');
+  });
+
+  it('shows the folder it followed the version to', () => {
+    elsewhere();
+    const modal = modalOn();
+    const drop = modal.contentEl.querySelector('select') as HTMLSelectElement;
+    const folder = modal.contentEl.querySelector('input') as HTMLInputElement;
+
+    drop.value = 'Shedd';
+    drop.dispatchEvent(new Event('change'));
+
+    expect(modal.folder).toBe('Estudos');
+    expect(folder.value).toBe('Estudos');
+  });
+
+  it('leaves a folder that was written by hand where the version moves', () => {
+    elsewhere();
+    const modal = modalOn();
+    const drop = modal.contentEl.querySelector('select') as HTMLSelectElement;
+    const folder = modal.contentEl.querySelector('input') as HTMLInputElement;
+
+    folder.value = 'Comentarios';
+    folder.dispatchEvent(new Event('input'));
+    drop.value = 'Shedd';
+    drop.dispatchEvent(new Event('change'));
+
+    expect(modal.folder).toBe('Comentarios');
+    expect(folder.value).toBe('Comentarios');
+  });
+
+  it('follows the version again once the folder is emptied', () => {
+    elsewhere();
+    const modal = modalOn();
+    const drop = modal.contentEl.querySelector('select') as HTMLSelectElement;
+    const folder = modal.contentEl.querySelector('input') as HTMLInputElement;
+
+    folder.value = 'Comentarios';
+    folder.dispatchEvent(new Event('input'));
+    folder.value = '';
+    folder.dispatchEvent(new Event('input'));
+    drop.value = 'Shedd';
+    drop.dispatchEvent(new Event('change'));
+
+    expect(modal.folder).toBe('Estudos');
   });
 });
 
