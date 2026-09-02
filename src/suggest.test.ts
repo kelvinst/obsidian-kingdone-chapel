@@ -477,6 +477,38 @@ describe('an embed', () => {
   });
 });
 
+describe('a version no link may point at', () => {
+  /** The same vault, with a partial version beside the translations. */
+  function partial() {
+    const w = harness({
+      ...vault,
+      'Notas/Kelvin/Kelvin.md': '',
+      'Notas/Kelvin/Kelvin-01-GEN-001.md': '1. O que eu penso ^kelvin-gen-1-1',
+    });
+    w.metadataCache.frontmatter.set('Notas/Kelvin/Kelvin.md', {
+      bible: true,
+      complete: false,
+    });
+    return new ReferenceSuggest(w.plugin);
+  }
+
+  it('is not reached for by a half-written version name', () => {
+    expect(
+      partial().versionsFor({ version: 'k', versionPrefix: true }, null),
+    ).toEqual([]);
+  });
+
+  it('is not reached for by its own name written in full', () => {
+    expect(
+      partial().versionsFor({ version: 'kelvin', versionPrefix: false }, null),
+    ).toEqual([]);
+  });
+
+  it('offers no row for a reference that names it', async () => {
+    expect(await offered(context('Gn 1 -kelvin'), partial())).toEqual([]);
+  });
+});
+
 describe('versionsFor', () => {
   it('reaches for every version a half-written name begins', () => {
     expect(

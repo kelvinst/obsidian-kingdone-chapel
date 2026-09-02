@@ -41,6 +41,12 @@ import {
 } from './sources';
 import type { Source } from './sources';
 
+/** The version `word` names, matched without case, or null where none does. */
+function named(versions: string[], word: string): string | null {
+  const wanted = word.toLowerCase();
+  return versions.find((v) => v.toLowerCase() === wanted) || null;
+}
+
 /** Rendered elements a verse can be: a list item now, a paragraph in older chapters. */
 const VERSE_SELECTOR = '.markdown-preview-sizer li, .markdown-preview-sizer p';
 
@@ -472,6 +478,26 @@ export default class KingdoneChapelPlugin extends Plugin {
   }
 
   /**
+   * The versions a link may be written to: the ones answering for the whole
+   * Bible.
+   *
+   * Everything else about a version is open to all of them — the sidebar lists
+   * them, the breadcrumb walks them, each gets its own command — because
+   * reading a partial version beside a translation is the point of keeping
+   * one. Writing is where the two part: a reference names a chapter, and a
+   * version that has not written that chapter would be linked to a file that
+   * is not there. So `@` and the version it falls back on read this list, and
+   * everything else reads the whole of it.
+   */
+  completeSources(): Source[] {
+    return this.listSources().filter((source) => source.complete);
+  }
+
+  completeVersions(): string[] {
+    return this.completeSources().map((source) => source.code);
+  }
+
+  /**
    * Parse the active file into { version, bookIndex, book, chapter, verse }.
    * Expects <VERSION>/<any folders>/<VERSION>-<NN>-<CODE>-<CCC>.md
    */
@@ -807,17 +833,34 @@ export default class KingdoneChapelPlugin extends Plugin {
    * such version. This is what tells `@ARA Joao` from a two-word book name.
    */
   findVersion(word: string): string | null {
-    const wanted = word.toLowerCase();
-    return this.listVersions().find((v) => v.toLowerCase() === wanted) || null;
+    return named(this.listVersions(), word);
+  }
+
+  /**
+   * The same, among the versions a link may point at.
+   *
+   * A reference naming a version that cannot be linked to is a reference that
+   * names no version at all, rather than one refused after the fact: the word
+   * goes back to being part of the book name, and the popup says what it would
+   * have said had the vault never held that version. Nothing is written that
+   * the reader would then have to unwrite.
+   */
+  findCompleteVersion(word: string): string | null {
+    return named(this.completeVersions(), word);
   }
 
   /**
    * Version a reference with none of its own points at: the one set in the
    * settings, else the version of the note being written in when that note is
    * itself a chapter, else the first version in the vault.
+   *
+   * Only ever one a link may point at, the note being written in included: a
+   * reference written inside a partial version still has to land somewhere it
+   * can be followed, and the version at hand is no better a target for being
+   * the one under the cursor.
    */
   defaultVersion(from: TFile | null): string | null {
-    const versions = this.listVersions();
+    const versions = this.completeVersions();
     const preferred = this.settings.defaultVersion;
     if (preferred && versions.includes(preferred)) return preferred;
 

@@ -44,6 +44,26 @@ let world: Harness;
 let tab: KingdoneChapelSettingTab;
 let containerEl: HTMLElement;
 
+/**
+ * The same vault with a partial version in it, drawn afresh: a version that
+ * says it is not the whole Bible is listed like any other and offered as a
+ * link target by nothing.
+ */
+function withKelvin(): KingdoneChapelSettingTab {
+  const w = harness({
+    ...vault,
+    'Notas/Kelvin/Kelvin.md': '',
+    'Notas/Kelvin/Kelvin-01-GEN-001.md': '1. O que eu penso ^kelvin-gen-1-1',
+  });
+  w.metadataCache.frontmatter.set('Notas/Kelvin/Kelvin.md', {
+    bible: true,
+    complete: false,
+  });
+  const drawn = new KingdoneChapelSettingTab(w.app, w.plugin);
+  drawn.display();
+  return drawn;
+}
+
 beforeEach(() => {
   world = harness(vault, { labels: { NVI: 'Nova Versão Internacional' } });
   tab = new KingdoneChapelSettingTab(world.app, world.plugin);
@@ -152,6 +172,21 @@ describe('the default version for @ references', () => {
     ]);
   });
 
+  it('leaves out a version no link may point at', () => {
+    const partial = withKelvin();
+    const drop = control<HTMLSelectElement>(
+      partial.containerEl,
+      name,
+      'select',
+    );
+
+    expect(Array.from(drop.options).map((o) => o.value)).toEqual([
+      '',
+      'ARA',
+      'NVI',
+    ]);
+  });
+
   it('saves the version it is set to', async () => {
     const drop = control<HTMLSelectElement>(containerEl, name, 'select');
     drop.value = 'NVI';
@@ -177,6 +212,14 @@ describe('the versions it found', () => {
         '.setting-item-description',
       )?.textContent,
     ).toBe('ARA, NVI');
+  });
+
+  it('says which of them no link may point at', () => {
+    expect(
+      setting(withKelvin().containerEl, 'Detected versions').querySelector(
+        '.setting-item-description',
+      )?.textContent,
+    ).toBe('Kelvin (partial), ARA, NVI');
   });
 
   it('says so when there are none', () => {
