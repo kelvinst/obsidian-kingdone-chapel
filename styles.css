@@ -344,3 +344,15 @@
   --embed-border-start: none;
   --embed-padding: 0;
 }
+
+/* --- subscript and superscript --- */
+
+/* `~sub~` and `^sup^`, marked by the post-processor in `subsup.ts`. The tags
+   carry the browser's own size and shift; the zero line height is what keeps a
+   raised or lowered run from opening up the line it sits in. Scoped to the
+   plugin's class so a `<sub>` a note writes by hand is left as the theme has
+   it. */
+.kcp-sub,
+.kcp-sup {
+  line-height: 0;
+}

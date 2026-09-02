@@ -334,6 +334,8 @@ export class Plugin extends Component {
   views = new Map<string, (leaf: unknown) => unknown>();
   settingTabs: PluginSettingTab[] = [];
   suggests: unknown[] = [];
+  /** What `onload` gave the renderer, for a test to run over an element. */
+  postProcessors: ((el: HTMLElement) => unknown)[] = [];
   ribbons: { icon: string; title: string; callback: () => void }[] = [];
   /** What `saveData` last wrote, which is what `loadData` reads back. */
   data: unknown = null;
@@ -373,6 +375,13 @@ export class Plugin extends Component {
 
   registerEditorSuggest(suggest: unknown) {
     this.suggests.push(suggest);
+  }
+
+  registerMarkdownPostProcessor(
+    processor: (el: HTMLElement) => unknown,
+  ): (el: HTMLElement) => unknown {
+    this.postProcessors.push(processor);
+    return processor;
   }
 
   async loadData(): Promise<unknown> {
