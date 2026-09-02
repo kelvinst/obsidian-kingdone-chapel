@@ -69,8 +69,9 @@ function elsewhere() {
     { language: 'pt' },
   );
   world.metadataCache.frontmatter.set('Estudos/Shedd/Shedd.md', {
-    'bible-group': 'Versões',
-    'bible-code': 'Shedd',
+    bible: true,
+    group: 'Versões',
+    code: 'Shedd',
   });
   anchorsForVault();
 }
@@ -305,9 +306,10 @@ describe('writing the version', () => {
 
     expect(wrote('Comentarios/Shedd/Shedd.md')).toBe(
       '---\n' +
-        'bible-group: Versões\n' +
-        'bible-code: Shedd\n' +
-        'bible-name: Bíblia Shedd\n' +
+        'bible: true\n' +
+        'group: Versões\n' +
+        'code: Shedd\n' +
+        'name: Bíblia Shedd\n' +
         '---\n',
     );
   });
@@ -315,9 +317,7 @@ describe('writing the version', () => {
   it('falls back to the code where no name was written', async () => {
     await write();
 
-    expect(wrote('Comentarios/Shedd/Shedd.md')).toContain(
-      'bible-name: Shedd\n',
-    );
+    expect(wrote('Comentarios/Shedd/Shedd.md')).toContain('name: Shedd\n');
   });
 
   it('writes a chapter for every chapter the translation holds', async () => {

@@ -8,18 +8,19 @@
  * translation it is based on.
  *
  * So a folder says so itself, in the note it already keeps. Any note sitting
- * directly in a folder with a `bible-` key in its frontmatter makes that folder
+ * directly in a folder and saying `bible` in its frontmatter makes that folder
  * a version, wherever in the vault it is and however deeply it is buried:
  *
  *     ---
- *     bible-group: Editions
- *     bible-code: Shedd
- *     bible-name: Bíblia Shedd
+ *     bible: true
+ *     group: Editions
+ *     code: Shedd
+ *     name: Bíblia Shedd
  *     ---
  *
- * `bible-group` is the heading it is listed under, so the grouping is the
- * vault's to name — `Translations`, `Editions`, `Comentários`, anything —
- * rather than a set of kinds this plugin decides on.
+ * `group` is the heading it is listed under, so the grouping is the vault's to
+ * name — `Translations`, `Editions`, `Comentários`, anything — rather than a
+ * set of kinds this plugin decides on.
  *
  * Declaring is not required. The direct subfolders of the translations folder
  * are still versions on their own, headed as translations, so a vault that only
@@ -30,20 +31,27 @@ import { TFolder } from 'obsidian';
 import type { App, TAbstractFile, TFile } from 'obsidian';
 
 /**
- * What every frontmatter key this plugin reads begins with.
+ * The key that does the declaring, and the only one this plugin looks for
+ * before it has decided a folder is a version at all.
  *
- * The prefix is the whole of the marker: a note carrying any key under it says
- * the folder it sits in is a version, and there is nothing to write twice. It
- * has to be a prefix and not a bare name, because presence is what declares
- * and every note in the vault is asked — `type`, `group` and `name` are among
- * the most written keys there are, and any of them would have vaults growing
- * versions they never asked for.
+ * It is a key of its own rather than one of the three that describe the
+ * version, because every note in the vault is asked and presence is the whole
+ * of the question: `code`, `name` and `group` are among the most written keys
+ * there are, and reading any of them as the marker would have vaults growing
+ * versions they never asked for. One key that means nothing else says it once.
  */
-export const SOURCE_PREFIX = 'bible-';
+export const SOURCE_KEY = 'bible';
 
-/** Whether a note's frontmatter says the folder it sits in is a version. */
+/**
+ * Whether a note's frontmatter says the folder it sits in is a version.
+ *
+ * Written at all is enough — `bible: true` reads best and is what the create
+ * command writes, but a key on its own is a key someone meant. `bible: false`
+ * is the one way to write it and mean no, so a note can turn itself off
+ * without the key having to be deleted and remembered.
+ */
 export function declaresSource(front: Record<string, unknown>): boolean {
-  return Object.keys(front).some((key) => key.startsWith(SOURCE_PREFIX));
+  return SOURCE_KEY in front && front[SOURCE_KEY] !== false;
 }
 
 /** A folder holding one version's notes, and how it is named and listed. */
@@ -119,21 +127,22 @@ export function collectSources(
  * Read a declaring note's frontmatter, filling in what it leaves out.
  *
  * Every key is optional — the folder's own name is a code, and a code is a
- * label — so the least a folder can say is one of them, whichever it had a
- * reason to write. A folder naming no `bible-group` is listed under no
- * heading, the same as one in no folder the settings name.
+ * label — so the least a folder can say is `bible` and nothing else, and be
+ * read entirely off where it sits and what it is called. A folder naming no
+ * `group` is listed under no heading, the same as one in no folder the
+ * settings name.
  */
 function declared(
   folder: TFolder,
   front: Record<string, unknown>,
   declaredBy: string,
 ): Source {
-  const code = text(front[SOURCE_PREFIX + 'code']) || folder.name;
+  const code = text(front.code) || folder.name;
   return {
     path: folder.path,
     code,
-    label: text(front[SOURCE_PREFIX + 'name']) || code,
-    group: text(front[SOURCE_PREFIX + 'group']),
+    label: text(front.name) || code,
+    group: text(front.group),
     declaredBy,
   };
 }

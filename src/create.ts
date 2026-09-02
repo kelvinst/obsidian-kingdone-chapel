@@ -97,14 +97,15 @@ export function chapterNote(
 
 /**
  * The note that says the new folder is a version, what to call it, and what
- * to list it under. A version naming no heading leaves the key out rather
- * than writing it empty, which is the same answer and reads as one.
+ * to list it under. `bible` is what declares it; the rest describe it, and a
+ * version naming no heading leaves the key out rather than writing it empty,
+ * which is the same answer and reads as one.
  */
 export function declaringNote(
   code: string,
   name: string,
   group: string,
 ): string {
-  const heading = group ? `bible-group: ${group}\n` : '';
-  return `---\n${heading}bible-code: ${code}\nbible-name: ${name}\n---\n`;
+  const heading = group ? `group: ${group}\n` : '';
+  return `---\nbible: true\n${heading}code: ${code}\nname: ${name}\n---\n`;
 }
