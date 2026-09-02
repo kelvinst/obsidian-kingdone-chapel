@@ -87,6 +87,35 @@ describe('build', () => {
     ]);
   });
 
+  it('leaves the caret of a block anchor alone', () => {
+    expect(
+      read('Refs: [[NVI-43-JHN-001#^nvi-jhn-1-1|Jo 1.1]]; [[X#^x-1-2|Jr]].'),
+    ).toEqual([]);
+  });
+
+  it('leaves the block ids of two verse lines alone', () => {
+    expect(
+      read(
+        [
+          '**1** No princípio. ^ara-gen-1-1',
+          '**2** E a terra. ^ara-gen-1-2',
+        ].join('\n'),
+      ),
+    ).toEqual([]);
+  });
+
+  it('leaves a markdown link alone', () => {
+    expect(read('Veja [um^dois](http://x/a^b) ali.')).toEqual([]);
+  });
+
+  it('reads a run holding a link', () => {
+    expect(read(below('!!Refs: [[Sl 26.4|Sl 26.4]].!!'))).toEqual([
+      'hidden:!!',
+      'kcp-small:Refs: [[Sl 26.4|Sl 26.4]].',
+      'hidden:!!',
+    ]);
+  });
+
   it('leaves inline maths alone', () => {
     expect(read('veja $x^2^$ ali')).toEqual([]);
   });

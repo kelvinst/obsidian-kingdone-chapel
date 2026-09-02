@@ -27,8 +27,17 @@ import { fencesOf, runsIn } from './syntax';
 /** A stretch of source no run may be read out of: code, or maths. */
 const OPAQUE = '￼';
 
-/** Inline code and inline maths, neither of which is prose. */
-const NOT_PROSE = /`[^`\n]*`|\$[^$\n]*\$/g;
+/**
+ * What the source holds that the reader never sees as prose.
+ *
+ * Code and maths are one half of it, and links the other: a link carries its
+ * target as well as its label, and a target is full of delimiters the note
+ * never wrote. A block anchor is a caret — `[[NVI-43-JHN-001#^nvi-jhn-1-1|Jo
+ * 1.1]]` — so a line naming two of them would otherwise read as one long
+ * superscript, and so would a verse between two lines ending in block ids.
+ */
+const NOT_PROSE =
+  /`[^`\n]*`|\$[^$\n]*\$|!?\[\[[^\]\n]*\]\]|\[[^\]\n]*\]\([^)\n]*\)|\^[\w-]+(?=[ \t]*$)/gm;
 
 /** A line opening or closing a code block. */
 const CODE_BLOCK = /^\s*(?:```|~~~)/;
@@ -38,8 +47,8 @@ const CODE_BLOCK = /^\s*(?:```|~~~)/;
  *
  * The stand-in is as long as what it replaces, so a run's place in the source
  * is still its place after masking — and being a character no delimiter can be
- * read from, `!!rode `ls` agora!!` stays one aside without the code inside it
- * being read for delimiters.
+ * read from, `!!rode `ls` agora!!` stays one aside, and `!!Refs: [[Sl 26.4]].!!`
+ * one aside holding a link, without either being read for delimiters.
  */
 function mask(text: string): string {
   return text.replace(NOT_PROSE, (found) => OPAQUE.repeat(found.length));
