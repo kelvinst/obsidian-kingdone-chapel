@@ -336,6 +336,8 @@ export class Plugin extends Component {
   suggests: unknown[] = [];
   /** What `onload` gave the renderer, for a test to run over an element. */
   postProcessors: ((el: HTMLElement) => unknown)[] = [];
+  /** What `onload` gave the editor, so a test can see one was. */
+  editorExtensions: unknown[] = [];
   ribbons: { icon: string; title: string; callback: () => void }[] = [];
   /** What `saveData` last wrote, which is what `loadData` reads back. */
   data: unknown = null;
@@ -382,6 +384,10 @@ export class Plugin extends Component {
   ): (el: HTMLElement) => unknown {
     this.postProcessors.push(processor);
     return processor;
+  }
+
+  registerEditorExtension(extension: unknown) {
+    this.editorExtensions.push(extension);
   }
 
   async loadData(): Promise<unknown> {

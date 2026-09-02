@@ -1,63 +1,15 @@
 import type { MarkdownPostProcessorContext } from 'obsidian';
 
+import { fencesOf, runsIn } from './syntax';
+import type { Mark } from './syntax';
+
 /**
- * The `~sub~`, `^sup^` and `!!small!!` syntax: three marks Obsidian has no
- * Markdown for, and a `!!!` fence for a block of the last of them.
+ * The three marks in a rendered note.
  *
- * Notes want all three often enough — a verse number beside a word, a footnote
- * marker of one's own, an aside said more quietly than the sentence around it —
- * and without a syntax each has to be written as a raw tag in the middle of the
- * prose. A CSS snippet cannot add one: nothing in the rendered output marks the
- * passage, so there is nothing for a rule to select. The marking is what this
- * does.
- *
- * The sub and sup delimiters are the ones Pandoc and markdown-it use, so a note
- * carrying them still reads as intended outside this vault; neither ecosystem
- * has a small, and an exclamation is free of Markdown, only ever meaning
- * anything in front of a bracket. All three are free of Obsidian too:
- * strikethrough takes two tildes, and a lone caret means something only at the
- * end of a line, where it names a block.
- *
- * A run reaches as far as bold and italic do, and stops where they stop: across
- * a soft line break, through the middle of a link or an emphasis, but never out
- * of the paragraph it started in. An aside of several paragraphs is what the
- * fence is for — three exclamations on a line of their own, opening and closing
- * a block of them the way three backticks are the block form of one.
- *
- * The delimiters are dropped rather than hidden: reading view is finished text,
+ * `syntax.ts` reads the runs; here they are cut into the rendered page. The
+ * delimiters are dropped rather than hidden: reading view is finished text,
  * with no cursor that could ever want them back.
  */
-
-/** What a run is marked as, one per capturing group of `RUN`, in that order. */
-interface Mark {
-  tag: string;
-  cls: string;
-}
-
-const MARKS: Mark[] = [
-  { tag: 'sub', cls: 'kcp-sub' },
-  { tag: 'sup', cls: 'kcp-sup' },
-  { tag: 'span', cls: 'kcp-small' },
-];
-
-/**
- * One run of any of the three kinds, its text in the group that matched.
- *
- * All three are read the same way. Neither end of a run may be a space, which
- * is what keeps a delimiter written as itself — `a ~ b ~ c` — from opening one;
- * and a run may not hold its own delimiter, which is what closes `~um~ e ~dois~`
- * twice rather than once. The tilde is barred from touching another tilde
- * besides, so `~~riscado~~` stays strikethrough.
- *
- * A small is the exception to holding its own delimiter: prose is full of single
- * exclamations, so only a doubled one closes a run. Neither end of one may touch
- * a third, which is what keeps a fence line from being read as an inline run.
- *
- * Nothing in any of them is written as `.`, which would not match the newline a
- * soft line break joins as.
- */
-const RUN =
-  /(?<!~)~([^~\s](?:[^~]*?[^~\s])?)~(?!~)|\^([^^\s](?:[^^]*?[^^\s])?)\^|!!(?![\s!])((?:(?!!!)[\s\S])*?[^\s])!!(?!!)/g;
 
 /**
  * What stands in the gathered text for a stretch that is not prose. It is a
@@ -211,18 +163,10 @@ function paint(block: Block) {
   if (!block.pieces.length) return;
 
   const ops = new Map<Text, Op[]>();
-  RUN.lastIndex = 0;
-  let match = RUN.exec(block.text);
-  while (match) {
-    const group = match[1] !== undefined ? 1 : match[2] !== undefined ? 2 : 3;
-    const start = match.index;
-    const end = start + match[0].length;
-    // Both delimiters are the same width, whichever kind of run this is.
-    const delimiter = (match[0].length - match[group].length) / 2;
-    note(block, start, start + delimiter, null, ops);
-    note(block, start + delimiter, end - delimiter, MARKS[group - 1], ops);
-    note(block, end - delimiter, end, null, ops);
-    match = RUN.exec(block.text);
+  for (const run of runsIn(block.text)) {
+    note(block, run.from, run.contentFrom, null, ops);
+    note(block, run.contentFrom, run.contentTo, run.mark, ops);
+    note(block, run.contentTo, run.to, null, ops);
   }
 
   for (const [node, list] of ops) rewrite(node, list);
@@ -240,44 +184,6 @@ function markInline(el: HTMLElement) {
   const block: Block = { text: '', pieces: [] };
   gather(el, block);
   paint(block);
-}
-
-/** A line of its own holding nothing but the fence. */
-const FENCE = /^!!!$/;
-
-/** The lines a fence opens and closes on, in the order they were written. */
-function readFences(source: string): [number, number][] {
-  const out: [number, number][] = [];
-  const lines = source.split('\n');
-  let open: number | null = null;
-  for (let line = 0; line < lines.length; line++) {
-    if (!FENCE.test(lines[line].trim())) continue;
-    if (open === null) open = line;
-    else {
-      out.push([open, line]);
-      open = null;
-    }
-  }
-  // A fence left open closes nothing, and its line stays as it was written.
-  return out;
-}
-
-/**
- * The fences of the note last asked about.
- *
- * Reading view renders a section at a time, so every block of a note asks this
- * same question of the same source, one after another. Reading it once is the
- * difference between walking a chapter's lines once and walking them per verse.
- */
-let lastSource = '';
-let lastFences: [number, number][] = [];
-
-function fencesOf(source: string): [number, number][] {
-  if (source !== lastSource) {
-    lastSource = source;
-    lastFences = readFences(source);
-  }
-  return lastFences;
 }
 
 /** Empty `el`, the fence line itself being no part of what the note says. */

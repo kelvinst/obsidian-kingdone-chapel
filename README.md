@@ -153,7 +153,10 @@ E outro parágrafo dela.
 Code and maths are left exactly as written, and a run may reach across an inline `` `code` ``
 without its contents being read for delimiters.
 
-Reading view only for now — while editing, the delimiters still show as typed.
+Both views draw them. Reading view rewrites the note; while editing, the run is styled where
+it stands and its delimiters are hidden until the cursor is inside it — the way Obsidian
+hides the asterisks of its own bold. A `!!!` line likewise stays out of the way until you
+put the cursor on it.
 
 ### `@` references
 

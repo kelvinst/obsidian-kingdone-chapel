@@ -360,3 +360,25 @@
 .kcp-small {
   font-size: 0.8em;
 }
+
+/* Live preview draws the source itself, so a mark there is a decoration over
+   the text rather than a tag: the classes have to carry the shape the browser
+   would have given `<sub>` and `<sup>`. Reading view, which does get the tags,
+   is left alone. */
+.cm-line .kcp-sub,
+.cm-line .kcp-sup {
+  font-size: 0.75em;
+}
+
+.cm-line .kcp-sup {
+  vertical-align: super;
+}
+
+.cm-line .kcp-sub {
+  vertical-align: sub;
+}
+
+/* The line a `!!!` is written on, while the cursor is somewhere else. */
+.cm-line.kcp-fence {
+  display: none;
+}
