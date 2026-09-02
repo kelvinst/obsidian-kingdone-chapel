@@ -22,12 +22,17 @@
  * name — `Translations`, `Editions`, `Comentários`, anything — rather than a
  * set of kinds this plugin decides on.
  *
- * `complete: false` says the version does not answer for the whole Bible, and
- * that is the one thing this plugin holds a version back from: it can be read
- * beside every other and walked through like every other, but no link is
+ * `complete` says whether the version answers for the whole Bible, and that is
+ * the one thing this plugin holds a version back from: a partial one can be
+ * read beside every other and walked through like every other, but no link is
  * written to it, because a link to a chapter nobody has written yet is a link
- * to nothing. Left out it is complete, a version normally being the whole of
- * one.
+ * to nothing.
+ *
+ * Left out, where the folder sits answers for it — a translation is the whole
+ * of a Bible, and a commentary filed elsewhere is written a book at a time —
+ * so the key is only ever written by the folder that is the exception to the
+ * company it keeps: `complete: true` on a study Bible that does run end to
+ * end, `complete: false` on a draft translation that does not yet.
  *
  * Declaring is not required. The direct subfolders of the translations folder
  * are still versions on their own, headed as translations, so a vault that only
@@ -48,6 +53,18 @@ import type { App, TAbstractFile, TFile } from 'obsidian';
  * versions they never asked for. One key that means nothing else says it once.
  */
 export const SOURCE_KEY = 'bible';
+
+/**
+ * The key saying whether the version answers for the whole Bible.
+ *
+ * Left out, where the folder sits answers for it: one filed in the
+ * translations folder is a translation, and a translation is the whole of a
+ * Bible; one declared anywhere else is a commentary, a study Bible or a set of
+ * notes, and those are written a book at a time. So the common case writes
+ * nothing either way, and the key is for the folder that is the exception to
+ * the company it keeps.
+ */
+export const COMPLETE_KEY = 'complete';
 
 /**
  * Whether a note's frontmatter says the folder it sits in is a version.
@@ -87,8 +104,10 @@ export interface Source {
    * be read, only a complete version can be pointed at — and a partial one
    * says so once rather than being kept out of the vault's own lists.
    *
-   * True unless a note says otherwise, because a version is normally the whole
-   * of one and the exception is the thing worth writing down.
+   * Where the folder sits decides it unless a note says otherwise: a folder in
+   * the translations folder is a translation, and a translation is the whole
+   * of a Bible; one declared anywhere else is the sort of thing that is
+   * written a book at a time, and is taken as partial until it says it is not.
    */
   complete: boolean;
   /**
@@ -119,28 +138,33 @@ export function collectSources(
   files: TFile[] = app.vault.getMarkdownFiles(),
 ): Map<string, Source> {
   const out = new Map<string, Source>();
+  // Read before the notes are, because where a folder sits is what a note in
+  // it leaves unsaid: a translation does not have to call itself complete.
+  const root = app.vault.getAbstractFileByPath(translationsFolder);
+  const children =
+    root instanceof TFolder
+      ? root.children.filter((c): c is TFolder => c instanceof TFolder)
+      : [];
+  const filed = new Set(children.map((c) => c.path));
 
   for (const file of files) {
     const front = app.metadataCache.getFileCache(file)?.frontmatter;
     if (!front || !declaresSource(front)) continue;
     const folder = file.parent;
     if (!folder || out.has(folder.path)) continue;
-    out.set(folder.path, declared(folder, front, file.path));
+    out.set(folder.path, declared(folder, front, file.path, filed));
   }
 
-  const root = app.vault.getAbstractFileByPath(translationsFolder);
-  if (root instanceof TFolder) {
-    for (const child of root.children) {
-      if (!(child instanceof TFolder) || out.has(child.path)) continue;
-      out.set(child.path, {
-        path: child.path,
-        code: child.name,
-        label: child.name,
-        group: translations,
-        complete: true,
-        declaredBy: '',
-      });
-    }
+  for (const child of children) {
+    if (out.has(child.path)) continue;
+    out.set(child.path, {
+      path: child.path,
+      code: child.name,
+      label: child.name,
+      group: translations,
+      complete: true,
+      declaredBy: '',
+    });
   }
 
   return out;
@@ -153,13 +177,17 @@ export function collectSources(
  * label — so the least a folder can say is `bible` and nothing else, and be
  * read entirely off where it sits and what it is called. A folder naming no
  * `group` is listed under no heading, the same as one in no folder the
- * settings name. `complete: false` is the one that has to be written to be
- * true of a folder, since a version is normally the whole of one.
+ * settings name.
+ *
+ * `complete` is the one key read against where the folder sits rather than
+ * against a default: `filed` is the translations folder's own subfolders, and
+ * a folder among them is a whole Bible without being asked to say so.
  */
 function declared(
   folder: TFolder,
   front: Record<string, unknown>,
   declaredBy: string,
+  filed: Set<string>,
 ): Source {
   const code = text(front.code) || folder.name;
   return {
@@ -167,7 +195,10 @@ function declared(
     code,
     label: text(front.name) || code,
     group: text(front.group),
-    complete: front.complete !== false,
+    complete:
+      COMPLETE_KEY in front
+        ? front[COMPLETE_KEY] !== false
+        : filed.has(folder.path),
     declaredBy,
   };
 }

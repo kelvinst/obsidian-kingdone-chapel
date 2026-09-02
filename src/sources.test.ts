@@ -95,7 +95,7 @@ describe('collectSources', () => {
       code: 'Shedd',
       label: 'Shedd',
       group: 'Editions',
-      complete: true,
+      complete: false,
       declaredBy: 'Igreja/Comentarios/Shedd/Shedd.md',
     });
   });
@@ -199,14 +199,56 @@ describe('collectSources', () => {
     expect(found.get('Notas/Kelvin')).toMatchObject({ complete: false });
   });
 
-  it('takes a version that says nothing about it for the whole of one', () => {
+  it('takes a version declared away from the translations for a partial one', () => {
     const shedd = folder('Notes/Shedd');
     const found = collect(
       vault([note('Notes/Shedd/Shedd.md', shedd, { bible: true })]),
       'Bibles',
     );
 
+    expect(found.get('Notes/Shedd')).toMatchObject({ complete: false });
+  });
+
+  it('takes one declared inside the translations folder for a whole Bible', () => {
+    const bibles = folder('Bibles');
+    const ara = folder('Bibles/ARA', bibles);
+    const found = collect(
+      vault([note('Bibles/ARA/ARA.md', ara, { bible: true })], bibles),
+      'Bibles',
+    );
+
+    expect(found.get('Bibles/ARA')).toMatchObject({ complete: true });
+  });
+
+  it('lets a version away from the translations say it is a whole Bible', () => {
+    const shedd = folder('Notes/Shedd');
+    const found = collect(
+      vault([
+        note('Notes/Shedd/Shedd.md', shedd, { bible: true, complete: true }),
+      ]),
+      'Bibles',
+    );
+
     expect(found.get('Notes/Shedd')).toMatchObject({ complete: true });
+  });
+
+  it('lets a translation say it is not a whole Bible yet', () => {
+    const bibles = folder('Bibles');
+    const draft = folder('Bibles/Rascunho', bibles);
+    const found = collect(
+      vault(
+        [
+          note('Bibles/Rascunho/Rascunho.md', draft, {
+            bible: true,
+            complete: false,
+          }),
+        ],
+        bibles,
+      ),
+      'Bibles',
+    );
+
+    expect(found.get('Bibles/Rascunho')).toMatchObject({ complete: false });
   });
 
   it('ignores a declaring note that is in no folder at all', () => {
