@@ -96,26 +96,31 @@ export function chapterNote(
 }
 
 /**
- * The note that says the new folder is a version, what to call it, and what
- * to list it under. `bible` is what declares it; the rest describe it, and a
- * version naming no heading leaves the key out rather than writing it empty,
- * which is the same answer and reads as one.
+ * The note that says the new folder is a version, what to call it, what to
+ * list it under, and which translation it was written from. `bible` is what
+ * declares it; the rest describe it, and a version naming no heading leaves
+ * the key out rather than writing it empty, which is the same answer and reads
+ * as one.
  *
- * `complete` is written outright rather than left to where the folder lands.
- * A generated version answers its translation chapter for chapter — that is
- * what generating it did — so it is as complete as the translation was,
- * wherever it is filed, and saying so is what lets `@` link to it from the
- * moment it is written.
+ * `complete` is written outright rather than left to where the folder lands. A
+ * generated version has a file for every chapter its translation has — that is
+ * what generating it did — so it is a whole Bible wherever it is filed, and
+ * saying so is what lets `@` link to it from the moment it is written.
+ *
+ * `translation` is what it was written from. Nothing reads it back yet: it is
+ * there so the vault says where its chapters came from, which is the question
+ * anyone opening a folder full of embeds asks first, and it is what a run that
+ * regenerates the version would have to be told otherwise.
  */
 export function declaringNote(
   code: string,
   name: string,
   group: string,
-  complete: boolean,
+  translation: string,
 ): string {
   const heading = group ? `group: ${group}\n` : '';
   return (
-    `---\nbible: true\ncomplete: ${complete}\n` +
+    `---\nbible: true\ncomplete: true\ntranslation: ${translation}\n` +
     `${heading}code: ${code}\nname: ${name}\n---\n`
   );
 }

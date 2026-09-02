@@ -97,10 +97,11 @@ describe('chapterNote', () => {
 
 describe('declaringNote', () => {
   it('says the heading, the code and the name', () => {
-    expect(declaringNote('Shedd', 'Bíblia Shedd', 'Versões', true)).toBe(
+    expect(declaringNote('Shedd', 'Bíblia Shedd', 'Versões', 'ARA')).toBe(
       '---\n' +
         'bible: true\n' +
         'complete: true\n' +
+        'translation: ARA\n' +
         'group: Versões\n' +
         'code: Shedd\n' +
         'name: Bíblia Shedd\n' +
@@ -109,14 +110,15 @@ describe('declaringNote', () => {
   });
 
   it('leaves the heading out rather than writing it empty', () => {
-    expect(declaringNote('Shedd', 'Bíblia Shedd', '', true)).toBe(
-      '---\nbible: true\ncomplete: true\ncode: Shedd\nname: Bíblia Shedd\n---\n',
+    expect(declaringNote('Shedd', 'Bíblia Shedd', '', 'ARA')).toBe(
+      '---\nbible: true\ncomplete: true\ntranslation: ARA\n' +
+        'code: Shedd\nname: Bíblia Shedd\n---\n',
     );
   });
 
-  it('says a version is partial where the translation it answers was', () => {
-    expect(declaringNote('Shedd', 'Bíblia Shedd', '', false)).toContain(
-      'complete: false\n',
+  it('says a generated version is a whole Bible whatever it answers', () => {
+    expect(declaringNote('Shedd', 'Bíblia Shedd', '', 'Rascunho')).toContain(
+      'complete: true\n',
     );
   });
 });
