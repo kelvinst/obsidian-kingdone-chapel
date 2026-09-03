@@ -279,10 +279,19 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
           // A version nobody named is the note's own, which the labels leave
           // unsaid; one that was asked for is offered in every version it could
           // still be finished as, and said in what the row writes.
+          //
+          // The note's own only stands while a link may point at it. A note
+          // about a partial version is read for the passage it is about all
+          // the same — that is what `linkContext` answered — but the link goes
+          // where it can be followed, which is what the reference with no
+          // context of its own falls back on.
           const named = asked.versionPrefix || asked.version !== null;
           const versions = named
             ? this.versionsFor(asked, ctx.file)
-            : [here.version];
+            : [
+                this.plugin.findCompleteVersion(here.version) ??
+                  this.plugin.defaultVersion(ctx.file),
+              ].filter((v): v is string => v !== null);
           // A half-written version stands for every version starting with it,
           // and a lone dash for every version there is — each of them reading
           // the vault for rows the popup has no room to show. Stop at the room
