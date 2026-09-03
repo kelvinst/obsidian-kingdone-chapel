@@ -6,6 +6,8 @@ import type {
   ViewUpdate,
 } from '@codemirror/view';
 import type { EditorState, Range } from '@codemirror/state';
+import { syntaxTree } from '@codemirror/language';
+import type { SyntaxNodeRef } from '@lezer/common';
 import { editorLivePreviewField } from 'obsidian';
 
 import { runsIn } from './syntax';
@@ -23,12 +25,24 @@ import { runsIn } from './syntax';
  * What is a rewritten node in reading view is a decoration here, over the
  * source. The reading of the syntax is the same either way, and lives in
  * `syntax.ts`.
+ *
+ * Where a run's block begins and ends is not: reading view is handed one
+ * rendered block at a time and gets the bound for free, and the editor used
+ * to guess it from the raw lines — a run of characters that look like a list
+ * marker, a heading, a quote, a fence. Every kind of block Markdown has was
+ * another guess to get right, and a quote or a code block or a table nested
+ * inside another multiplied the guessing. Obsidian is already parsing the
+ * note for its own syntax highlighting, and `syntaxTree` is the same parse:
+ * asking it where a paragraph starts and ends is asking the one thing that
+ * also decides where reading view's `<p>` starts and ends, rather than
+ * reimplementing Markdown's block grammar one regex at a time.
  */
 
 /**
  * A stretch of source with nothing of the note's own to show for it: code, or
  * maths, both of which a run may reach across but neither of which it may be
- * read out of.
+ * read out of. Also what a quote's own marker becomes, wherever it repeats
+ * inside a run's block — see `proseText`.
  */
 const OPAQUE = '￼';
 
@@ -38,7 +52,7 @@ const OPAQUE = '￼';
  * aside that is only a reference is still an aside — it just cannot be opened
  * or closed inside the target.
  */
-const LABEL = '\uFFFD';
+const LABEL = '�';
 
 /**
  * What the source holds that the reader never sees as prose.
@@ -57,37 +71,6 @@ const LABEL = '\uFFFD';
 const NOT_PROSE =
   /`[^`\n]*`|\$(?![\s$])[^$\n]*[^\s$]\$|!?\[\[[^\]\n]*\]\]|\[[^\]\n]*\]\([^)\n]*\)|\^[\w-]+(?=[ \t]*$)/gm;
 
-/** A line opening or closing a code block. */
-const CODE_BLOCK = /^\s*(?:```|~~~)/;
-
-/**
- * A line that begins a block of its own: a list item, a heading, a quote, a
- * table row, a rule.
- *
- * The editor is handed a whole note and has to find the bound on a run itself,
- * where reading view is handed one rendered block at a time and gets it for
- * free. A blank line is not the only thing that ends a block: two list items
- * are two blocks with no blank line between them, and so are a heading and the
- * paragraph under it. Without this a run would reach from one into the next —
- * marking text the reader will see unmarked, and swallowing the second item's
- * own bullet along the way.
- *
- * A quote is not among them. Its marker repeats on every line of the one
- * paragraph rather than opening a block, so a quoted aside written over two
- * lines is one run, exactly as it is when the note is read. A callout is
- * written as a quote but is among them: its title is drawn apart from the body
- * under it, and `[!note]` is what says so.
- */
-const NEW_BLOCK = /^\s*(?:[-*+] |\d+[.)] |#{1,6} |\||---|\[!|=+\s*$)/;
-
-/**
- * And one that is a block all by itself. A heading is a line, not a paragraph:
- * what follows it starts afresh without a blank line to say so, and the same
- * goes for a callout's title and for the rule of equals or dashes underlining
- * a heading written the other way.
- */
-const ONE_LINE = /^\s*(?:#{1,6} |---|\[!|=+\s*$)/;
-
 /**
  * An embed, which is a block of its own wherever it is written.
  *
@@ -95,11 +78,47 @@ const ONE_LINE = /^\s*(?:#{1,6} |---|\[!|=+\s*$)/;
  * it is no part of one paragraph with it: a run opened before an embed is
  * finished before it, whatever the note wrote after. Marked `flat` or not —
  * the frame is a matter of styling, and the content is a block either way.
+ * `[[wikilink]]` on its own is not one of these: only the `!` in front of it
+ * says the note is embedding the target rather than only naming it.
  */
 const EMBED = /!\[\[[^\]\n]*\]\]/g;
 
-/** A line drawn as a table row, whose cells are blocks of their own. */
-const TABLE_ROW = /^\s*\|/;
+/**
+ * A callout's title line: `[!note]`, followed by whatever the note wrote after
+ * it. A callout is written as an ordinary quote, and the grammar reads it as
+ * one — its title and the paragraph under it are one lazy-continued paragraph,
+ * exactly as an aside quoted over two lines is. But a callout draws its title
+ * apart from the body under it, which the grammar has no way to know; this is
+ * the one place `build` still reads the note's own syntax rather than asking
+ * the tree.
+ */
+const CALLOUT_TITLE = /^\[!\w+\]/;
+
+/**
+ * The block types a run is read out of: a paragraph, a heading of either
+ * kind, a table cell. Every other block a run stops at without being one
+ * itself — a list item, a table row, a quote — is walked into rather than
+ * read, on the way to the paragraphs it holds.
+ */
+const PROSE = new Set([
+  'Paragraph',
+  'ATXHeading1',
+  'ATXHeading2',
+  'ATXHeading3',
+  'ATXHeading4',
+  'ATXHeading5',
+  'ATXHeading6',
+  'SetextHeading1',
+  'SetextHeading2',
+  'TableCell',
+]);
+
+/**
+ * What a run may never be read out of, whole: code and raw HTML, at the block
+ * level as `verbatim` is at the element level in `marks.ts`. Left standing,
+ * not walked into — nothing inside one is a block of its own to find.
+ */
+const SKIP = new Set(['FencedCode', 'CodeBlock', 'HTMLBlock', 'CommentBlock']);
 
 /**
  * Blank out what is not prose, keeping every other character where it was.
@@ -143,23 +162,27 @@ const LINES: Record<string, Decoration> = {
 };
 
 /**
- * Mark every run of one block of prose, if any of it is on screen.
+ * Read `text` for runs and decorate them — the same work reading view's
+ * post-processor does over a rendered node, done here over a slice of source
+ * already cleared of everything that is not prose. `from` is that slice's
+ * place in the document, which `text` is the same length as.
  *
  * `hiding` is live preview, where a delimiter is taken off the page until the
  * cursor asks for it. Source mode shows a note as it is written and keeps them.
  */
-function markBlock(
+function markRun(
   state: EditorState,
   from: number,
-  to: number,
+  text: string,
   visible: readonly { from: number; to: number }[],
   hiding: boolean,
   into: Range<Decoration>[],
 ) {
+  const to = from + text.length;
   // A note is drawn a screenful at a time; the rest of it is not worth reading.
   if (!visible.some((range) => range.from <= to && range.to >= from)) return;
 
-  const masked = mask(state.doc.sliceString(from, to));
+  const masked = mask(text);
   for (const run of runsIn(masked, from)) {
     // A run whose whole content is code has nothing of its own to mark, and
     // reading view leaves it as the note wrote it. Do the same here.
@@ -194,61 +217,117 @@ function markBlock(
 }
 
 /**
- * Mark each cell of a table row on its own.
+ * `[from, to)` as prose: its own text, with a quote's marker blanked out
+ * wherever it repeats inside the span.
  *
- * A row is one line but not one block: every cell of it is drawn in a box of
- * its own, and a run opened in one has no business closing in the next, with
- * the pipe between them marked along the way. The pipes are what bound them,
- * bar one written `\\|`, which is a pipe the cell holds rather than its end.
+ * A block nested in a quote is one node covering every line of it, markers
+ * and all — the marker is not cut out of the range, only marked apart as its
+ * own small node in the middle of the paragraph's. Left in, `> a\n> b` would
+ * read its second `>` as part of the prose; blanked the same way code and
+ * links already are, a quote read over several lines is one span of it,
+ * however deep the quote nests.
  */
-function markCells(
-  state: EditorState,
-  line: { from: number; to: number; text: string },
-  visible: readonly { from: number; to: number }[],
-  hiding: boolean,
-  into: Range<Decoration>[],
-) {
-  let at = line.from;
-  for (let index = 0; index < line.text.length; index++) {
-    if (line.text[index] !== '|' || line.text[index - 1] === '\\') continue;
-    const pipe = line.from + index;
-    if (pipe > at) markBlock(state, at, pipe, visible, hiding, into);
-    at = pipe + 1;
-  }
-  // What follows the last pipe, a row being free to leave the closing one off.
-  if (at < line.to) markBlock(state, at, line.to, visible, hiding, into);
+function proseText(state: EditorState, from: number, to: number): string {
+  let text = state.doc.sliceString(from, to);
+  syntaxTree(state).iterate({
+    from,
+    to,
+    enter(node: SyntaxNodeRef) {
+      if (node.name !== 'QuoteMark') return;
+      const start = Math.max(node.from, from) - from;
+      const end = Math.min(node.to, to) - from;
+      text =
+        text.slice(0, start) + OPAQUE.repeat(end - start) + text.slice(end);
+    },
+  });
+  return text;
 }
 
-/** Mark the stretches of a line lying either side of the embeds written in it. */
+/**
+ * `markRun` over the stretches of `text` lying either side of the embeds
+ * written in it, `from` being where `text` sits in the document.
+ *
+ * An embed found here is read out of prose the marker is still standing in,
+ * not yet masked — masking would blank its own `![[` and `]]` along with a
+ * plain link's, and there would be nothing left to split on.
+ */
 function markAround(
   state: EditorState,
-  line: { from: number; to: number; text: string },
+  from: number,
+  text: string,
   visible: readonly { from: number; to: number }[],
   hiding: boolean,
   into: Range<Decoration>[],
 ) {
-  let at = line.from;
+  let at = 0;
   EMBED.lastIndex = 0;
-  for (
-    let found = EMBED.exec(line.text);
-    found;
-    found = EMBED.exec(line.text)
-  ) {
-    const start = line.from + found.index;
-    if (start > at) markBlock(state, at, start, visible, hiding, into);
-    at = start + found[0].length;
+  for (let found = EMBED.exec(text); found; found = EMBED.exec(text)) {
+    if (found.index > at) {
+      markRun(
+        state,
+        from + at,
+        text.slice(at, found.index),
+        visible,
+        hiding,
+        into,
+      );
+    }
+    at = found.index + found[0].length;
   }
-  // And what follows the last of them, an embed being free to end the line.
-  if (at < line.to) markBlock(state, at, line.to, visible, hiding, into);
+  // And what follows the last of them, an embed being free to end the block.
+  if (at < text.length)
+    markRun(state, from + at, text.slice(at), visible, hiding, into);
+}
+
+/** `markAround` a block found to hold prose, `[from, to)` in the document. */
+function handleProse(
+  state: EditorState,
+  from: number,
+  to: number,
+  visible: readonly { from: number; to: number }[],
+  hiding: boolean,
+  into: Range<Decoration>[],
+) {
+  markAround(state, from, proseText(state, from, to), visible, hiding, into);
+}
+
+/**
+ * `handleProse` a block the tree found, splitting a callout's title off first.
+ *
+ * The tree reads a callout as an ordinary quote, its title and the body under
+ * it one paragraph — the split only Obsidian's own reading of `[!note]` asks
+ * for, and the one thing here that is not simply asking the tree where a
+ * block lies.
+ */
+function markNode(
+  state: EditorState,
+  node: SyntaxNodeRef,
+  visible: readonly { from: number; to: number }[],
+  hiding: boolean,
+  into: Range<Decoration>[],
+) {
+  if (node.name === 'Paragraph') {
+    const first = state.doc.lineAt(node.from);
+    const title = first.text.slice(node.from - first.from);
+    if (CALLOUT_TITLE.test(title) && node.to > first.to) {
+      handleProse(state, node.from, first.to, visible, hiding, into);
+      const body = state.doc.line(first.number + 1);
+      handleProse(state, body.from, node.to, visible, hiding, into);
+      return;
+    }
+  }
+  handleProse(state, node.from, node.to, visible, hiding, into);
 }
 
 /**
  * Every decoration the marks ask for, over what `visible` covers.
  *
- * Runs are read a block at a time, a block being a run of lines with no blank
- * one among them, and none of it code — the same bound reading view gets for
- * free by being handed one rendered block at a time, and what keeps a run
- * inside its paragraph.
+ * The tree is walked once, over the outer bound of what is on screen: a block
+ * that is prose is read for its runs and not descended into further: it holds
+ * no block of its own. Anything else — a quote, a list, a list item, a table
+ * and its rows — holds nothing to mark by itself and is walked into, on the
+ * way to whatever prose it is holding. Code and raw HTML hold nothing to be
+ * walked into at all.
  */
 export function build(
   state: EditorState,
@@ -260,70 +339,21 @@ export function build(
   // Absent, as in a state built by hand, take it for live preview.
   const hiding = state.field(editorLivePreviewField, false) ?? true;
   const into: Range<Decoration>[] = [];
-  let code = false;
-  let depth = 0;
-  let codeDepth = 0;
-  let from: number | null = null;
-  let to = 0;
+  const from = visible.length ? visible[0].from : 0;
+  const to = visible.length ? visible[visible.length - 1].to : 0;
 
-  const close = () => {
-    if (from !== null) markBlock(state, from, to, visible, hiding, into);
-    from = null;
-  };
-
-  for (let number = 1; number <= state.doc.lines; number++) {
-    const line = state.doc.line(number);
-    // What a quote is quoting: everything a line says once its markers are
-    // taken off, and the markers themselves. A quote holds whole blocks of its
-    // own — code, lists, headings, tables, blank lines — and none of them
-    // would be recognised through the markers standing in front of them.
-    const said = line.text.replace(/^(\s*>)+\s?/, '');
-    const prefix = line.text.slice(0, line.text.length - said.length);
-    // How deep in quotes the line is written, which is all the markers say
-    // that matters: whether one is spaced `> ` or `>` is nobody's business.
-    const quoted = (prefix.match(/>/g) ?? []).length;
-
-    // A code block ends on a fence written as deep as the one that opened it.
-    // A quoted fence closes a quoted block; the same line inside an unquoted
-    // one is part of what that block holds, and closes nothing.
-    if (CODE_BLOCK.test(said) && (!code || quoted === codeDepth)) {
-      code = !code;
-      codeDepth = quoted;
-      close();
-      continue;
-    }
-    if (code) {
-      close();
-      continue;
-    }
-
-    // A quote's own blank line is written with its markers and nothing else.
-    if (!said.trim()) {
-      close();
-      continue;
-    }
-    // A quote interrupts the paragraph above it, and so does a quote written
-    // inside one. Only going deeper ends a block: a line shallower than the one
-    // before it is that paragraph still being written, which Markdown reads as
-    // part of the quote it started in.
-    if (quoted > depth) close();
-    depth = quoted;
-
-    if (NEW_BLOCK.test(said)) close();
-    if (TABLE_ROW.test(said)) {
-      markCells(state, line, visible, hiding, into);
-      continue;
-    }
-    if (line.text.includes('![[')) {
-      close();
-      markAround(state, line, visible, hiding, into);
-      continue;
-    }
-    if (from === null) from = line.from;
-    to = line.to;
-    if (ONE_LINE.test(said)) close();
-  }
-  close();
+  syntaxTree(state).iterate({
+    from,
+    to,
+    enter(node: SyntaxNodeRef) {
+      if (SKIP.has(node.name)) return false;
+      if (PROSE.has(node.name)) {
+        markNode(state, node, visible, hiding, into);
+        return false;
+      }
+      return true;
+    },
+  });
 
   return Decoration.set(into, true);
 }

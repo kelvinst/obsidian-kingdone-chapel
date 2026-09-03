@@ -2,9 +2,21 @@
 import { describe, expect, it } from 'vitest';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
+import { markdown } from '@codemirror/lang-markdown';
+import { GFM } from '@lezer/markdown';
 import { editorLivePreviewField } from 'obsidian';
 
 import { LiveMarks, build, liveMarks } from './live';
+
+/**
+ * The parse `build` reads its blocks from.
+ *
+ * Obsidian's own editor already carries this — a plugin only ever reads the
+ * tree, never builds one — so a test has to bring one of its own. GFM is
+ * tables: without it a `|` row is only ever a line of prose to the grammar,
+ * never cells of their own.
+ */
+const MD = markdown({ extensions: GFM });
 
 /**
  * Every decoration a note asks for, as `what:text` — or `what@Ln` for the ones
@@ -14,7 +26,11 @@ import { LiveMarks, build, liveMarks } from './live';
  * whose first line is plain is a note read with the cursor out of the way.
  */
 function read(doc: string, cursor = 0): string[] {
-  const state = EditorState.create({ doc, selection: { anchor: cursor } });
+  const state = EditorState.create({
+    doc,
+    selection: { anchor: cursor },
+    extensions: [MD],
+  });
   const set = build(state, [{ from: 0, to: doc.length }]);
   const out: string[] = [];
   set.between(0, doc.length, (from, to, value) => {
@@ -111,11 +127,11 @@ describe('build', () => {
   });
 
   it('does not carry a run from one table cell into the next', () => {
-    expect(read(below('| !!a | b!! |'))).toEqual([]);
+    expect(read(below('| !!a | b!! |', '|---|---|'))).toEqual([]);
   });
 
   it('reads a run written inside one cell', () => {
-    expect(read(below('| !!uma nota!! | outra |'))).toEqual([
+    expect(read(below('| !!uma nota!! | outra |', '|---|---|'))).toEqual([
       'hidden:!!',
       'kcp-small:uma nota',
       'hidden:!!',
@@ -123,15 +139,18 @@ describe('build', () => {
   });
 
   it('reads the last cell of a row written without its closing pipe', () => {
-    expect(read(below('| outra | !!uma nota!!'))).toEqual([
+    expect(read(below('| outra | !!uma nota!!', '|---|---|'))).toEqual([
       'hidden:!!',
       'kcp-small:uma nota',
       'hidden:!!',
     ]);
   });
 
-  it('reads a run across a pipe the cell holds rather than ends on', () => {
-    expect(read(below('| !!a \\| b!! |'))).toEqual([
+  it('reads one run out of a row an escaped pipe stops from being a table', () => {
+    // A pipe the grammar counts before it ever tries to parse the delimiter
+    // row: an escaped one throws that count off, so this is one paragraph
+    // rather than two cells — and, with no cell to end it, one run.
+    expect(read(below('| !!a \\| b!! |', '|---|---|'))).toEqual([
       'hidden:!!',
       'kcp-small:a \\| b',
       'hidden:!!',
@@ -147,7 +166,7 @@ describe('build', () => {
   });
 
   it('does not carry a run from one quoted table cell into the next', () => {
-    expect(read(below('> | !!a | b!! |'))).toEqual([]);
+    expect(read(below('> | !!a | b!! |', '> |---|---|'))).toEqual([]);
   });
 
   it('leaves a code block written inside a quote alone', () => {
@@ -227,6 +246,24 @@ describe('build', () => {
       'kcp-small:uma nota',
       'hidden:!!',
     ]);
+  });
+
+  it('carries a run across a quote written inside a list item', () => {
+    // A quote written over two lines is one lazy-continued paragraph whether
+    // it sits at the top of the note or inside a list item.
+    expect(read(below('- > !!a', '  > b!! fim'))).toEqual([
+      'hidden:!!',
+      'kcp-small:a\n  > b',
+      'hidden:!!',
+    ]);
+  });
+
+  it('does not carry a run from one list item into the next, inside a quote', () => {
+    expect(read(below('> - !!um', '> - dois!!'))).toEqual([]);
+  });
+
+  it('does not carry a run across a table cell nested in a quote in a list', () => {
+    expect(read(below('- > | !!a | b!! |', '  > |---|---|'))).toEqual([]);
   });
 
   it('does not carry a run out of a heading', () => {
@@ -325,9 +362,39 @@ describe('build', () => {
     expect(read('')).toEqual([]);
   });
 
+  it('reads nothing when nothing is visible', () => {
+    const state = EditorState.create({ doc: 'H~2~O', extensions: [MD] });
+    expect(build(state, []).size).toBe(0);
+  });
+
+  it('skips a block lying in the gap between two visible ranges', () => {
+    const doc = 'H~2~O\n\n2^10^\n\n!!nota!!';
+    const state = EditorState.create({ doc, extensions: [MD] });
+    // The first and third paragraph are on screen; the second — folded away —
+    // still falls inside the outer bound the tree is walked over, and has to
+    // be turned down on its own.
+    const set = build(state, [
+      { from: 0, to: 5 },
+      { from: 14, to: 21 },
+    ]);
+    const out: string[] = [];
+    set.between(0, doc.length, (_from, _to, value) => {
+      out.push((value.spec.class as string | undefined) ?? 'hidden');
+    });
+    expect(out).toEqual([
+      'hidden',
+      'kcp-sub',
+      'hidden',
+      'kcp-small-line',
+      'hidden',
+      'kcp-small',
+      'hidden',
+    ]);
+  });
+
   it('reads only what is on screen', () => {
     const doc = 'H~2~O\n\n2^10^';
-    const state = EditorState.create({ doc });
+    const state = EditorState.create({ doc, extensions: [MD] });
     const set = build(state, [{ from: 0, to: 5 }]);
     const out: string[] = [];
     set.between(0, doc.length, (_from, _to, value) => {
@@ -343,7 +410,7 @@ describe('source mode', () => {
     const state = EditorState.create({
       doc,
       selection: { anchor: 0 },
-      extensions: [editorLivePreviewField.init(() => live)],
+      extensions: [MD, editorLivePreviewField.init(() => live)],
     });
     const out: string[] = [];
     build(state, [{ from: 0, to: doc.length }]).between(
@@ -407,7 +474,7 @@ describe('the spacing of an aside', () => {
 describe('LiveMarks', () => {
   /** Enough of an editor to be decorated: what it holds and what it shows. */
   function view(doc: string): EditorView {
-    const state = EditorState.create({ doc });
+    const state = EditorState.create({ doc, extensions: [MD] });
     return {
       state,
       visibleRanges: [{ from: 0, to: doc.length }],
@@ -433,7 +500,10 @@ describe('LiveMarks', () => {
 
   it('hands its decorations to the editor it is installed in', () => {
     const view = new EditorView({
-      state: EditorState.create({ doc: 'H~2~O', extensions: [liveMarks] }),
+      state: EditorState.create({
+        doc: 'H~2~O',
+        extensions: [MD, liveMarks],
+      }),
       parent: document.body,
     });
     expect(view.plugin(liveMarks)?.decorations.size).toBe(3);
@@ -446,7 +516,7 @@ describe('LiveMarks', () => {
     const state = EditorState.create({
       doc,
       selection: { anchor: 0 },
-      extensions: [editorLivePreviewField.init(() => live)],
+      extensions: [MD, editorLivePreviewField.init(() => live)],
     });
     return {
       state,
