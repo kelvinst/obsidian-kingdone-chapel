@@ -258,9 +258,13 @@ export default class KingdoneChapelPlugin extends Plugin {
       this.lockPreviewVerse(evt),
     );
 
-    if (this.settings.openSidebarOnStart) {
-      this.app.workspace.onLayoutReady(() => this.activateView(false));
-    }
+    // Whether or not the sidebar opens by itself: the panes left over from the
+    // last load are in the workspace either way, and only this plugin knows
+    // they were its own.
+    this.app.workspace.onLayoutReady(async () => {
+      if (this.settings.openSidebarOnStart) await this.activateView(false);
+      else await this.adoptStaleViews();
+    });
   }
 
   async saveSettings() {
@@ -437,7 +441,47 @@ export default class KingdoneChapelPlugin extends Plugin {
     if (this.breadcrumbs) this.breadcrumbs.refresh();
   }
 
+  /**
+   * Panes this view was in and lost, from a load that is over.
+   *
+   * Obsidian keeps a pane whose plugin went away: the leaf stays in the
+   * workspace carrying the view type it was showing, but what is in it is a
+   * placeholder, which is why the tab turns into a ghost icon labelled with
+   * the raw type. `getLeavesOfType` asks the pane's contents what they are and
+   * so walks straight past those, leaving the saved state as the only place
+   * that still says the pane was ours.
+   */
+  staleViewLeaves(): WorkspaceLeaf[] {
+    const live = new Set(this.app.workspace.getLeavesOfType(VIEW_TYPE));
+    const stale: WorkspaceLeaf[] = [];
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      if (live.has(leaf)) return;
+      if (leaf.getViewState().type === VIEW_TYPE) stale.push(leaf);
+    });
+    return stale;
+  }
+
+  /**
+   * Take the abandoned panes back, one at most.
+   *
+   * Every reload leaves one behind — and reloads come thick, since Hot Reload
+   * fires on each `npm run vault` build — so opening the sidebar without
+   * looking at them stacks a live pane beside a row of ghosts that grows by
+   * one each time. Move back into the first, unless a live pane is already
+   * open, and close the rest.
+   */
+  async adoptStaleViews(): Promise<void> {
+    const stale = this.staleViewLeaves();
+    if (!stale.length) return;
+    const adopted = this.app.workspace.getLeavesOfType(VIEW_TYPE).length
+      ? 0
+      : 1;
+    for (const leaf of stale.slice(adopted)) leaf.detach();
+    if (adopted) await stale[0].setViewState({ type: VIEW_TYPE });
+  }
+
   async activateView(reveal = true): Promise<WorkspaceLeaf | null> {
+    await this.adoptStaleViews();
     const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE);
     if (existing.length) {
       if (reveal) this.app.workspace.revealLeaf(existing[0]);

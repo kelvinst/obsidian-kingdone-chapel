@@ -232,10 +232,18 @@ export class FakeMetadataCache extends Emitter {
 }
 
 export interface FakeLeaf {
+  /** What the pane is showing — what `getLeavesOfType` goes by. */
   type: string;
+  /**
+   * The type the workspace has saved for the pane, which outlives what is in
+   * it: a pane whose plugin was unloaded keeps this and shows a placeholder.
+   */
+  state: string;
   view: unknown;
   app: unknown;
   setViewState: (state: { type: string; active?: boolean }) => Promise<void>;
+  getViewState: () => { type: string };
+  detach: () => void;
 }
 
 export class FakeWorkspace extends Emitter {
@@ -247,6 +255,8 @@ export class FakeWorkspace extends Emitter {
   /** Every `openLinkText`, in order — what a jump actually did. */
   opened: { link: string; from: string; newLeaf: unknown }[] = [];
   revealed: FakeLeaf[] = [];
+  /** Every pane closed, in order — what a cleanup actually took away. */
+  detached: FakeLeaf[] = [];
   /** The leaf `getRightLeaf` hands back, or null for a workspace with none. */
   rightLeaf: FakeLeaf | null = null;
   /** Whether `onLayoutReady` runs its callback, or holds it back. */
@@ -257,14 +267,26 @@ export class FakeWorkspace extends Emitter {
     super();
   }
 
-  /** A pane of `type`, in the workspace, holding `view`. */
-  addLeaf(type: string, view: unknown = null): FakeLeaf {
+  /**
+   * A pane of `type`, in the workspace, holding `view`.
+   *
+   * `state` is the type the workspace saved for it, which is `type` unless a
+   * caller wants the two apart — a pane an unloaded plugin left behind.
+   */
+  addLeaf(type: string, view: unknown = null, state = type): FakeLeaf {
     const leaf: FakeLeaf = {
       type,
+      state,
       view,
       app: this.app,
-      setViewState: async (state) => {
-        leaf.type = state.type;
+      setViewState: async (next) => {
+        leaf.type = next.type;
+        leaf.state = next.type;
+      },
+      getViewState: () => ({ type: leaf.state }),
+      detach: () => {
+        this.leaves = this.leaves.filter((other) => other !== leaf);
+        this.detached.push(leaf);
       },
     };
     this.leaves.push(leaf);
@@ -273,6 +295,10 @@ export class FakeWorkspace extends Emitter {
 
   getLeavesOfType(type: string): FakeLeaf[] {
     return this.leaves.filter((leaf) => leaf.type === type);
+  }
+
+  iterateAllLeaves(each: (leaf: FakeLeaf) => void) {
+    for (const leaf of [...this.leaves]) each(leaf);
   }
 
   getActiveViewOfType<T>(ctor: new (...args: never[]) => T): T | null {
