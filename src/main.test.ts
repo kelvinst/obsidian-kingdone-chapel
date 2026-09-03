@@ -1641,6 +1641,54 @@ describe('onload', () => {
     expect(world.workspace.getLeavesOfType(VIEW_TYPE)).toHaveLength(0);
   });
 
+  /** A pane the last load left behind: saved as ours, showing nothing of ours. */
+  function ghostLeaf() {
+    return world.workspace.addLeaf('placeholder', null, VIEW_TYPE);
+  }
+
+  it('moves back into the pane the last load left behind', async () => {
+    world.plugin.data = { openSidebarOnStart: true };
+    const ghost = ghostLeaf();
+    world.workspace.rightLeaf = world.workspace.addLeaf('empty');
+    await world.plugin.onload();
+    await vi.waitFor(() =>
+      expect(world.workspace.getLeavesOfType(VIEW_TYPE)).toEqual([ghost]),
+    );
+    expect(world.workspace.detached).toEqual([]);
+  });
+
+  it('closes the panes every reload before it left behind', async () => {
+    world.plugin.data = { openSidebarOnStart: true };
+    const ghosts = [ghostLeaf(), ghostLeaf(), ghostLeaf()];
+    world.workspace.rightLeaf = world.workspace.addLeaf('empty');
+    await world.plugin.onload();
+    await vi.waitFor(() =>
+      expect(world.workspace.getLeavesOfType(VIEW_TYPE)).toEqual([ghosts[0]]),
+    );
+    expect(world.workspace.detached).toEqual(ghosts.slice(1));
+  });
+
+  it('clears them away even where the sidebar stays shut', async () => {
+    const ghosts = [ghostLeaf(), ghostLeaf()];
+    world.workspace.rightLeaf = world.workspace.addLeaf('empty');
+    await world.plugin.onload();
+    await vi.waitFor(() =>
+      expect(world.workspace.getLeavesOfType(VIEW_TYPE)).toEqual([ghosts[0]]),
+    );
+    expect(world.workspace.detached).toEqual([ghosts[1]]);
+    expect(world.workspace.revealed).toEqual([]);
+  });
+
+  it('keeps the pane it has, and drops the leftovers beside it', async () => {
+    const live = world.workspace.addLeaf(VIEW_TYPE);
+    const ghost = ghostLeaf();
+    await world.plugin.onload();
+    await world.plugin.activateView();
+    expect(world.workspace.getLeavesOfType(VIEW_TYPE)).toEqual([live]);
+    expect(world.workspace.detached).toEqual([ghost]);
+    expect(world.workspace.revealed).toEqual([live]);
+  });
+
   it('takes the bars down with it when it is unloaded', async () => {
     await world.plugin.onload();
     const clear = vi.spyOn(world.plugin.breadcrumbs, 'clear');
