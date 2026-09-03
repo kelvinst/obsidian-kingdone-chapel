@@ -74,15 +74,19 @@ const CODE_BLOCK = /^\s*(?:```|~~~)/;
  *
  * A quote is not among them. Its marker repeats on every line of the one
  * paragraph rather than opening a block, so a quoted aside written over two
- * lines is one run, exactly as it is when the note is read.
+ * lines is one run, exactly as it is when the note is read. A callout is
+ * written as a quote but is among them: its title is drawn apart from the body
+ * under it, and `[!note]` is what says so.
  */
-const NEW_BLOCK = /^\s*(?:[-*+] |\d+[.)] |#{1,6} |\||---)/;
+const NEW_BLOCK = /^\s*(?:[-*+] |\d+[.)] |#{1,6} |\||---|\[!|=+\s*$)/;
 
 /**
  * And one that is a block all by itself. A heading is a line, not a paragraph:
- * what follows it starts afresh without a blank line to say so.
+ * what follows it starts afresh without a blank line to say so, and the same
+ * goes for a callout's title and for the rule of equals or dashes underlining
+ * a heading written the other way.
  */
-const ONE_LINE = /^\s*(?:#{1,6} |---)/;
+const ONE_LINE = /^\s*(?:#{1,6} |---|\[!|=+\s*$)/;
 
 /** A line drawn as a table row, whose cells are blocks of their own. */
 const TABLE_ROW = /^\s*\|/;

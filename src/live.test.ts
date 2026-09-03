@@ -190,6 +190,22 @@ describe('build', () => {
     expect(read(below('> > !!a', '> >', '> > b!! fim'))).toEqual([]);
   });
 
+  it("does not carry a run out of a callout's title", () => {
+    expect(read(below('> [!note] !!a', '> b!! fim'))).toEqual([]);
+  });
+
+  it('reads a run written in the body of a callout', () => {
+    expect(read(below('> [!note] Nota', '> !!uma nota!!'))).toEqual([
+      'hidden:!!',
+      'kcp-small:uma nota',
+      'hidden:!!',
+    ]);
+  });
+
+  it('does not carry a run out of a heading underlined with equals', () => {
+    expect(read(below('Título !!a', '===', 'b!! resto'))).toEqual([]);
+  });
+
   it('does not carry a run out of a heading', () => {
     expect(read(below('# Título !!a', 'b!! resto'))).toEqual([]);
   });
