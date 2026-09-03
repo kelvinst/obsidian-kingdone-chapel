@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
+import { editorLivePreviewField } from 'obsidian';
 
 import { LiveMarks, build, liveMarks } from './live';
 
@@ -188,6 +189,43 @@ describe('build', () => {
       out.push((value.spec.class as string | undefined) ?? 'hidden');
     });
     expect(out).toEqual(['hidden', 'kcp-sub', 'hidden']);
+  });
+});
+
+describe('source mode', () => {
+  /** The decorations of a note the editor is drawing one way or the other. */
+  function read(doc: string, live: boolean): string[] {
+    const state = EditorState.create({
+      doc,
+      selection: { anchor: 0 },
+      extensions: [editorLivePreviewField.init(() => live)],
+    });
+    const out: string[] = [];
+    build(state, [{ from: 0, to: doc.length }]).between(
+      0,
+      doc.length,
+      (f, t, v) => {
+        const what = (v.spec.class as string | undefined) ?? 'hidden';
+        out.push(f === t ? `${what}@line` : `${what}:${doc.slice(f, t)}`);
+      },
+    );
+    return out;
+  }
+
+  it('keeps the delimiters on the page, and still marks the run', () => {
+    expect(read('Um verso.\n\n!!uma nota!!', false)).toEqual([
+      'kcp-small-line@line',
+      'kcp-small:uma nota',
+    ]);
+  });
+
+  it('hides them in live preview, as before', () => {
+    expect(read('Um verso.\n\n!!uma nota!!', true)).toEqual([
+      'kcp-small-line@line',
+      'hidden:!!',
+      'kcp-small:uma nota',
+      'hidden:!!',
+    ]);
   });
 });
 
