@@ -97,6 +97,34 @@ describe('build', () => {
     expect(read(below('> !!Refs: Sl 26.4', '>', '> Notas: n1!!'))).toEqual([]);
   });
 
+  it('does not carry a run from one table cell into the next', () => {
+    expect(read(below('| !!a | b!! |'))).toEqual([]);
+  });
+
+  it('reads a run written inside one cell', () => {
+    expect(read(below('| !!uma nota!! | outra |'))).toEqual([
+      'hidden:!!',
+      'kcp-small:uma nota',
+      'hidden:!!',
+    ]);
+  });
+
+  it('reads the last cell of a row written without its closing pipe', () => {
+    expect(read(below('| outra | !!uma nota!!'))).toEqual([
+      'hidden:!!',
+      'kcp-small:uma nota',
+      'hidden:!!',
+    ]);
+  });
+
+  it('reads a run across a pipe the cell holds rather than ends on', () => {
+    expect(read(below('| !!a \\| b!! |'))).toEqual([
+      'hidden:!!',
+      'kcp-small:a \\| b',
+      'hidden:!!',
+    ]);
+  });
+
   it('does not carry a run out of a heading', () => {
     expect(read(below('# Título !!a', 'b!! resto'))).toEqual([]);
   });

@@ -72,6 +72,9 @@ const NEW_BLOCK = /^\s*(?:[-*+] |\d+[.)] |#{1,6} |\||---)/;
  */
 const ONE_LINE = /^\s*(?:#{1,6} |---)/;
 
+/** A line drawn as a table row, whose cells are blocks of their own. */
+const TABLE_ROW = /^\s*\|/;
+
 /**
  * Blank out what is not prose, keeping every other character where it was.
  *
@@ -150,6 +153,32 @@ function markBlock(
 }
 
 /**
+ * Mark each cell of a table row on its own.
+ *
+ * A row is one line but not one block: every cell of it is drawn in a box of
+ * its own, and a run opened in one has no business closing in the next, with
+ * the pipe between them marked along the way. The pipes are what bound them,
+ * bar one written `\\|`, which is a pipe the cell holds rather than its end.
+ */
+function markCells(
+  state: EditorState,
+  line: { from: number; to: number; text: string },
+  visible: readonly { from: number; to: number }[],
+  hiding: boolean,
+  into: Range<Decoration>[],
+) {
+  let at = line.from;
+  for (let index = 0; index < line.text.length; index++) {
+    if (line.text[index] !== '|' || line.text[index - 1] === '\\') continue;
+    const pipe = line.from + index;
+    if (pipe > at) markBlock(state, at, pipe, visible, hiding, into);
+    at = pipe + 1;
+  }
+  // What follows the last pipe, a row being free to leave the closing one off.
+  if (at < line.to) markBlock(state, at, line.to, visible, hiding, into);
+}
+
+/**
  * Every decoration the marks ask for, over what `visible` covers.
  *
  * Runs are read a block at a time, a block being a run of lines with no blank
@@ -194,6 +223,10 @@ export function build(
       continue;
     }
     if (NEW_BLOCK.test(line.text)) close();
+    if (TABLE_ROW.test(line.text)) {
+      markCells(state, line, visible, hiding, into);
+      continue;
+    }
     if (from === null) from = line.from;
     to = line.to;
     if (ONE_LINE.test(line.text)) close();
