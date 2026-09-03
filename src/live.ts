@@ -224,6 +224,7 @@ export function build(
   const hiding = state.field(editorLivePreviewField, false) ?? true;
   const into: Range<Decoration>[] = [];
   let code = false;
+  let quoted = false;
   let from: number | null = null;
   let to = 0;
 
@@ -249,6 +250,14 @@ export function build(
       close();
       continue;
     }
+    // A quote interrupts the paragraph above it, where a line joining a quote
+    // already under way carries on the one paragraph. Only going in ends a
+    // block: a quoted line followed by an unquoted one is that paragraph still
+    // being written, which Markdown reads as part of the quote.
+    const quoting = /^\s*>/.test(line.text);
+    if (quoting && !quoted) close();
+    quoted = quoting;
+
     if (NEW_BLOCK.test(line.text)) close();
     if (TABLE_ROW.test(line.text)) {
       markCells(state, line, visible, hiding, into);
