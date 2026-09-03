@@ -347,25 +347,22 @@
 
 /* --- marks --- */
 
-/* `!!small!!`, marked by the post-processor in `marks.ts`. Relative to
-   whatever it sits in, so an aside inside a heading steps down from the
-   heading. `~sub~` and `^sup^` are left to the browser's own sizing and shift;
-   they carry `.kcp-sub` and `.kcp-sup` only as something to hook a snippet on.
+/* One size for all three, marked by `marks.ts` when a note is read and by
+   `live.ts` while it is written. Reading view gets `<sub>` and `<sup>` as
+   tags, whose own sizing this replaces so that an aside beside a raised digit
+   is the same height as it; live preview has no tags to inherit from, a
+   decoration being a class over the source, so the shift is spelled out below.
+
+   Relative to whatever it sits in, so a mark inside a heading steps down from
+   the heading.
 
    None of the three touches line height. A run reaches across a soft line
    break, so it can be a whole line — or two — and the zero line height that
    suits a raised digit mid-sentence would collapse the lines of one that is
    not. */
+.kcp-sub,
+.kcp-sup,
 .kcp-small {
-  font-size: 0.8em;
-}
-
-/* Live preview draws the source itself, so a mark there is a decoration over
-   the text rather than a tag: the classes have to carry the shape the browser
-   would have given `<sub>` and `<sup>`. Reading view, which does get the tags,
-   is left alone. */
-.cm-line .kcp-sub,
-.cm-line .kcp-sup {
   font-size: 0.75em;
 }
 
@@ -383,7 +380,7 @@
    spaced as though it were not small. The run inside then inherits rather than
    shrinking twice. */
 .cm-line.kcp-small-line {
-  font-size: 0.8em;
+  font-size: 0.75em;
 }
 
 .cm-line.kcp-small-line .kcp-small {
