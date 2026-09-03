@@ -77,6 +77,22 @@ describe('build', () => {
     expect(read(below('!!Refs: Sl 26.4', '', 'Notas: n1!!'))).toEqual([]);
   });
 
+  it('does not carry a run from one list item into the next', () => {
+    expect(read(below('- !!nota um', '- nota dois!!'))).toEqual([]);
+  });
+
+  it('does not carry a run out of a heading', () => {
+    expect(read(below('# Título !!a', 'b!! resto'))).toEqual([]);
+  });
+
+  it('still reads a run written inside one list item', () => {
+    expect(read(below('- !!uma nota!!', '- outra'))).toEqual([
+      'hidden:!!',
+      'kcp-small:uma nota',
+      'hidden:!!',
+    ]);
+  });
+
   it('leaves a code block alone', () => {
     expect(read('```\na ~b~ c\n```')).toEqual([]);
   });

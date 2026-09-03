@@ -43,6 +43,26 @@ const NOT_PROSE =
 const CODE_BLOCK = /^\s*(?:```|~~~)/;
 
 /**
+ * A line that begins a block of its own: a list item, a heading, a quote, a
+ * table row, a rule.
+ *
+ * The editor is handed a whole note and has to find the bound on a run itself,
+ * where reading view is handed one rendered block at a time and gets it for
+ * free. A blank line is not the only thing that ends a block: two list items
+ * are two blocks with no blank line between them, and so are a heading and the
+ * paragraph under it. Without this a run would reach from one into the next —
+ * marking text the reader will see unmarked, and swallowing the second item's
+ * own bullet along the way.
+ */
+const NEW_BLOCK = /^\s*(?:[-*+] |\d+[.)] |#{1,6} |>|\||---)/;
+
+/**
+ * And one that is a block all by itself. A heading is a line, not a paragraph:
+ * what follows it starts afresh without a blank line to say so.
+ */
+const ONE_LINE = /^\s*(?:#{1,6} |---)/;
+
+/**
  * Blank out what is not prose, keeping every other character where it was.
  *
  * The stand-in is as long as what it replaces, so a run's place in the source
@@ -151,8 +171,10 @@ export function build(
       close();
       continue;
     }
+    if (NEW_BLOCK.test(line.text)) close();
     if (from === null) from = line.from;
     to = line.to;
+    if (ONE_LINE.test(line.text)) close();
   }
   close();
 
