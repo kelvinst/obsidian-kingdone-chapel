@@ -118,11 +118,11 @@ Turn the bar off under **Chapter breadcrumbs**.
 Obsidian has no Markdown for any of the three, so a note that wants one has to carry a raw
 tag in the middle of its prose. These write them instead:
 
-| You type       | You get                          |
-| -------------- | -------------------------------- |
-| `H~2~O`        | `H<sub>2</sub>O`                 |
-| `2^10^`        | `2<sup>10</sup>`                 |
-| `!!uma nota!!` | the run at `0.8em`, for an aside |
+| You type       | You get                           |
+| -------------- | --------------------------------- |
+| `H~2~O`        | `H<sub>2</sub>O`                  |
+| `2^10^`        | `2<sup>10</sup>`                  |
+| `!!uma nota!!` | the run at `0.75em`, for an aside |
 
 The sub and sup delimiters are the ones Pandoc and markdown-it use, so a note carrying them
 still reads as intended outside your vault. `~~strikethrough~~` is untouched — a tilde may
