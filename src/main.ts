@@ -472,26 +472,27 @@ export default class KingdoneChapelPlugin extends Plugin {
    * one each time. Move back into the first, unless a live pane is already
    * open, and close the rest.
    */
-  async adoptStaleViews(): Promise<void> {
+  async adoptStaleViews(reveal = false): Promise<void> {
     if (this.pendingAdoption) return this.pendingAdoption;
-    this.pendingAdoption = this.adoptStaleViewsNow().finally(() => {
+    this.pendingAdoption = this.adoptStaleViewsNow(reveal).finally(() => {
       this.pendingAdoption = null;
     });
     return this.pendingAdoption;
   }
 
-  async adoptStaleViewsNow(): Promise<void> {
+  async adoptStaleViewsNow(reveal: boolean): Promise<void> {
     const stale = this.staleViewLeaves();
     if (!stale.length) return;
     const adopted = this.app.workspace.getLeavesOfType(VIEW_TYPE).length
       ? 0
       : 1;
     for (const leaf of stale.slice(adopted)) leaf.detach();
-    if (adopted) await stale[0].setViewState({ type: VIEW_TYPE });
+    if (adopted)
+      await stale[0].setViewState({ type: VIEW_TYPE, active: reveal });
   }
 
   async activateView(reveal = true): Promise<WorkspaceLeaf | null> {
-    await this.adoptStaleViews();
+    await this.adoptStaleViews(reveal);
     const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE);
     if (existing.length) {
       if (reveal) this.app.workspace.revealLeaf(existing[0]);
