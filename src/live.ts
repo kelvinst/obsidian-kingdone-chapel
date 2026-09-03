@@ -288,8 +288,17 @@ export class LiveMarks implements PluginValue {
 
   update(update: ViewUpdate) {
     // The selection among them: a run reveals its delimiters when the cursor
-    // arrives, and hides them again when it leaves.
-    if (update.docChanged || update.selectionSet || update.viewportChanged) {
+    // arrives, and hides them again when it leaves. And the view the editor is
+    // drawing, which decides whether a delimiter is taken off the page at all —
+    // switching to source mode moves neither the note nor the cursor, and the
+    // marks would otherwise stay as live preview left them.
+    if (
+      update.docChanged ||
+      update.selectionSet ||
+      update.viewportChanged ||
+      update.state.field(editorLivePreviewField, false) !==
+        update.startState.field(editorLivePreviewField, false)
+    ) {
       this.decorations = build(update.view.state, update.view.visibleRanges);
     }
   }

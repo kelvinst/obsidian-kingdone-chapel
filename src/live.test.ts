@@ -366,14 +366,49 @@ describe('LiveMarks', () => {
     view.destroy();
   });
 
-  it('leaves the decorations alone when nothing that matters moved', () => {
-    const marks = new LiveMarks(view('H~2~O'));
-    const before = marks.decorations;
+  /** An editor drawing one view of a note or the other. */
+  function drawing(doc: string, live: boolean): EditorView {
+    const state = EditorState.create({
+      doc,
+      selection: { anchor: 0 },
+      extensions: [editorLivePreviewField.init(() => live)],
+    });
+    return {
+      state,
+      visibleRanges: [{ from: 0, to: doc.length }],
+    } as unknown as EditorView;
+  }
+
+  it('reads the editor again when it is switched to source mode', () => {
+    const note = 'Um verso.\n\n!!uma nota!!';
+    const preview = drawing(note, true);
+    const marks = new LiveMarks(preview);
+    // The line, the run, and the two delimiters taken off the page.
+    expect(marks.decorations.size).toBe(4);
+
+    const source = drawing(note, false);
     marks.update({
       docChanged: false,
       selectionSet: false,
       viewportChanged: false,
-      view: view('H~2~O e 2^10^'),
+      startState: preview.state,
+      state: source.state,
+      view: source,
+    } as never);
+    expect(marks.decorations.size).toBe(2);
+  });
+
+  it('leaves the decorations alone when nothing that matters moved', () => {
+    const marks = new LiveMarks(view('H~2~O'));
+    const before = marks.decorations;
+    const still = view('H~2~O e 2^10^');
+    marks.update({
+      docChanged: false,
+      selectionSet: false,
+      viewportChanged: false,
+      startState: still.state,
+      state: still.state,
+      view: still,
     } as never);
     expect(marks.decorations).toBe(before);
   });
