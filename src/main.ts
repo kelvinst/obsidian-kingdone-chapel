@@ -111,6 +111,8 @@ export default class KingdoneChapelPlugin extends Plugin {
   lastLocation: Location | null = null;
   /** Verse clicked in reading mode, held until that pane scrolls again. */
   previewLock: { path: string; verse: number; scrollTop: number } | null = null;
+  /** An `adoptStaleViews` in flight, so a call arriving mid-adoption waits on it instead of racing it. */
+  pendingAdoption: Promise<void> | null = null;
 
   async onload() {
     const stored = ((await this.loadData()) || {}) as Record<string, unknown>;
@@ -471,6 +473,14 @@ export default class KingdoneChapelPlugin extends Plugin {
    * open, and close the rest.
    */
   async adoptStaleViews(): Promise<void> {
+    if (this.pendingAdoption) return this.pendingAdoption;
+    this.pendingAdoption = this.adoptStaleViewsNow().finally(() => {
+      this.pendingAdoption = null;
+    });
+    return this.pendingAdoption;
+  }
+
+  async adoptStaleViewsNow(): Promise<void> {
     const stale = this.staleViewLeaves();
     if (!stale.length) return;
     const adopted = this.app.workspace.getLeavesOfType(VIEW_TYPE).length

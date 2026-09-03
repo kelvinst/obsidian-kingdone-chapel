@@ -1679,6 +1679,15 @@ describe('onload', () => {
     expect(world.workspace.revealed).toEqual([]);
   });
 
+  it('makes a call that arrives mid-adoption wait on the one already running', async () => {
+    const ghost = ghostLeaf();
+    const first = world.plugin.adoptStaleViews();
+    const second = world.plugin.adoptStaleViews();
+    await Promise.all([first, second]);
+    expect(world.workspace.getLeavesOfType(VIEW_TYPE)).toEqual([ghost]);
+    expect(world.workspace.detached).toEqual([]);
+  });
+
   it('keeps the pane it has, and drops the leftovers beside it', async () => {
     const live = world.workspace.addLeaf(VIEW_TYPE);
     const ghost = ghostLeaf();
