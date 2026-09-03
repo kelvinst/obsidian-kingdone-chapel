@@ -160,6 +160,13 @@ function note(
   }
 }
 
+/** Whether any of the block's pieces holds part of `from`-`to`. */
+function covered(block: Block, from: number, to: number): boolean {
+  return block.pieces.some(
+    (piece) => piece.at < to && piece.at + piece.node.data.length > from,
+  );
+}
+
 /** Rebuild one text node as its marks and the plain text between them. */
 function rewrite(node: Text, ops: Op[]) {
   const value = node.data;
@@ -189,6 +196,10 @@ function paint(block: Block) {
 
   const ops = new Map<Text, Op[]>();
   for (const run of runsIn(block.masked)) {
+    // A run whose whole content is a stand-in — an aside of nothing but code —
+    // has no text of its own to mark, and dropping its delimiters would take
+    // them off the page with nothing to show for them.
+    if (!covered(block, run.contentFrom, run.contentTo)) continue;
     note(block, run.from, run.contentFrom, null, ops);
     note(block, run.contentFrom, run.contentTo, run.mark, ops);
     note(block, run.contentTo, run.to, null, ops);
