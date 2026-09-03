@@ -300,3 +300,18 @@
   color: var(--text-muted);
   font-style: italic;
 }
+
+/* --- flat embeds --- */
+
+/* `![[Chapter#^verse|flat]]` — an embed that draws no frame of its own, for a
+   verse already framed by whatever holds it. A version written on top of a
+   translation is made of embeds itself, so referring to one of its verses
+   stacks two bars and two indents: the version's, and the translation's
+   inside it. Obsidian writes a link's display text onto the embed as `alt`,
+   which makes the alias a marker this stylesheet can read and every other
+   reader ignores. The variables are inherited, so an embed marked flat
+   flattens the embeds inside it in turn. */
+.internal-embed[alt='flat' i] {
+  --embed-border-start: none;
+  --embed-padding: 0;
+}
