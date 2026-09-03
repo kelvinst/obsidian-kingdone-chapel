@@ -124,6 +124,14 @@ too — put a space between the two to link after an exclamation mark instead.
 | `!@Joao 1.1-3` | one embed per verse, a line each                                                                           |
 | `!@Joao 1`     | your pick of _whole file_ (`![[NVI-43-JHN-001]]`) or _verse by verse_ — one embed per verse of the chapter |
 
+Every embed draws a bar and an indent down its left side, and a version written on top of a
+translation is made of embeds itself — so referring to one of its verses shows two of each,
+the version's and the translation's inside it. Mark the embed `flat` —
+`![[ARA-19-Salmos-001#^ara-psa-1-1|flat]]` — and it draws neither. The marker is an ordinary
+link alias, which Obsidian puts on the embed for this plugin's stylesheet to find and every
+other reader ignores, so a note written this way still opens anywhere. Flat carries inward:
+an embed marked flat flattens the embeds inside it too.
+
 Books are matched in Portuguese and English, by full name, by the two-letter Portuguese
 abbreviations (`Gn`, `Jz`, `Sl`, `Tg`, `Ap`), by the usual English ones (`Ps`, `Rev`,
 `1Cor`), and by their USFM code (`JHN`). Accents are optional — `@Joao` and `@João` both
