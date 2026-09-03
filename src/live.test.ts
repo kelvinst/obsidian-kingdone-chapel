@@ -138,6 +138,22 @@ describe('build', () => {
     ]);
   });
 
+  it('does not carry a run from one quoted list item into the next', () => {
+    expect(read(below('> - !!nota um', '> - nota dois!!'))).toEqual([]);
+  });
+
+  it('does not carry a run out of a quoted heading', () => {
+    expect(read(below('> # Título !!a', '> b!! resto'))).toEqual([]);
+  });
+
+  it('does not carry a run from one quoted table cell into the next', () => {
+    expect(read(below('> | !!a | b!! |'))).toEqual([]);
+  });
+
+  it("does not carry a run across a nested quote's own blank line", () => {
+    expect(read(below('> > !!a', '> >', '> > b!! fim'))).toEqual([]);
+  });
+
   it('does not carry a run out of a heading', () => {
     expect(read(below('# Título !!a', 'b!! resto'))).toEqual([]);
   });

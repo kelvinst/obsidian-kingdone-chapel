@@ -245,8 +245,14 @@ export function build(
       continue;
     }
 
-    // A quote's own blank line is written with its marker and nothing else.
-    if (!line.text.replace(/^\s*>+/, '').trim()) {
+    // What a quote is quoting: everything a line says once its markers are
+    // taken off. A quote holds whole blocks of its own — lists, headings,
+    // tables, blank lines — and none of them would be recognised through the
+    // markers standing in front of them.
+    const said = line.text.replace(/^(\s*>)+\s?/, '');
+
+    // A quote's own blank line is written with its markers and nothing else.
+    if (!said.trim()) {
       close();
       continue;
     }
@@ -258,14 +264,14 @@ export function build(
     if (quoting && !quoted) close();
     quoted = quoting;
 
-    if (NEW_BLOCK.test(line.text)) close();
-    if (TABLE_ROW.test(line.text)) {
+    if (NEW_BLOCK.test(said)) close();
+    if (TABLE_ROW.test(said)) {
       markCells(state, line, visible, hiding, into);
       continue;
     }
     if (from === null) from = line.from;
     to = line.to;
-    if (ONE_LINE.test(line.text)) close();
+    if (ONE_LINE.test(said)) close();
   }
   close();
 
