@@ -224,7 +224,8 @@ export function build(
   const hiding = state.field(editorLivePreviewField, false) ?? true;
   const into: Range<Decoration>[] = [];
   let code = false;
-  let quoted = false;
+  let depth = 0;
+  let codePrefix = '';
   let from: number | null = null;
   let to = 0;
 
@@ -235,8 +236,19 @@ export function build(
 
   for (let number = 1; number <= state.doc.lines; number++) {
     const line = state.doc.line(number);
-    if (CODE_BLOCK.test(line.text)) {
+    // What a quote is quoting: everything a line says once its markers are
+    // taken off, and the markers themselves. A quote holds whole blocks of its
+    // own — code, lists, headings, tables, blank lines — and none of them
+    // would be recognised through the markers standing in front of them.
+    const said = line.text.replace(/^(\s*>)+\s?/, '');
+    const prefix = line.text.slice(0, line.text.length - said.length);
+
+    // A code block ends on a fence written the way the one that opened it was.
+    // A quoted fence closes a quoted block; the same line inside an unquoted
+    // one is part of what that block holds, and closes nothing.
+    if (CODE_BLOCK.test(said) && (!code || prefix === codePrefix)) {
       code = !code;
+      codePrefix = prefix;
       close();
       continue;
     }
@@ -245,24 +257,18 @@ export function build(
       continue;
     }
 
-    // What a quote is quoting: everything a line says once its markers are
-    // taken off. A quote holds whole blocks of its own — lists, headings,
-    // tables, blank lines — and none of them would be recognised through the
-    // markers standing in front of them.
-    const said = line.text.replace(/^(\s*>)+\s?/, '');
-
     // A quote's own blank line is written with its markers and nothing else.
     if (!said.trim()) {
       close();
       continue;
     }
-    // A quote interrupts the paragraph above it, where a line joining a quote
-    // already under way carries on the one paragraph. Only going in ends a
-    // block: a quoted line followed by an unquoted one is that paragraph still
-    // being written, which Markdown reads as part of the quote.
-    const quoting = /^\s*>/.test(line.text);
-    if (quoting && !quoted) close();
-    quoted = quoting;
+    // A quote interrupts the paragraph above it, and so does a quote written
+    // inside one. Only going deeper ends a block: a line shallower than the one
+    // before it is that paragraph still being written, which Markdown reads as
+    // part of the quote it started in.
+    const quoted = (prefix.match(/>/g) ?? []).length;
+    if (quoted > depth) close();
+    depth = quoted;
 
     if (NEW_BLOCK.test(said)) close();
     if (TABLE_ROW.test(said)) {

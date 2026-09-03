@@ -150,6 +150,34 @@ describe('build', () => {
     expect(read(below('> | !!a | b!! |'))).toEqual([]);
   });
 
+  it('leaves a code block written inside a quote alone', () => {
+    expect(read(below('> ```', '> a ~b~ c', '> ```'))).toEqual([]);
+  });
+
+  it('reads a run written after a quoted code block', () => {
+    expect(read(below('> ```', '> a ~b~ c', '> ```', '', 'H~2~O'))).toEqual([
+      'hidden:~',
+      'kcp-sub:2',
+      'hidden:~',
+    ]);
+  });
+
+  it('leaves a quoted fence inside a code block as part of it', () => {
+    expect(read(below('```', '> ```', '~x~ solto'))).toEqual([]);
+  });
+
+  it('does not carry a run into a quote written inside a quote', () => {
+    expect(read(below('> !!a', '> > b!! fim'))).toEqual([]);
+  });
+
+  it('carries a run on into the line a nested quote is finished on', () => {
+    expect(read(below('> > !!a', '> b!! fim'))).toEqual([
+      'hidden:!!',
+      'kcp-small:a\n> b',
+      'hidden:!!',
+    ]);
+  });
+
   it("does not carry a run across a nested quote's own blank line", () => {
     expect(read(below('> > !!a', '> >', '> > b!! fim'))).toEqual([]);
   });
