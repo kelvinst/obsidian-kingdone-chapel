@@ -143,9 +143,10 @@ But it never leaves its paragraph, so a blank line ends an aside.
 Code and maths are left exactly as written, and a run may reach across an inline `` `code` ``
 without its contents being read for delimiters.
 
-Both views draw them. Reading view rewrites the note; while editing, the run is styled where
+Both views draw them. Reading view rewrites the note; in live preview the run is styled where
 it stands and its delimiters are hidden until the cursor is inside it — the way Obsidian
-hides the asterisks of its own bold. An aside covering whole lines is drawn at its own line
+hides the asterisks of its own bold. Source mode keeps them on the page, being the note as it
+is written, and marks the run all the same. An aside covering whole lines is drawn at its own line
 spacing there, rather than at the spacing of the text around it.
 
 ### `@` references

@@ -6,6 +6,7 @@ import type {
   ViewUpdate,
 } from '@codemirror/view';
 import type { EditorState, Range } from '@codemirror/state';
+import { editorLivePreviewField } from 'obsidian';
 
 import { runsIn } from './syntax';
 
@@ -103,12 +104,18 @@ const LINES: Record<string, Decoration> = {
   'kcp-small': Decoration.line({ class: 'kcp-small-line' }),
 };
 
-/** Mark every run of one block of prose, if any of it is on screen. */
+/**
+ * Mark every run of one block of prose, if any of it is on screen.
+ *
+ * `hiding` is live preview, where a delimiter is taken off the page until the
+ * cursor asks for it. Source mode shows a note as it is written and keeps them.
+ */
 function markBlock(
   state: EditorState,
   from: number,
   to: number,
   visible: readonly { from: number; to: number }[],
+  hiding: boolean,
   into: Range<Decoration>[],
 ) {
   // A note is drawn a screenful at a time; the rest of it is not worth reading.
@@ -136,7 +143,7 @@ function markBlock(
     }
 
     // Inside the run, the delimiters are what is being edited.
-    if (touched(state, run.from, run.to)) continue;
+    if (!hiding || touched(state, run.from, run.to)) continue;
     into.push(Decoration.replace({}).range(run.from, run.contentFrom));
     into.push(Decoration.replace({}).range(run.contentTo, run.to));
   }
@@ -154,13 +161,18 @@ export function build(
   state: EditorState,
   visible: readonly { from: number; to: number }[],
 ): DecorationSet {
+  // Source mode is the note as it is written, markup and all: Obsidian draws
+  // the bold of `**forte**` there and leaves both pairs of asterisks standing,
+  // and a mark of the plugin's own has no business being quieter about it.
+  // Absent, as in a state built by hand, take it for live preview.
+  const hiding = state.field(editorLivePreviewField, false) ?? true;
   const into: Range<Decoration>[] = [];
   let code = false;
   let from: number | null = null;
   let to = 0;
 
   const close = () => {
-    if (from !== null) markBlock(state, from, to, visible, into);
+    if (from !== null) markBlock(state, from, to, visible, hiding, into);
     from = null;
   };
 

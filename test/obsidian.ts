@@ -13,7 +13,20 @@
  * into an API Obsidian does not have.
  */
 
+import { StateField } from '@codemirror/state';
+
 export type EventRef = { off: () => void };
+
+/**
+ * Whether an editor is drawing live preview rather than the source.
+ *
+ * The app fills this in; a state built by a test carries it only when the test
+ * says which of the two it is standing in for.
+ */
+export const editorLivePreviewField = StateField.define<boolean>({
+  create: () => true,
+  update: (value) => value,
+});
 
 export class Component {
   _loaded = false;
