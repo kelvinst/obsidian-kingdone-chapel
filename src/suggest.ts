@@ -284,7 +284,9 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
           // about a partial version is read for the passage it is about all
           // the same — that is what `linkContext` answered — but the link goes
           // where it can be followed, which is what the reference with no
-          // context of its own falls back on.
+          // context of its own falls back on. Falling back that far is said in
+          // the row: a version left unsaid reads as the note's own, and this
+          // one is not it.
           const named = asked.versionPrefix || asked.version !== null;
           const versions = named
             ? this.versionsFor(asked, ctx.file)
@@ -305,7 +307,7 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
                 asked,
                 embed,
                 ctx.file,
-                named ? version : null,
+                named || version !== here.version ? version : null,
               )),
             );
           }

@@ -1449,6 +1449,21 @@ describe('onload', () => {
     expect(world.plugin.settings.translationsFolder).toBe('Textos');
   });
 
+  it('keeps a folder emptied on purpose emptied', async () => {
+    world.plugin.data = { bibleFolder: 'Antigo', translationsFolder: '' };
+    await world.plugin.onload();
+    expect(world.plugin.settings.translationsFolder).toBe('');
+  });
+
+  it('stops saving the name the folder was carried over from', async () => {
+    world.plugin.data = { bibleFolder: 'Textos' };
+    await world.plugin.onload();
+    await world.plugin.saveSettings();
+
+    expect(world.plugin.data).not.toHaveProperty('bibleFolder');
+    expect(world.plugin.data).toMatchObject({ translationsFolder: 'Textos' });
+  });
+
   it('offers to write a version, and says when there is none to write from', async () => {
     const opened = vi.spyOn(CreateVersionModal.prototype, 'open');
     await world.plugin.onload();
