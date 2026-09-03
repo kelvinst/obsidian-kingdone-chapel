@@ -206,6 +206,29 @@ describe('build', () => {
     expect(read(below('Título !!a', '===', 'b!! resto'))).toEqual([]);
   });
 
+  it('does not carry a run across an embed', () => {
+    const embed = '![[ARA-19-Salmos-001#^ara-psa-1-1|flat]]';
+    expect(read(below(`!!Refs: ${embed} fim!!`))).toEqual([]);
+  });
+
+  it('reads a run written before an embed on the same line', () => {
+    const embed = '![[ARA-19-Salmos-001#^ara-psa-1-1|flat]]';
+    expect(read(below(`!!uma nota!! e ${embed}`))).toEqual([
+      'hidden:!!',
+      'kcp-small:uma nota',
+      'hidden:!!',
+    ]);
+  });
+
+  it('reads a run written after one', () => {
+    const embed = '![[ARA-19-Salmos-001#^ara-psa-1-1|flat]]';
+    expect(read(below(`${embed} e !!uma nota!!`))).toEqual([
+      'hidden:!!',
+      'kcp-small:uma nota',
+      'hidden:!!',
+    ]);
+  });
+
   it('does not carry a run out of a heading', () => {
     expect(read(below('# Título !!a', 'b!! resto'))).toEqual([]);
   });
