@@ -63,6 +63,21 @@ interface Piece {
 /** A block's text, and the nodes it was gathered from. */
 interface Block {
   text: string;
+  /**
+   * The same text with a link's label blanked out, which is what the runs are
+   * read from.
+   *
+   * A link's label is not always only a label: one written without an alias
+   * shows its target, and a target carries the caret of a block anchor. A row
+   * of two of them would otherwise read as one long superscript — the tail of
+   * the first link, the punctuation between them, and the head of the second.
+   *
+   * The stand-in is as long as what it replaces, so a run's place in the text
+   * is its place here too, and the pieces are gathered either way: a run may
+   * still cover a link and mark it, it just cannot be opened or closed inside
+   * one.
+   */
+  masked: string;
   pieces: Piece[];
 }
 
@@ -86,26 +101,38 @@ function verbatim(el: Element): boolean {
   );
 }
 
-/** Gather `el`'s text into `block`, painting any block-level child on its own. */
-function gather(el: HTMLElement, block: Block) {
+/**
+ * Gather `el`'s text into `block`, painting any block-level child on its own.
+ *
+ * `linked` says the text being gathered is a link's label, which is kept out of
+ * what the runs are read from.
+ */
+function gather(el: HTMLElement, block: Block, linked = false) {
   // A live child list would be walked into the fragments painting leaves behind.
   for (const node of Array.from(el.childNodes)) {
     if (node.nodeType === Node.TEXT_NODE) {
       const text = node as Text;
       block.pieces.push({ node: text, at: block.text.length });
       block.text += text.data;
+      block.masked += linked ? OPAQUE.repeat(text.data.length) : text.data;
       continue;
     }
     if (node.nodeType !== Node.ELEMENT_NODE) continue;
 
     const child = node as HTMLElement;
-    if (verbatim(child)) block.text += OPAQUE;
-    else if (child.tagName === 'BR') block.text += '\n';
-    else if (INLINE.has(child.tagName)) gather(child, block);
-    else {
+    if (verbatim(child)) {
+      block.text += OPAQUE;
+      block.masked += OPAQUE;
+    } else if (child.tagName === 'BR') {
+      block.text += '\n';
+      block.masked += '\n';
+    } else if (INLINE.has(child.tagName)) {
+      gather(child, block, linked || child.tagName === 'A');
+    } else {
       // A block of its own: whatever was being gathered ends here.
       paint(block);
       block.text = '';
+      block.masked = '';
       block.pieces = [];
       renderMarks(child);
     }
@@ -161,7 +188,7 @@ function paint(block: Block) {
   if (!block.pieces.length) return;
 
   const ops = new Map<Text, Op[]>();
-  for (const run of runsIn(block.text)) {
+  for (const run of runsIn(block.masked)) {
     note(block, run.from, run.contentFrom, null, ops);
     note(block, run.contentFrom, run.contentTo, run.mark, ops);
     note(block, run.contentTo, run.to, null, ops);
@@ -179,7 +206,7 @@ function paint(block: Block) {
  * `<sub>` either side of a `<br>` read as the one the note wrote.
  */
 export function renderMarks(el: HTMLElement) {
-  const block: Block = { text: '', pieces: [] };
+  const block: Block = { text: '', masked: '', pieces: [] };
   gather(el, block);
   paint(block);
 }
