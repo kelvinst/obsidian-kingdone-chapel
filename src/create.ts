@@ -111,6 +111,13 @@ export function chapterNote(
  * there so the vault says where its chapters came from, which is the question
  * anyone opening a folder full of embeds asks first, and it is what a run that
  * regenerates the version would have to be told otherwise.
+ *
+ * Every one of them is quoted. They are words a reader typed into a form, and
+ * a name reading `Bíblia Shedd: edição revista` written bare is not YAML at
+ * all — the frontmatter fails to parse, and a folder whose frontmatter does
+ * not parse is not a version, which is a hard thing to see once a thousand
+ * chapter files have been written into it. One beginning `#` fails quieter
+ * still, read as a comment and leaving the key empty.
  */
 export function declaringNote(
   code: string,
@@ -118,9 +125,21 @@ export function declaringNote(
   group: string,
   translation: string,
 ): string {
-  const heading = group ? `group: ${group}\n` : '';
+  const heading = group ? `group: ${quoted(group)}\n` : '';
   return (
-    `---\nbible: true\ncomplete: true\ntranslation: ${translation}\n` +
-    `${heading}code: ${code}\nname: ${name}\n---\n`
+    `---\nbible: true\ncomplete: true\ntranslation: ${quoted(translation)}\n` +
+    `${heading}code: ${quoted(code)}\nname: ${quoted(name)}\n---\n`
   );
+}
+
+/**
+ * A value written into frontmatter, as a YAML double-quoted scalar.
+ *
+ * A double-quoted scalar escapes the way a JSON string does — backslash, the
+ * quote itself, the control characters — so `JSON.stringify` writes one, and
+ * writes it for whatever a reader typed rather than for the characters someone
+ * thought to look for.
+ */
+function quoted(value: string): string {
+  return JSON.stringify(value);
 }

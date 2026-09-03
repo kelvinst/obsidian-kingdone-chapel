@@ -308,10 +308,10 @@ describe('writing the version', () => {
       '---\n' +
         'bible: true\n' +
         'complete: true\n' +
-        'translation: ARA\n' +
-        'group: Versões\n' +
-        'code: Shedd\n' +
-        'name: Bíblia Shedd\n' +
+        'translation: "ARA"\n' +
+        'group: "Versões"\n' +
+        'code: "Shedd"\n' +
+        'name: "Bíblia Shedd"\n' +
         '---\n',
     );
   });
@@ -319,7 +319,7 @@ describe('writing the version', () => {
   it('falls back to the code where no name was written', async () => {
     await write();
 
-    expect(wrote('Comentarios/Shedd/Shedd.md')).toContain('name: Shedd\n');
+    expect(wrote('Comentarios/Shedd/Shedd.md')).toContain('name: "Shedd"\n');
   });
 
   it('writes a chapter for every chapter the translation holds', async () => {

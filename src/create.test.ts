@@ -101,18 +101,42 @@ describe('declaringNote', () => {
       '---\n' +
         'bible: true\n' +
         'complete: true\n' +
-        'translation: ARA\n' +
-        'group: Versões\n' +
-        'code: Shedd\n' +
-        'name: Bíblia Shedd\n' +
+        'translation: "ARA"\n' +
+        'group: "Versões"\n' +
+        'code: "Shedd"\n' +
+        'name: "Bíblia Shedd"\n' +
         '---\n',
     );
   });
 
   it('leaves the heading out rather than writing it empty', () => {
     expect(declaringNote('Shedd', 'Bíblia Shedd', '', 'ARA')).toBe(
-      '---\nbible: true\ncomplete: true\ntranslation: ARA\n' +
-        'code: Shedd\nname: Bíblia Shedd\n---\n',
+      '---\nbible: true\ncomplete: true\ntranslation: "ARA"\n' +
+        'code: "Shedd"\nname: "Bíblia Shedd"\n---\n',
+    );
+  });
+
+  it('quotes a name the reader wrote a colon into', () => {
+    expect(
+      declaringNote('Shedd', 'Bíblia Shedd: edição revista', '', 'ARA'),
+    ).toContain('name: "Bíblia Shedd: edição revista"\n');
+  });
+
+  it('quotes a heading the reader wrote a colon into', () => {
+    expect(
+      declaringNote('Shedd', 'Shedd', 'Comentários: Novo Testamento', 'ARA'),
+    ).toContain('group: "Comentários: Novo Testamento"\n');
+  });
+
+  it('quotes a name that would otherwise open a comment', () => {
+    expect(declaringNote('Shedd', '#1 Shedd', '', 'ARA')).toContain(
+      'name: "#1 Shedd"\n',
+    );
+  });
+
+  it('escapes a quote the reader wrote into the name', () => {
+    expect(declaringNote('Shedd', 'A "Shedd"', '', 'ARA')).toContain(
+      'name: "A \\"Shedd\\""\n',
     );
   });
 
