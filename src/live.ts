@@ -25,8 +25,20 @@ import { runsIn } from './syntax';
  * `syntax.ts`.
  */
 
-/** A stretch of source no run may be read out of: code, or maths. */
+/**
+ * A stretch of source with nothing of the note's own to show for it: code, or
+ * maths, both of which a run may reach across but neither of which it may be
+ * read out of.
+ */
 const OPAQUE = '￼';
+
+/**
+ * And one that does show something, only not what the source says: a link,
+ * which stands on the page as its label. A run may hold one and mark it — an
+ * aside that is only a reference is still an aside — it just cannot be opened
+ * or closed inside the target.
+ */
+const LABEL = '\uFFFD';
 
 /**
  * What the source holds that the reader never sees as prose.
@@ -84,7 +96,16 @@ const TABLE_ROW = /^\s*\|/;
  * one aside holding a link, without either being read for delimiters.
  */
 function mask(text: string): string {
-  return text.replace(NOT_PROSE, (found) => OPAQUE.repeat(found.length));
+  return text.replace(NOT_PROSE, (found) =>
+    (found[0] === '`' || found[0] === '$' ? OPAQUE : LABEL).repeat(
+      found.length,
+    ),
+  );
+}
+
+/** Whether a run's content is anything of the note's own, or only stand-ins. */
+function prose(text: string): boolean {
+  return text.split(OPAQUE).join('') !== '';
 }
 
 /** Whether anything is selected, or the cursor sits, within `from`-`to`. */
@@ -124,7 +145,13 @@ function markBlock(
   // A note is drawn a screenful at a time; the rest of it is not worth reading.
   if (!visible.some((range) => range.from <= to && range.to >= from)) return;
 
-  for (const run of runsIn(mask(state.doc.sliceString(from, to)), from)) {
+  const masked = mask(state.doc.sliceString(from, to));
+  for (const run of runsIn(masked, from)) {
+    // A run whose whole content is code has nothing of its own to mark, and
+    // reading view leaves it as the note wrote it. Do the same here.
+    if (!prose(masked.slice(run.contentFrom - from, run.contentTo - from))) {
+      continue;
+    }
     into.push(
       Decoration.mark({ class: run.mark.cls }).range(
         run.contentFrom,
