@@ -892,22 +892,51 @@ describe('a number read against the passage the note is about', () => {
     return { world, from, suggest: new ReferenceSuggest(world.plugin) };
   }
 
-  it('writes into a linkable version where the note is about a partial one', async () => {
-    const { world, from, suggest } = about('Kelvin-01-GEN-001', {
+  /** A note about a partial version, which no link may point at. */
+  function aboutPartial() {
+    const made = about('Kelvin-01-GEN-001', {
       ...vault,
       'Notas/Kelvin/Kelvin.md': '',
       'Notas/Kelvin/Kelvin-01-GEN-001.md': '1. O que eu penso ^kelvin-gen-1-1',
     });
-    world.metadataCache.frontmatter.set('Notas/Kelvin/Kelvin.md', {
+    made.world.metadataCache.frontmatter.set('Notas/Kelvin/Kelvin.md', {
       bible: true,
       complete: false,
     });
-    world.plugin.invalidateIndex();
+    made.world.plugin.invalidateIndex();
+    return made;
+  }
+
+  it('writes into a linkable version where the note is about a partial one', async () => {
+    const { from, suggest } = aboutPartial();
 
     const rows = await offered(context('2', from), suggest);
 
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.every((r) => !r.markdown.includes('Kelvin'))).toBe(true);
+  });
+
+  it('names the version it fell back to, the note being about another', async () => {
+    const { from, suggest } = aboutPartial();
+
+    const rows = await offered(context('2', from), suggest);
+
+    // The bare rows read back what was typed and name nothing; the ones that
+    // spell the reference out say where it lands, which is not this note.
+    expect(rows.map((r) => r.ref)).toEqual([
+      '2',
+      '2',
+      'Gênesis 1.2 - NVI',
+      'Gênesis 2 - NVI',
+    ]);
+  });
+
+  it('leaves the version unsaid where it is the one the note is about', async () => {
+    const { from, suggest } = about('NVI-01-GEN-001');
+
+    const rows = await offered(context('2', from), suggest);
+
+    expect(rows.some((r) => r.ref.includes(' - '))).toBe(false);
   });
 
   it('offers the verse of the chapter, then the chapter of the book', async () => {

@@ -119,9 +119,21 @@ export default class KingdoneChapelPlugin extends Plugin {
     // version. It now says only where the translations sit, and is named for
     // that. A vault saved before the rename still carries the old name, so
     // take it once; the next save writes the new one.
-    if (!stored.translationsFolder && typeof stored.bibleFolder === 'string') {
+    //
+    // Written at all is what counts, not written to something: naming no
+    // folder is an answer — no folder is the translations folder, and only the
+    // versions that declare themselves count — and reading it as unanswered
+    // would put the old name back on every launch, since the whole of what was
+    // stored is saved again and the old key is saved with it.
+    if (
+      !('translationsFolder' in stored) &&
+      typeof stored.bibleFolder === 'string'
+    ) {
       this.settings.translationsFolder = stored.bibleFolder;
     }
+    // Saved again with everything else otherwise, so the name it replaced
+    // outlives it and is read back by the migration above.
+    delete (this.settings as unknown as Record<string, unknown>).bibleFolder;
     this.chapterCache = new Map();
 
     this.addSettingTab(new KingdoneChapelSettingTab(this.app, this));
