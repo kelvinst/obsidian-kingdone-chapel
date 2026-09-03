@@ -65,9 +65,11 @@ describe('build', () => {
 
   it('carries a run across a line break', () => {
     expect(read(below('!!Refs: Sl 26.4', 'Notas: n1!!'))).toEqual([
+      'kcp-small-line@L3',
       'hidden:!!',
       'kcp-small:Refs: Sl 26.4\nNotas: n1',
       'hidden:!!',
+      'kcp-small-line@L4',
     ]);
   });
 
@@ -81,6 +83,7 @@ describe('build', () => {
 
   it('leaves inline code alone, and reads a run across it', () => {
     expect(read(below('!!rode `a ~b~ c` agora!!'))).toEqual([
+      'kcp-small-line@L3',
       'hidden:!!',
       'kcp-small:rode `a ~b~ c` agora',
       'hidden:!!',
@@ -110,6 +113,7 @@ describe('build', () => {
 
   it('reads a run holding a link', () => {
     expect(read(below('!!Refs: [[Sl 26.4|Sl 26.4]].!!'))).toEqual([
+      'kcp-small-line@L3',
       'hidden:!!',
       'kcp-small:Refs: [[Sl 26.4|Sl 26.4]].',
       'hidden:!!',
@@ -148,43 +152,33 @@ describe('build', () => {
   });
 });
 
-describe('the !!! fence', () => {
-  const doc = ['Um verso.', '', '!!!', 'Uma nota.', '', 'E outra.', '!!!'].join(
-    '\n',
-  );
-
-  it('hides both fence lines and shrinks every line between them', () => {
-    expect(read(doc)).toEqual([
-      'kcp-fence@L3',
-      'kcp-small@L4',
-      'kcp-small@L5',
-      'kcp-small@L6',
-      'kcp-fence@L7',
+describe('the spacing of an aside', () => {
+  it('gives its size to a line it covers whole', () => {
+    expect(read(below('!!very', 'small', 'text!!'))).toEqual([
+      'kcp-small-line@L3',
+      'hidden:!!',
+      'kcp-small:very\nsmall\ntext',
+      'hidden:!!',
+      'kcp-small-line@L4',
+      'kcp-small-line@L5',
     ]);
   });
 
-  it('gives a fence line back when the cursor is on it', () => {
-    expect(read(doc, 11)).toEqual([
-      'kcp-small@L4',
-      'kcp-small@L5',
-      'kcp-small@L6',
-      'kcp-fence@L7',
+  it('gives it to one long line too, which the editor wraps on its own', () => {
+    const long = `!!${'very '.repeat(40)}long line!!`;
+    expect(read(below(long))).toContain('kcp-small-line@L3');
+  });
+
+  it('leaves a line the aside only reaches into at its own size', () => {
+    expect(read(below('Refs: !!uma nota!! e o resto.'))).toEqual([
+      'hidden:!!',
+      'kcp-small:uma nota',
+      'hidden:!!',
     ]);
   });
 
-  it('leaves a fence that was never closed as it was written', () => {
-    expect(read(below('!!!', 'Uma nota.'))).toEqual([]);
-  });
-
-  it('still marks the runs inside a fenced block', () => {
-    expect(read(below('!!!', 'Água é H~2~O.', '!!!'))).toEqual([
-      'kcp-fence@L3',
-      'kcp-small@L4',
-      'hidden:~',
-      'kcp-sub:2',
-      'hidden:~',
-      'kcp-fence@L5',
-    ]);
+  it('leaves the line of a raised or lowered run alone', () => {
+    expect(read(below('~2~'))).toEqual(['hidden:~', 'kcp-sub:2', 'hidden:~']);
   });
 });
 

@@ -1,6 +1,6 @@
 /**
  * The `~sub~`, `^sup^` and `!!small!!` syntax: three marks Obsidian has no
- * Markdown for, and a `!!!` fence for a block of the last of them.
+ * Markdown for.
  *
  * Notes want all three often enough — a verse number beside a word, a footnote
  * marker of one's own, an aside said more quietly than the sentence around it —
@@ -17,9 +17,7 @@
  *
  * A run reaches as far as bold and italic do, and stops where they stop: across
  * a soft line break, through the middle of a link or an emphasis, but never out
- * of the paragraph it started in. An aside of several paragraphs is what the
- * fence is for — three exclamations on a line of their own, opening and closing
- * a block of them the way three backticks are the block form of one.
+ * of the paragraph it started in.
  *
  * Here is only the reading of it, against plain text and knowing nothing of
  * where that text came from. `marks.ts` reads a rendered note this way and
@@ -49,7 +47,7 @@ export const MARKS: Mark[] = [
  *
  * A small is the exception to holding its own delimiter: prose is full of single
  * exclamations, so only a doubled one closes a run. Neither end of one may touch
- * a third, which is what keeps a fence line from being read as an inline run.
+ * a third, so a `!!!` is three exclamations and not a run of one.
  *
  * Nothing in any of them is written as `.`, which would not match the newline a
  * soft line break joins as.
@@ -96,47 +94,4 @@ export function runsIn(text: string, offset = 0): Run[] {
     match = RUN.exec(text);
   }
   return out;
-}
-
-/** A line of its own holding nothing but the fence. */
-const FENCE = /^!!!$/;
-
-/** Whether `line` is a fence, whatever it is padded with. */
-export function isFence(line: string): boolean {
-  return FENCE.test(line.trim());
-}
-
-/** The lines a fence opens and closes on, in the order they were written. */
-function readFences(source: string): [number, number][] {
-  const out: [number, number][] = [];
-  const lines = source.split('\n');
-  let open: number | null = null;
-  for (let line = 0; line < lines.length; line++) {
-    if (!isFence(lines[line])) continue;
-    if (open === null) open = line;
-    else {
-      out.push([open, line]);
-      open = null;
-    }
-  }
-  // A fence left open closes nothing, and its line stays as it was written.
-  return out;
-}
-
-/**
- * The fences of the note last asked about.
- *
- * Reading view renders a section at a time, so every block of a note asks this
- * same question of the same source, one after another. Reading it once is the
- * difference between walking a chapter's lines once and walking them per verse.
- */
-let lastSource = '';
-let lastFences: [number, number][] = [];
-
-export function fencesOf(source: string): [number, number][] {
-  if (source !== lastSource) {
-    lastSource = source;
-    lastFences = readFences(source);
-  }
-  return lastFences;
 }

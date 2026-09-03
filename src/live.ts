@@ -7,7 +7,7 @@ import type {
 } from '@codemirror/view';
 import type { EditorState, Range } from '@codemirror/state';
 
-import { fencesOf, runsIn } from './syntax';
+import { runsIn } from './syntax';
 
 /**
  * The three marks while the note is being edited.
@@ -20,8 +20,8 @@ import { fencesOf, runsIn } from './syntax';
  * they are wanted back.
  *
  * What is a rewritten node in reading view is a decoration here, over the
- * source, and the fence is a line rather than a section. The reading of the
- * syntax is the same either way, and lives in `syntax.ts`.
+ * source. The reading of the syntax is the same either way, and lives in
+ * `syntax.ts`.
  */
 
 /** A stretch of source no run may be read out of: code, or maths. */
@@ -59,22 +59,20 @@ function touched(state: EditorState, from: number, to: number): boolean {
   return state.selection.ranges.some((r) => r.from <= to && r.to >= from);
 }
 
-/** What a fence makes of the line at `at`, counting from zero. */
-function fenced(
-  fences: [number, number][],
-  at: number,
-): 'edge' | 'inside' | null {
-  for (const [open, close] of fences) {
-    if (at === open || at === close) return 'edge';
-    if (at > open && at < close) return 'inside';
-  }
-  return null;
-}
-
-/** The line a fence is written on, which is no part of what the note says. */
-const HIDDEN = Decoration.line({ class: 'kcp-fence' });
-/** And a line between a pair of them. */
-const SMALL_LINE = Decoration.line({ class: 'kcp-small' });
+/**
+ * The line a run of a kind lends its size to, when it covers one whole.
+ *
+ * A span at four fifths of the size does not shrink the line it sits in: the
+ * height of the line is struck from the size of the line itself, and the editor
+ * draws one line per line of the source. A note whose aside runs over three of
+ * them is small text at full-size spacing, which is the one thing an aside is
+ * not. Where a whole line is inside the run, the line takes the size and the
+ * spacing follows. Only the small does this; a raised digit belongs on a line
+ * of ordinary height.
+ */
+const LINES: Record<string, Decoration> = {
+  'kcp-small': Decoration.line({ class: 'kcp-small-line' }),
+};
 
 /** Mark every run of one block of prose, if any of it is on screen. */
 function markBlock(
@@ -94,6 +92,20 @@ function markBlock(
         run.contentTo,
       ),
     );
+    const line = LINES[run.mark.cls];
+    if (line) {
+      const first = state.doc.lineAt(run.from);
+      const last = state.doc.lineAt(run.to);
+      for (let number = first.number; number <= last.number; number++) {
+        const covered = state.doc.line(number);
+        // A line the run only reaches into keeps its height, the rest of it
+        // being ordinary text that would be shrunk along with the aside.
+        if (covered.from >= run.from && covered.to <= run.to) {
+          into.push(line.range(covered.from));
+        }
+      }
+    }
+
     // Inside the run, the delimiters are what is being edited.
     if (touched(state, run.from, run.to)) continue;
     into.push(Decoration.replace({}).range(run.from, run.contentFrom));
@@ -105,14 +117,14 @@ function markBlock(
  * Every decoration the marks ask for, over what `visible` covers.
  *
  * Runs are read a block at a time, a block being a run of lines with no blank
- * one among them — the same bound reading view gets for free by being handed
- * one rendered block at a time, and what keeps a run inside its paragraph.
+ * one among them, and none of it code — the same bound reading view gets for
+ * free by being handed one rendered block at a time, and what keeps a run
+ * inside its paragraph.
  */
 export function build(
   state: EditorState,
   visible: readonly { from: number; to: number }[],
 ): DecorationSet {
-  const fences = fencesOf(state.doc.toString());
   const into: Range<Decoration>[] = [];
   let code = false;
   let from: number | null = null;
@@ -134,16 +146,6 @@ export function build(
       close();
       continue;
     }
-
-    const role = fenced(fences, number - 1);
-    if (role === 'edge') {
-      close();
-      // On the line, the fence is being written, and has to be readable.
-      if (!touched(state, line.from, line.to))
-        into.push(HIDDEN.range(line.from));
-      continue;
-    }
-    if (role === 'inside') into.push(SMALL_LINE.range(line.from));
 
     if (!line.text.trim()) {
       close();

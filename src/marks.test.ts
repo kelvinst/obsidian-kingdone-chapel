@@ -1,52 +1,13 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import type { MarkdownPostProcessorContext } from 'obsidian';
 
 import { renderMarks } from './marks';
 
-/** A section of a note: what it rendered as, and the lines it came from. */
-interface Section {
-  html: string;
-  from: number;
-  to: number;
-}
-
-/**
- * Render a note section by section, the way reading view hands them over.
- *
- * Every section is its own call, and each is told the whole source and the
- * lines it covers — which is all a fence has to go on.
- */
-function note(source: string, sections: Section[]): HTMLElement[] {
-  const info = new Map<
-    HTMLElement,
-    { text: string; lineStart: number; lineEnd: number }
-  >();
-  const els = sections.map((section) => {
-    const el = document.createElement('div');
-    el.innerHTML = section.html;
-    info.set(el, {
-      text: source,
-      lineStart: section.from,
-      lineEnd: section.to,
-    });
-    return el;
-  });
-  const ctx = {
-    getSectionInfo: (el: HTMLElement) => info.get(el) ?? null,
-  } as unknown as MarkdownPostProcessorContext;
-  for (const el of els) renderMarks(el, ctx);
-  return els;
-}
-
-/** A rendered block of a note nothing is known about — an embed, a card. */
+/** A rendered block, as the post-processor is handed one. */
 function rendered(html: string): HTMLElement {
   const el = document.createElement('div');
   el.innerHTML = html;
-  const ctx = {
-    getSectionInfo: () => null,
-  } as unknown as MarkdownPostProcessorContext;
-  renderMarks(el, ctx);
+  renderMarks(el);
   return el;
 }
 
@@ -177,82 +138,5 @@ describe('renderMarks', () => {
   it('leaves a block holding no text at all alone', () => {
     const el = rendered('<p><img src="a.png"></p>');
     expect(el.innerHTML).toBe('<p><img src="a.png"></p>');
-  });
-});
-
-describe('the !!! fence', () => {
-  const source = [
-    'Um verso.',
-    '',
-    '!!!',
-    'Uma nota.',
-    '',
-    'E outra.',
-    '!!!',
-  ].join('\n');
-  const sections: Section[] = [
-    { html: '<p>Um verso.</p>', from: 0, to: 0 },
-    { html: '<p>!!!</p>', from: 2, to: 2 },
-    { html: '<p>Uma nota.</p>', from: 3, to: 3 },
-    { html: '<p>E outra.</p>', from: 5, to: 5 },
-    { html: '<p>!!!</p>', from: 6, to: 6 },
-  ];
-
-  it('shrinks every block between a pair, paragraphs and all', () => {
-    const [, , first, second] = note(source, sections);
-    expect(first.classList.contains('kcp-small')).toBe(true);
-    expect(second.classList.contains('kcp-small')).toBe(true);
-  });
-
-  it('empties the lines the fence is written on', () => {
-    const [, open, , , close] = note(source, sections);
-    expect(open.innerHTML).toBe('');
-    expect(close.innerHTML).toBe('');
-  });
-
-  it('leaves what lies outside the fence alone', () => {
-    const [before] = note(source, sections);
-    expect(before.classList.contains('kcp-small')).toBe(false);
-    expect(before.textContent).toBe('Um verso.');
-  });
-
-  it('reads a note it has already read without reading it again', () => {
-    const [, , first] = note(source, sections);
-    const [, , again] = note(source, sections);
-    expect(first.classList.contains('kcp-small')).toBe(true);
-    expect(again.classList.contains('kcp-small')).toBe(true);
-  });
-
-  it('finds the pair a block lies in, and not an earlier one', () => {
-    const twice = ['!!!', 'Uma.', '!!!', '', '!!!', 'Outra.', '!!!'].join('\n');
-    const [, , , inner] = note(twice, [
-      { html: '<p>!!!</p>', from: 0, to: 0 },
-      { html: '<p>Uma.</p>', from: 1, to: 1 },
-      { html: '<p>!!!</p>', from: 2, to: 2 },
-      { html: '<p>!!!</p>', from: 4, to: 4 },
-      { html: '<p>Outra.</p>', from: 5, to: 5 },
-      { html: '<p>!!!</p>', from: 6, to: 6 },
-    ]);
-    expect(inner.textContent).toBe('');
-  });
-
-  it('leaves a fence that was never closed as it was written', () => {
-    const open = ['!!!', 'Uma nota.'].join('\n');
-    const [fence, after] = note(open, [
-      { html: '<p>!!!</p>', from: 0, to: 0 },
-      { html: '<p>Uma nota.</p>', from: 1, to: 1 },
-    ]);
-    expect(fence.textContent).toBe('!!!');
-    expect(after.classList.contains('kcp-small')).toBe(false);
-  });
-
-  it('still marks the runs inside a fenced block', () => {
-    const inner = ['!!!', 'Água é H~2~O.', '!!!'].join('\n');
-    const [, block] = note(inner, [
-      { html: '<p>!!!</p>', from: 0, to: 0 },
-      { html: '<p>Água é H~2~O.</p>', from: 1, to: 1 },
-      { html: '<p>!!!</p>', from: 2, to: 2 },
-    ]);
-    expect(marks(block)).toEqual(['sub:2']);
   });
 });

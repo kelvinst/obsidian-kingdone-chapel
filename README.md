@@ -138,25 +138,15 @@ break and the middle of a link or an emphasis, so a pair of lines is one aside:
 Notas: [[n1]]; [[n2]].!!
 ```
 
-But it never leaves its paragraph. For an aside of several, fence them with three
-exclamations on lines of their own — the block form, as three backticks are the block form of
-one:
-
-```markdown
-!!!
-Uma nota inteira, com [[Sl 26.4|links]] e tudo mais.
-
-E outro parágrafo dela.
-!!!
-```
+But it never leaves its paragraph, so a blank line ends an aside.
 
 Code and maths are left exactly as written, and a run may reach across an inline `` `code` ``
 without its contents being read for delimiters.
 
 Both views draw them. Reading view rewrites the note; while editing, the run is styled where
 it stands and its delimiters are hidden until the cursor is inside it — the way Obsidian
-hides the asterisks of its own bold. A `!!!` line likewise stays out of the way until you
-put the cursor on it.
+hides the asterisks of its own bold. An aside covering whole lines is drawn at its own line
+spacing there, rather than at the spacing of the text around it.
 
 ### `@` references
 
