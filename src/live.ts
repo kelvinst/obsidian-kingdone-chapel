@@ -35,9 +35,14 @@ const OPAQUE = '￼';
  * never wrote. A block anchor is a caret — `[[NVI-43-JHN-001#^nvi-jhn-1-1|Jo
  * 1.1]]` — so a line naming two of them would otherwise read as one long
  * superscript, and so would a verse between two lines ending in block ids.
+ *
+ * Maths is held to Obsidian's own rule, that a dollar opening or closing it
+ * touches what it delimits. Two dollars written as money would otherwise pair
+ * off and blank out everything between them, `!!Custa $5!! e $6` losing the
+ * exclamations that close the aside along with the rest.
  */
 const NOT_PROSE =
-  /`[^`\n]*`|\$[^$\n]*\$|!?\[\[[^\]\n]*\]\]|\[[^\]\n]*\]\([^)\n]*\)|\^[\w-]+(?=[ \t]*$)/gm;
+  /`[^`\n]*`|\$(?![\s$])[^$\n]*[^\s$]\$|!?\[\[[^\]\n]*\]\]|\[[^\]\n]*\]\([^)\n]*\)|\^[\w-]+(?=[ \t]*$)/gm;
 
 /** A line opening or closing a code block. */
 const CODE_BLOCK = /^\s*(?:```|~~~)/;
