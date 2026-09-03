@@ -133,6 +133,12 @@ describe('renderMarks', () => {
     expect(el.querySelector('code')?.textContent).toBe('a ~b~ c');
   });
 
+  it('leaves a run with nothing but code in it as it was written', () => {
+    const el = rendered('<p>!!<code>ls -la</code>!!</p>');
+    expect(marks(el)).toEqual([]);
+    expect(el.textContent).toBe('!!ls -la!!');
+  });
+
   it('leaves a code block alone', () => {
     const el = rendered('<pre><code>a ~b~ c^d^ e!!f!!g</code></pre>');
     expect(marks(el)).toEqual([]);
