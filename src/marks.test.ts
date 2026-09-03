@@ -114,6 +114,19 @@ describe('renderMarks', () => {
     expect(el.innerHTML).toBe('<p>Veja o bloco ^abc</p>');
   });
 
+  it('leaves the caret of a link label alone', () => {
+    const el = rendered(
+      '<p>Refs: <a>NVI-43-JHN-001#^nvi-jhn-1-1</a>; <a>X#^y</a>.</p>',
+    );
+    expect(marks(el)).toEqual([]);
+  });
+
+  it('marks a run holding a link', () => {
+    const el = rendered('<p>!!Refs: <a>Sl 26.4</a>.!!</p>');
+    expect(marks(el)).toEqual(['span:Refs: ', 'span:Sl 26.4', 'span:.']);
+    expect(el.textContent).toBe('Refs: Sl 26.4.');
+  });
+
   it('leaves inline code alone, and reads a run across it', () => {
     const el = rendered('<p>!!rode <code>a ~b~ c</code> agora!!</p>');
     expect(marks(el)).toEqual(['span:rode ', 'span: agora']);
