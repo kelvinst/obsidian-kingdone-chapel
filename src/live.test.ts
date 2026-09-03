@@ -140,6 +140,14 @@ describe('build', () => {
     expect(read('veja $x^2^$ ali')).toEqual([]);
   });
 
+  it('reads a run holding a price, two dollars being no maths', () => {
+    expect(read(below('!!Custa $5!! e $6'))).toEqual([
+      'hidden:!!',
+      'kcp-small:Custa $5',
+      'hidden:!!',
+    ]);
+  });
+
   it('leaves strikethrough alone', () => {
     expect(read('um ~~riscado~~ verso')).toEqual([]);
   });
