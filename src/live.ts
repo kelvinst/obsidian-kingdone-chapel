@@ -58,8 +58,12 @@ const CODE_BLOCK = /^\s*(?:```|~~~)/;
  * paragraph under it. Without this a run would reach from one into the next —
  * marking text the reader will see unmarked, and swallowing the second item's
  * own bullet along the way.
+ *
+ * A quote is not among them. Its marker repeats on every line of the one
+ * paragraph rather than opening a block, so a quoted aside written over two
+ * lines is one run, exactly as it is when the note is read.
  */
-const NEW_BLOCK = /^\s*(?:[-*+] |\d+[.)] |#{1,6} |>|\||---)/;
+const NEW_BLOCK = /^\s*(?:[-*+] |\d+[.)] |#{1,6} |\||---)/;
 
 /**
  * And one that is a block all by itself. A heading is a line, not a paragraph:
@@ -172,7 +176,8 @@ export function build(
       continue;
     }
 
-    if (!line.text.trim()) {
+    // A quote's own blank line is written with its marker and nothing else.
+    if (!line.text.replace(/^\s*>+/, '').trim()) {
       close();
       continue;
     }

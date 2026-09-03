@@ -81,6 +81,21 @@ describe('build', () => {
     expect(read(below('- !!nota um', '- nota dois!!'))).toEqual([]);
   });
 
+  it('carries a run across the lines of one quote', () => {
+    expect(read(below('> !!Refs: Sl 26.4', '> Notas: n1!!'))).toEqual([
+      'hidden:!!',
+      'kcp-small:Refs: Sl 26.4\n> Notas: n1',
+      'hidden:!!',
+      // The quote's own marker is inside the run, the note having written it
+      // between the delimiters, so the line it opens takes the size with it.
+      'kcp-small-line@L4',
+    ]);
+  });
+
+  it('does not carry a run across a quote of its own', () => {
+    expect(read(below('> !!Refs: Sl 26.4', '>', '> Notas: n1!!'))).toEqual([]);
+  });
+
   it('does not carry a run out of a heading', () => {
     expect(read(below('# Título !!a', 'b!! resto'))).toEqual([]);
   });
