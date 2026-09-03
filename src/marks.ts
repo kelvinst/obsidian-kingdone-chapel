@@ -1,6 +1,4 @@
-import type { MarkdownPostProcessorContext } from 'obsidian';
-
-import { fencesOf, runsIn } from './syntax';
+import { runsIn } from './syntax';
 import type { Mark } from './syntax';
 
 /**
@@ -109,7 +107,7 @@ function gather(el: HTMLElement, block: Block) {
       paint(block);
       block.text = '';
       block.pieces = [];
-      markInline(child);
+      renderMarks(child);
     }
   }
 }
@@ -173,51 +171,15 @@ function paint(block: Block) {
 }
 
 /**
- * Mark every run under `el`.
+ * Mark every run under `el`, as a markdown post-processor.
  *
  * A run is read against a whole block rather than one text node, so it holds
  * together across a soft line break and through the middle of an emphasis or a
  * link. What it becomes is one mark per node it touches — two halves of a
  * `<sub>` either side of a `<br>` read as the one the note wrote.
  */
-function markInline(el: HTMLElement) {
+export function renderMarks(el: HTMLElement) {
   const block: Block = { text: '', pieces: [] };
   gather(el, block);
   paint(block);
-}
-
-/** Empty `el`, the fence line itself being no part of what the note says. */
-function hide(el: HTMLElement) {
-  while (el.firstChild) el.removeChild(el.firstChild);
-}
-
-/**
- * Mark every run under `el`, as a markdown post-processor.
- *
- * The fence cannot be paired here: the two ends of one are separate sections of
- * the note, and reading view hands them over in separate calls. So each call
- * decides alone, asking the note's source where the fences are and where the
- * lines it was given fall — a fence line is emptied, and everything between a
- * pair is marked small as a whole, paragraphs and all.
- */
-export function renderMarks(
-  el: HTMLElement,
-  ctx: MarkdownPostProcessorContext,
-) {
-  // No source to read means no section to place: an embed, a canvas, a card of
-  // the plugin's own. The inline marks still stand on their own.
-  const info = ctx.getSectionInfo(el);
-  if (info) {
-    for (const [open, close] of fencesOf(info.text)) {
-      if (info.lineStart === open || info.lineStart === close) {
-        hide(el);
-        return;
-      }
-      if (info.lineStart > open && info.lineEnd < close) {
-        el.classList.add('kcp-small');
-        break;
-      }
-    }
-  }
-  markInline(el);
 }

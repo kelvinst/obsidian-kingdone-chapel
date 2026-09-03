@@ -355,8 +355,7 @@
    None of the three touches line height. A run reaches across a soft line
    break, so it can be a whole line — or two — and the zero line height that
    suits a raised digit mid-sentence would collapse the lines of one that is
-   not. The class sits on the block itself between a `!!!` pair, which is the
-   same rule doing the same thing to a whole paragraph. */
+   not. */
 .kcp-small {
   font-size: 0.8em;
 }
@@ -378,7 +377,15 @@
   vertical-align: sub;
 }
 
-/* The line a `!!!` is written on, while the cursor is somewhere else. */
-.cm-line.kcp-fence {
-  display: none;
+/* An aside that covers whole lines takes the size on the lines themselves. A
+   span cannot shrink the line it sits in — the height of a line is struck from
+   the size of the line — so small text over three lines would otherwise be
+   spaced as though it were not small. The run inside then inherits rather than
+   shrinking twice. */
+.cm-line.kcp-small-line {
+  font-size: 0.8em;
+}
+
+.cm-line.kcp-small-line .kcp-small {
+  font-size: inherit;
 }
