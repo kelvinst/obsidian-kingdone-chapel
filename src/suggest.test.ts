@@ -892,6 +892,24 @@ describe('a number read against the passage the note is about', () => {
     return { world, from, suggest: new ReferenceSuggest(world.plugin) };
   }
 
+  it('writes into a linkable version where the note is about a partial one', async () => {
+    const { world, from, suggest } = about('Kelvin-01-GEN-001', {
+      ...vault,
+      'Notas/Kelvin/Kelvin.md': '',
+      'Notas/Kelvin/Kelvin-01-GEN-001.md': '1. O que eu penso ^kelvin-gen-1-1',
+    });
+    world.metadataCache.frontmatter.set('Notas/Kelvin/Kelvin.md', {
+      bible: true,
+      complete: false,
+    });
+    world.plugin.invalidateIndex();
+
+    const rows = await offered(context('2', from), suggest);
+
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((r) => !r.markdown.includes('Kelvin'))).toBe(true);
+  });
+
   it('offers the verse of the chapter, then the chapter of the book', async () => {
     const { from, suggest } = about('NVI-01-GEN-001');
     const rows = await offered(context('2', from), suggest);
