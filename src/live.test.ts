@@ -93,6 +93,19 @@ describe('build', () => {
     ]);
   });
 
+  it('does not carry a run from a paragraph into the quote under it', () => {
+    expect(read(below('Um verso !!a', '> b!! citado'))).toEqual([]);
+  });
+
+  it('carries a run on into the line a quote is finished on', () => {
+    expect(read(below('> !!Refs: Sl 26.4', 'Notas: n1!!'))).toEqual([
+      'hidden:!!',
+      'kcp-small:Refs: Sl 26.4\nNotas: n1',
+      'hidden:!!',
+      'kcp-small-line@L4',
+    ]);
+  });
+
   it('does not carry a run across a quote of its own', () => {
     expect(read(below('> !!Refs: Sl 26.4', '>', '> Notas: n1!!'))).toEqual([]);
   });
