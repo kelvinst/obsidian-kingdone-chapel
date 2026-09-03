@@ -137,6 +137,19 @@ describe('build', () => {
     ]);
   });
 
+  it('leaves a run with nothing but code in it as it was written', () => {
+    expect(read(below('!!`ls -la`!!'))).toEqual([]);
+  });
+
+  it('marks a run that is nothing but a link, which does show', () => {
+    expect(read(below('!![Sl 26.4](x)!!'))).toEqual([
+      'kcp-small-line@L3',
+      'hidden:!!',
+      'kcp-small:[Sl 26.4](x)',
+      'hidden:!!',
+    ]);
+  });
+
   it('leaves a code block alone', () => {
     expect(read('```\na ~b~ c\n```')).toEqual([]);
   });
