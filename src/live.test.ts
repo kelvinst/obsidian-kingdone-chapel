@@ -162,6 +162,14 @@ describe('build', () => {
     ]);
   });
 
+  it('closes a quoted code block on a fence spaced differently', () => {
+    expect(read(below('> ```', '> x', '>```', '', 'H~2~O'))).toEqual([
+      'hidden:~',
+      'kcp-sub:2',
+      'hidden:~',
+    ]);
+  });
+
   it('leaves a quoted fence inside a code block as part of it', () => {
     expect(read(below('```', '> ```', '~x~ solto'))).toEqual([]);
   });

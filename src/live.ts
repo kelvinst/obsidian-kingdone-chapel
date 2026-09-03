@@ -225,7 +225,7 @@ export function build(
   const into: Range<Decoration>[] = [];
   let code = false;
   let depth = 0;
-  let codePrefix = '';
+  let codeDepth = 0;
   let from: number | null = null;
   let to = 0;
 
@@ -242,13 +242,16 @@ export function build(
     // would be recognised through the markers standing in front of them.
     const said = line.text.replace(/^(\s*>)+\s?/, '');
     const prefix = line.text.slice(0, line.text.length - said.length);
+    // How deep in quotes the line is written, which is all the markers say
+    // that matters: whether one is spaced `> ` or `>` is nobody's business.
+    const quoted = (prefix.match(/>/g) ?? []).length;
 
-    // A code block ends on a fence written the way the one that opened it was.
+    // A code block ends on a fence written as deep as the one that opened it.
     // A quoted fence closes a quoted block; the same line inside an unquoted
     // one is part of what that block holds, and closes nothing.
-    if (CODE_BLOCK.test(said) && (!code || prefix === codePrefix)) {
+    if (CODE_BLOCK.test(said) && (!code || quoted === codeDepth)) {
       code = !code;
-      codePrefix = prefix;
+      codeDepth = quoted;
       close();
       continue;
     }
@@ -266,7 +269,6 @@ export function build(
     // inside one. Only going deeper ends a block: a line shallower than the one
     // before it is that paragraph still being written, which Markdown reads as
     // part of the quote it started in.
-    const quoted = (prefix.match(/>/g) ?? []).length;
     if (quoted > depth) close();
     depth = quoted;
 
