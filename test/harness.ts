@@ -66,6 +66,12 @@ export class FakeVault extends Emitter {
   root = new stub.TFolder();
   byPath = new Map<string, stub.TAbstractFile>();
   contents = new Map<string, string>();
+  /**
+   * The app's own settings, which the vault answers for rather than the
+   * plugin: Vim mode is one of them, and a plugin reads it the way Obsidian
+   * lets it, by asking.
+   */
+  config = new Map<string, unknown>();
   private all: stub.TFile[] = [];
   private clock = 1;
 
@@ -75,6 +81,10 @@ export class FakeVault extends Emitter {
     for (const [path, content] of Object.entries(files)) {
       this.write(path, content);
     }
+  }
+
+  getConfig(key: string): unknown {
+    return this.config.get(key);
   }
 
   /** Add the file, or replace its text and move its modification time on. */
@@ -351,6 +361,12 @@ export class FakeApp {
 /** A cursor, a selection and a run of lines — as much editor as is ever read. */
 export class FakeEditor {
   lines: string[];
+  /**
+   * The CodeMirror view behind the editor, and the CodeMirror 5 adapter the
+   * Vim extension keeps beside it. Left off unless a test is about Vim: an
+   * editor with Vim turned off carries no adapter either.
+   */
+  cm?: { cm?: unknown };
   cursor: EditorPosition = { line: 0, ch: 0 };
   anchor: EditorPosition = { line: 0, ch: 0 };
   selected = false;
