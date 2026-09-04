@@ -162,65 +162,6 @@ describe('two files for one chapter', () => {
   });
 });
 
-describe('warnAboutConflicts', () => {
-  it('says nothing about a vault with no duplicates', () => {
-    world.plugin.index();
-    expect(notices).toHaveLength(0);
-  });
-
-  it('names the files, once, however often the index is rebuilt', () => {
-    const world = harness({
-      ...vault,
-      'Bibles/NVI/cópia/NVI-01-GEN-001.md': '1. Uma cópia ^x',
-    });
-    world.plugin.index();
-    expect(notices).toHaveLength(1);
-    expect(notices[0].message).toContain('NVI-01-GEN-001 / NVI-01-GEN-001');
-    world.plugin.invalidateIndex();
-    world.plugin.index();
-    expect(notices).toHaveLength(1);
-  });
-
-  it('shows three of them and counts the rest', () => {
-    const many: Record<string, string> = { ...vault };
-    for (const number of [1, 2, 3, 4, 5]) {
-      const path = chapterPath('NVI', 1, 'GEN', number);
-      many[path] = '1. Original ^a';
-      many[path.replace('/NVI-', '/cópia/NVI-')] = '1. Cópia ^b';
-    }
-    const world = harness(many);
-    world.plugin.index();
-    expect(notices[0].message).toContain('...and 2 more');
-    expect(notices[0].timeout).toBe(10000);
-  });
-
-  it('says nothing more once the duplicates are gone', () => {
-    const world = harness({
-      ...vault,
-      'Bibles/NVI/cópia/NVI-01-GEN-001.md': '1. Uma cópia ^x',
-    });
-    world.plugin.index();
-    expect(notices).toHaveLength(1);
-
-    world.vault.remove('Bibles/NVI/cópia/NVI-01-GEN-001.md');
-    world.plugin.invalidateIndex();
-    world.plugin.index();
-    expect(notices).toHaveLength(1);
-  });
-
-  it('says it again once the duplicates are not the same ones', () => {
-    const world = harness({
-      ...vault,
-      'Bibles/NVI/cópia/NVI-01-GEN-001.md': '1. Uma cópia ^x',
-    });
-    world.plugin.index();
-    world.vault.write('Bibles/NVI/cópia/NVI-01-GEN-002.md', '1. Outra ^y');
-    world.plugin.invalidateIndex();
-    world.plugin.index();
-    expect(notices).toHaveLength(2);
-  });
-});
-
 describe('listVersions', () => {
   it('names the folders holding chapters, in order', () => {
     expect(world.plugin.listVersions()).toEqual(['ARA', 'NVI']);

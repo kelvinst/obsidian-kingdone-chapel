@@ -6,7 +6,7 @@ import {
   WorkspaceLeaf,
   getLinkpath,
 } from 'obsidian';
-import type { PaneType } from 'obsidian';
+import type { PaneType, TAbstractFile } from 'obsidian';
 
 import { DEFAULT_SETTINGS, VIEW_TYPE } from './types';
 import type {
@@ -33,6 +33,7 @@ import { ReferenceSuggest } from './suggest';
 import { KingdoneChapelSettingTab } from './settings';
 import { KingdoneChapelView } from './view';
 import { Breadcrumbs } from './breadcrumbs';
+import { Diagnostics } from './diagnostics';
 import { renderMarks } from './marks';
 import { liveMarks } from './live';
 import {
@@ -107,8 +108,8 @@ export default class KingdoneChapelPlugin extends Plugin {
   queuedRefresh: number | null = null;
   /** "version/book:chapter" -> the files fighting over it. Filled by index(). */
   chapterConflicts: Map<string, TFile[]> = new Map();
-  /** The conflicts the user was last warned about, so each is only said once. */
-  warnedConflicts = '';
+  /** What is wrong with the versions the vault holds, as far as it is known. */
+  diagnostics = new Diagnostics(this);
   /** Last location read from a real editor, kept for when focus leaves it. */
   lastLocation: Location | null = null;
   /** Verse clicked in reading mode, held until that pane scrolls again. */
@@ -209,7 +210,10 @@ export default class KingdoneChapelPlugin extends Plugin {
     // Any of the three can be the chapter on screen, or the one an arrow points
     // at, and nothing else says the bar above a note now names another passage —
     // another chapter either side of it, or none at all.
-    const moved = () => {
+    // The path a file was at, so what was read of it is not held against a
+    // name it no longer answers to: a rename is a new file everywhere else.
+    const moved = (file?: TAbstractFile, oldPath?: string) => {
+      if (file) this.diagnostics.forget(oldPath || file.path);
       this.invalidateIndex();
       this.queueBreadcrumbs();
     };
@@ -228,7 +232,11 @@ export default class KingdoneChapelPlugin extends Plugin {
       this.app.metadataCache.on('changed', (file, _data, cache) => {
         const front = cache.frontmatter;
         const declares = front ? declaresSource(front) : false;
-        if (declares || this.declaringNotes.has(file.path)) moved();
+        if (declares || this.declaringNotes.has(file.path)) moved(file);
+        // A chapter already read is read again, so what is known of it keeps
+        // up with the note. One never read stays unread: an edit is no reason
+        // to read the whole vault in.
+        this.diagnostics.refresh(file).catch(() => {});
       }),
     );
     // Which folders are versions is read from the metadata cache, and on a
@@ -408,7 +416,6 @@ export default class KingdoneChapelPlugin extends Plugin {
     this.bibleIndex = index;
     this.bookNotes = books;
     this.chapterConflicts = conflicts;
-    this.warnAboutConflicts();
     return index;
   }
 
@@ -424,25 +431,6 @@ export default class KingdoneChapelPlugin extends Plugin {
       if (clash) return clash;
     }
     return null;
-  }
-
-  /** Notice the user once per set of duplicates, when the index is rebuilt. */
-  warnAboutConflicts() {
-    const signature = Array.from(this.chapterConflicts.keys()).sort().join('|');
-    if (signature === this.warnedConflicts) return;
-    this.warnedConflicts = signature;
-    if (!this.chapterConflicts.size) return;
-
-    const names = Array.from(this.chapterConflicts.values(), (files) =>
-      files.map((f) => f.basename).join(' / '),
-    );
-    const shown = names.slice(0, 3).join('\n');
-    const rest = names.length > 3 ? `\n...and ${names.length - 3} more` : '';
-    new Notice(
-      `Kingdone Chapel: more than one file for the same chapter or book. ` +
-        `Rename or remove one of each:\n${shown}${rest}`,
-      10000,
-    );
   }
 
   refreshViews() {
