@@ -2340,3 +2340,91 @@ describe('the note command', () => {
     expect(world.plugin.noteTarget(view)).toBeNull();
   });
 });
+
+describe('a note written in a Vim editor', () => {
+  const CHAPTER =
+    '# Gênesis 1 - NVI\n\n![[ARA-01-GEN-001#^ara-gen-1-1|flat]]\n^nvi-gen-1-1\n';
+  const KIND = {
+    callout: 'note',
+    letter: 'n',
+    titles: { pt: 'Nota', en: 'Note' },
+  };
+
+  /** The Vim extension as the app publishes it, and the keys it was handed. */
+  function vim(): { keys: string[] } {
+    const keys: string[] = [];
+    (window as unknown as { CodeMirrorAdapter?: unknown }).CodeMirrorAdapter = {
+      Vim: { handleKey: (_cm: unknown, key: string) => keys.push(key) },
+    };
+    return { keys };
+  }
+
+  /** A pane over the chapter, with the cursor in verse 1. */
+  function editing(adapter: object | null = {}) {
+    const editor = new FakeEditor(CHAPTER);
+    if (adapter) editor.cm = { cm: adapter };
+    const view = pane(world.app, {
+      file: world.vault.getAbstractFileByPath(
+        chapterPath('NVI', 1, 'GEN', 1),
+      ) as TFile,
+      editor,
+    });
+    editor.at(3);
+    return { view, editor };
+  }
+
+  afterEach(() => {
+    delete (window as unknown as { CodeMirrorAdapter?: unknown })
+      .CodeMirrorAdapter;
+  });
+
+  it('is typed straight away, the mode switched before the cursor moves', () => {
+    const asked = vim();
+    world.vault.config.set('vimMode', true);
+    const { view, editor } = editing();
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+
+    expect(asked.keys).toEqual(['i']);
+    expect(editor.getLine(editor.cursor.line)).toBe('> ');
+  });
+
+  it('leaves an editor that is not in Vim mode alone', () => {
+    const asked = vim();
+    world.vault.config.set('vimMode', false);
+    const { view } = editing();
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+
+    expect(asked.keys).toEqual([]);
+  });
+
+  it('leaves an app that does not answer for the setting alone', () => {
+    const asked = vim();
+    world.vault.config.set('vimMode', true);
+    // An own property, which is what shadows the one the class carries: an
+    // older app answering no such question at all.
+    const shadow = world.vault as { getConfig?: unknown };
+    shadow.getConfig = undefined;
+    const { view } = editing();
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+    delete shadow.getConfig;
+
+    expect(asked.keys).toEqual([]);
+  });
+
+  it('leaves an editor keeping no adapter alone', () => {
+    const asked = vim();
+    world.vault.config.set('vimMode', true);
+    const { view } = editing(null);
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+
+    expect(asked.keys).toEqual([]);
+  });
+
+  it('leaves an app publishing no Vim of its own alone', () => {
+    world.vault.config.set('vimMode', true);
+    const { view, editor } = editing();
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+
+    expect(editor.getLine(editor.cursor.line)).toBe('> ');
+  });
+});

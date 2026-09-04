@@ -170,3 +170,71 @@ describe('the note being written', () => {
     expect(notices[notices.length - 1].message).toContain('numbered from 1 up');
   });
 });
+
+describe('the key that writes it', () => {
+  /** A key pressed in the modal, wherever the focus is. */
+  function press(
+    modal: WriteNoteModal,
+    key: string,
+    over: KeyboardEventInit = {},
+  ) {
+    const evt = new KeyboardEvent('keydown', {
+      key,
+      cancelable: true,
+      bubbles: true,
+      ...over,
+    });
+    modal.contentEl.dispatchEvent(evt);
+    return evt;
+  }
+
+  it('writes the note on Enter, wherever the field was left', () => {
+    const modal = opened();
+    const wrote = vi
+      .spyOn(world.plugin, 'writeNote')
+      .mockImplementation(() => {});
+    const evt = press(modal, 'Enter');
+
+    expect(wrote).toHaveBeenCalledWith(modal.target, modal.kind, 5);
+    expect(evt.defaultPrevented).toBe(true);
+  });
+
+  it('writes it from the number field as it was typed', () => {
+    const modal = opened();
+    const wrote = vi
+      .spyOn(world.plugin, 'writeNote')
+      .mockImplementation(() => {});
+    const input = control<HTMLInputElement>(modal, 'Number', 'input');
+    input.value = '26';
+    change(input, 'input');
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'Enter',
+        cancelable: true,
+        bubbles: true,
+      }),
+    );
+
+    expect(wrote).toHaveBeenCalledWith(modal.target, modal.kind, 26);
+  });
+
+  it('leaves every other key to the field it was typed into', () => {
+    const modal = opened();
+    const wrote = vi
+      .spyOn(world.plugin, 'writeNote')
+      .mockImplementation(() => {});
+    press(modal, '7');
+
+    expect(wrote).not.toHaveBeenCalled();
+  });
+
+  it('waits for a key still being composed', () => {
+    const modal = opened();
+    const wrote = vi
+      .spyOn(world.plugin, 'writeNote')
+      .mockImplementation(() => {});
+    press(modal, 'Enter', { isComposing: true });
+
+    expect(wrote).not.toHaveBeenCalled();
+  });
+});

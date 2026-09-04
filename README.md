@@ -122,7 +122,9 @@ And the note itself, under `## Notas` at the foot of the chapter — after the v
 ^shedd-psa-1-n2
 ```
 
-The cursor is left on the empty line, so the comment is typed straight away. A second note on
+The cursor is left on the empty line, so the comment is typed straight away — in Vim mode the
+editor is put into insert mode with it, so the note is typed rather than read as commands.
+Enter writes the note from the modal, wherever the focus was left. A second note on
 the same verse joins the marker list rather than replacing it, and a note over a range marks
 every verse in it and quotes every one of them in its body.
 

@@ -6,7 +6,7 @@ import {
   WorkspaceLeaf,
   getLinkpath,
 } from 'obsidian';
-import type { PaneType, TAbstractFile } from 'obsidian';
+import type { Editor, PaneType, TAbstractFile } from 'obsidian';
 
 import { DEFAULT_SETTINGS, VIEW_TYPE } from './types';
 import type {
@@ -62,6 +62,14 @@ import {
   sourceOf,
 } from './sources';
 import type { Source } from './sources';
+
+/**
+ * As much of the Vim extension as switching into insert mode needs: the key
+ * handler, over the CodeMirror 5 adapter the extension keeps for the view.
+ */
+interface VimAdapter {
+  Vim?: { handleKey: (adapter: unknown, key: string, from: string) => void };
+}
 
 /** A chapter a note is being written into, as the command reads it. */
 export interface NoteTarget {
@@ -898,7 +906,41 @@ export default class KingdoneChapelPlugin extends Plugin {
     for (const write of written.writes) {
       editor.replaceRange(write.text, write.from, write.to);
     }
+    // Insert mode first, then the cursor: normal mode holds the cursor on a
+    // character, and the line the note is typed into has none past the space,
+    // so a cursor set before the switch is pulled back a column by it.
+    this.startTyping(editor);
     editor.setCursor(written.comment);
+  }
+
+  /**
+   * Put a Vim editor into insert mode, so that the note can be typed the moment
+   * it is written.
+   *
+   * The command leaves the cursor on an empty line for the comment, which is an
+   * invitation to type; a Vim reader landing there in normal mode has the
+   * invitation and none of the typing, and the first word of the note is read
+   * as commands instead. So the mode follows the cursor.
+   *
+   * Vim is Obsidian's own setting rather than this plugin's, and the editor it
+   * hands over says nothing about it: the mode lives in the CodeMirror 5
+   * adapter the Vim extension keeps beside the view, which Obsidian publishes
+   * as `CodeMirrorAdapter`. Everything here is asked for rather than assumed —
+   * an editor with Vim turned off carries no adapter, and a version of the app
+   * that keeps it elsewhere is left alone rather than crashed on.
+   */
+  startTyping(editor: Editor) {
+    const config = this.app.vault as unknown as {
+      getConfig?: (key: string) => unknown;
+    };
+    if (!config.getConfig || config.getConfig('vimMode') !== true) return;
+
+    const adapter = (editor as unknown as { cm?: { cm?: unknown } }).cm?.cm;
+    const vim = (window as unknown as { CodeMirrorAdapter?: VimAdapter })
+      .CodeMirrorAdapter?.Vim;
+    if (!adapter || !vim) return;
+
+    vim.handleKey(adapter, 'i', 'mapping');
   }
 
   /**
