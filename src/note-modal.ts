@@ -86,6 +86,15 @@ export class WriteNoteModal extends Modal {
         .setCta()
         .onClick(() => this.write()),
     );
+
+    // Two fields and a button, both fields answered before the modal opened:
+    // Enter is what a reader presses next, wherever the focus happens to be.
+    // A key still being composed is part of typing the number, not an answer.
+    contentEl.addEventListener('keydown', (evt) => {
+      if (evt.key !== 'Enter' || evt.isComposing) return;
+      evt.preventDefault();
+      this.write();
+    });
   }
 
   onClose() {
