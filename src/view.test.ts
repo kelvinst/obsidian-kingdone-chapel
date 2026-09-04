@@ -252,7 +252,7 @@ describe('a card', () => {
     expect(world.workspace.opened[0].newLeaf).toBe('tab');
   });
 
-  it('copies the verse instead when the click carried Alt', () => {
+  it('copies the verse instead when the click carried Alt', async () => {
     const copy = vi
       .spyOn(navigator.clipboard, 'writeText')
       .mockResolvedValue(undefined);
@@ -261,9 +261,42 @@ describe('a card', () => {
     // whether or not the copy went on to make one.
     const jump = vi.spyOn(world.plugin, 'jumpTo');
     card().dispatchEvent(new MouseEvent('click', { altKey: true }));
-    expect(copy).toHaveBeenCalledWith('No princípio, criou Deus');
+    await vi.waitFor(() =>
+      expect(copy).toHaveBeenCalledWith('No princípio, criou Deus'),
+    );
     expect(jump).not.toHaveBeenCalled();
     expect(notices.at(-1)?.message).toBe('Copied Almeida Revista e Atualizada');
+  });
+
+  it('copies the words a version embeds, not the embed itself', async () => {
+    world.vault.write(
+      chapterPath('ARA', 1, 'GEN', 1),
+      '![[NVI-01-GEN-001#^nvi-gen-1-1|flat]]\n^ara-gen-1-1',
+    );
+    world.plugin.chapterCache.clear();
+    await view.refresh(true);
+    const copy = vi
+      .spyOn(navigator.clipboard, 'writeText')
+      .mockResolvedValue(undefined);
+    card().dispatchEvent(new MouseEvent('click', { altKey: true }));
+    await vi.waitFor(() => expect(copy).toHaveBeenCalledWith('No princípio'));
+    expect(notices.at(-1)?.message).toBe('Copied Almeida Revista e Atualizada');
+  });
+
+  it('says nothing was copied where the card has nothing to copy', async () => {
+    world.vault.write(chapterPath('ARA', 1, 'GEN', 1), 'Sem versículos.');
+    world.plugin.chapterCache.clear();
+    await view.refresh(true);
+    const copy = vi
+      .spyOn(navigator.clipboard, 'writeText')
+      .mockResolvedValue(undefined);
+    card().dispatchEvent(new MouseEvent('click', { altKey: true }));
+    await vi.waitFor(() =>
+      expect(notices.at(-1)?.message).toBe(
+        'Almeida Revista e Atualizada has nothing to copy here.',
+      ),
+    );
+    expect(copy).not.toHaveBeenCalled();
   });
 });
 
