@@ -77,8 +77,12 @@ const CODE_BLOCK = /^\s*(?:```|~~~)/;
  * lines is one run, exactly as it is when the note is read. A callout is
  * written as a quote but is among them: its title is drawn apart from the body
  * under it, and `[!note]` is what says so.
+ *
+ * A table row is not among them either, not by the look of its first
+ * character: a pipe only starts a row of a table that exists, and whether one
+ * does is a question `DELIMITER_ROW` answers.
  */
-const NEW_BLOCK = /^\s*(?:[-*+] |\d+[.)] |#{1,6} |\||---|\[!|=+\s*$)/;
+const NEW_BLOCK = /^\s*(?:[-*+] |\d+[.)] |#{1,6} |---|\[!|=+\s*$)/;
 
 /**
  * And one that is a block all by itself. A heading is a line, not a paragraph:
@@ -88,8 +92,24 @@ const NEW_BLOCK = /^\s*(?:[-*+] |\d+[.)] |#{1,6} |\||---|\[!|=+\s*$)/;
  */
 const ONE_LINE = /^\s*(?:#{1,6} |---|\[!|=+\s*$)/;
 
-/** A line drawn as a table row, whose cells are blocks of their own. */
+/** A line that may be a table row, if a table is what it belongs to. */
 const TABLE_ROW = /^\s*\|/;
+
+/**
+ * The row of dashes under a table's header, which is what makes it a table.
+ *
+ * A pipe is ordinary punctuation until one of these follows it. Without the
+ * check, `| a | b | mesmo` — a line of prose that happens to open with a pipe,
+ * or one lazily continuing the paragraph above it — was cut into cells the
+ * reader never sees, a run spanning the pipe marked when the note is read and
+ * lost while it is written.
+ */
+const DELIMITER_ROW = /^\s*\|?[\s:-]*-[\s:|-]*$/;
+
+/** What a line says once its quote markers are taken off. */
+function unquoted(text: string): string {
+  return text.replace(/^(\s*>)+\s?/, '');
+}
 
 /**
  * Blank out what is not prose, keeping every other character where it was.
@@ -228,10 +248,15 @@ export function build(
   const hiding = state.field(editorLivePreviewField, false) ?? true;
   const into: Range<Decoration>[] = [];
   let code = false;
+  let table = false;
   let depth = 0;
   let codeDepth = 0;
   let from: number | null = null;
   let to = 0;
+  // Past the foot of what is on screen, a line can still be read — the block
+  // straddling the bottom has to be finished for a run to close in it — but
+  // once that block is closed there is nothing below it worth walking.
+  const bottom = visible.length ? visible[visible.length - 1].to : -1;
 
   const close = () => {
     if (from !== null) markBlock(state, from, to, visible, hiding, into);
@@ -240,11 +265,12 @@ export function build(
 
   for (let number = 1; number <= state.doc.lines; number++) {
     const line = state.doc.line(number);
+    if (line.from > bottom && from === null) break;
     // What a quote is quoting: everything a line says once its markers are
     // taken off, and the markers themselves. A quote holds whole blocks of its
     // own — code, lists, headings, tables, blank lines — and none of them
     // would be recognised through the markers standing in front of them.
-    const said = line.text.replace(/^(\s*>)+\s?/, '');
+    const said = unquoted(line.text);
     const prefix = line.text.slice(0, line.text.length - said.length);
     // How deep in quotes the line is written, which is all the markers say
     // that matters: whether one is spaced `> ` or `>` is nobody's business.
@@ -256,6 +282,7 @@ export function build(
     if (CODE_BLOCK.test(said) && (!code || quoted === codeDepth)) {
       code = !code;
       codeDepth = quoted;
+      table = false;
       close();
       continue;
     }
@@ -266,6 +293,7 @@ export function build(
 
     // A quote's own blank line is written with its markers and nothing else.
     if (!said.trim()) {
+      table = false;
       close();
       continue;
     }
@@ -277,10 +305,22 @@ export function build(
     depth = quoted;
 
     if (NEW_BLOCK.test(said)) close();
-    if (TABLE_ROW.test(said)) {
+
+    // A table opens on a row the dashes vouch for, and every row after it is
+    // one until something that is not a row ends it.
+    const row =
+      TABLE_ROW.test(said) &&
+      (table ||
+        (number < state.doc.lines &&
+          DELIMITER_ROW.test(unquoted(state.doc.line(number + 1).text))));
+    if (row) {
+      table = true;
+      close();
       markCells(state, line, visible, hiding, into);
       continue;
     }
+    table = false;
+
     if (from === null) from = line.from;
     to = line.to;
     if (ONE_LINE.test(said)) close();

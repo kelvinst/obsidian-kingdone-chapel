@@ -111,11 +111,21 @@ describe('build', () => {
   });
 
   it('does not carry a run from one table cell into the next', () => {
-    expect(read(below('| !!a | b!! |'))).toEqual([]);
+    expect(read(below('| !!a | b!! |', '|---|---|'))).toEqual([]);
+  });
+
+  it('reads a pipe line no dashes vouch for as the prose it is', () => {
+    // No delimiter row under it, so Obsidian draws a paragraph rather than a
+    // table, and the pipe is punctuation a run reaches across.
+    expect(read(below('| !!a | b!! | mesmo'))).toEqual([
+      'hidden:!!',
+      'kcp-small:a | b',
+      'hidden:!!',
+    ]);
   });
 
   it('reads a run written inside one cell', () => {
-    expect(read(below('| !!uma nota!! | outra |'))).toEqual([
+    expect(read(below('| !!uma nota!! | outra |', '|---|---|'))).toEqual([
       'hidden:!!',
       'kcp-small:uma nota',
       'hidden:!!',
@@ -123,7 +133,7 @@ describe('build', () => {
   });
 
   it('reads the last cell of a row written without its closing pipe', () => {
-    expect(read(below('| outra | !!uma nota!!'))).toEqual([
+    expect(read(below('| outra | !!uma nota!!', '|---|---|'))).toEqual([
       'hidden:!!',
       'kcp-small:uma nota',
       'hidden:!!',
@@ -131,7 +141,7 @@ describe('build', () => {
   });
 
   it('reads a run across a pipe the cell holds rather than ends on', () => {
-    expect(read(below('| !!a \\| b!! |'))).toEqual([
+    expect(read(below('| !!a \\| b!! |', '|---|---|'))).toEqual([
       'hidden:!!',
       'kcp-small:a \\| b',
       'hidden:!!',
@@ -147,7 +157,7 @@ describe('build', () => {
   });
 
   it('does not carry a run from one quoted table cell into the next', () => {
-    expect(read(below('> | !!a | b!! |'))).toEqual([]);
+    expect(read(below('> | !!a | b!! |', '> |---|---|'))).toEqual([]);
   });
 
   it('leaves a code block written inside a quote alone', () => {
@@ -300,6 +310,38 @@ describe('build', () => {
 
   it('reads nothing out of an empty note', () => {
     expect(read('')).toEqual([]);
+  });
+
+  it('reads nothing when nothing is visible', () => {
+    const state = EditorState.create({ doc: 'H~2~O' });
+    expect(build(state, []).size).toBe(0);
+  });
+
+  it('leaves a block above the screen unmarked', () => {
+    const doc = 'H~2~O\n\n2^10^';
+    const state = EditorState.create({ doc });
+    // Only the last paragraph is on screen. The first is still walked — the
+    // fences and quotes above the screen are what say where a block ends —
+    // and turned down when it comes to marking it.
+    const set = build(state, [{ from: 7, to: doc.length }]);
+    const out: string[] = [];
+    set.between(0, doc.length, (_from, _to, value) => {
+      out.push((value.spec.class as string | undefined) ?? 'hidden');
+    });
+    expect(out).toEqual(['hidden', 'kcp-sup', 'hidden']);
+  });
+
+  it('finishes a block that straddles the foot of the screen', () => {
+    const doc = below('!!um', 'dois', 'tres!!');
+    const state = EditorState.create({ doc, selection: { anchor: 0 } });
+    // The screen ends inside the aside; the rest of the block is read anyway,
+    // a run having to close somewhere for the part on screen to be marked.
+    const out: string[] = [];
+    build(state, [{ from: 0, to: 17 }]).between(0, doc.length, (f, t, v) => {
+      const what = (v.spec.class as string | undefined) ?? 'hidden';
+      if (f !== t) out.push(`${what}:${doc.slice(f, t)}`);
+    });
+    expect(out).toEqual(['hidden:!!', 'kcp-small:um\ndois\ntres', 'hidden:!!']);
   });
 
   it('reads only what is on screen', () => {
