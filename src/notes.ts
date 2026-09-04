@@ -350,6 +350,13 @@ export function noteWrites(text: string, note: Note): WrittenNote {
       note.markers,
     );
     if (!write) continue;
+    // Every marker is measured against the chapter as it stands, so two of
+    // them over the same lines would be two answers to one question, and the
+    // one written second would throw the first away. It happens where one
+    // aside is read as covering two verses — a blank line missing between
+    // them, a `,,` left open above. The first stands, and the verse the second
+    // was for is left out and said to be.
+    if (markers.some((held) => overlaps(held, write))) continue;
     markers.push(write);
     verses.push(verse);
   }
@@ -379,6 +386,11 @@ export function noteWrites(text: string, note: Note): WrittenNote {
     comment: { line: placed.from.line + at + pushed, ch: COMMENT.length },
     verses,
   };
+}
+
+/** Whether two writes are over any of the same lines, and so cannot both go in. */
+function overlaps(one: Write, other: Write): boolean {
+  return one.from.line <= other.to.line && other.from.line <= one.to.line;
 }
 
 /** A run of whole lines replaced by `text`, which is as many lines as it likes. */
