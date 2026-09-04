@@ -1,4 +1,4 @@
-.PHONY: all setup precommit install-git-hooks
+.PHONY: all setup precommit vault install-git-hooks
 all: precommit
 
 # What `.kix/hooks/session-start.sh` looks for by name, so a fresh clone
@@ -7,6 +7,10 @@ setup: install-git-hooks
 
 precommit:
 	npm run precommit
+
+# Build the plugin and symlink it into the Obsidian vault.
+vault:
+	npm run vault
 
 # `.git` is a file rather than a directory inside a worktree, and worktrees
 # share the one hooks directory, so ask git where it is rather than guessing.
