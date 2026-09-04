@@ -356,7 +356,7 @@ export class FakeEditor {
    * Vim extension keeps beside it. Left off unless a test is about Vim: an
    * editor with Vim turned off carries no adapter either.
    */
-  cm?: { cm?: unknown };
+  cm?: { cm?: unknown; state?: unknown };
   cursor: EditorPosition = { line: 0, ch: 0 };
   anchor: EditorPosition = { line: 0, ch: 0 };
   selected = false;
@@ -390,6 +390,13 @@ export class FakeEditor {
 
   setCursor(pos: EditorPosition) {
     this.cursor = pos;
+  }
+
+  /** How many times the pane was asked for the focus back. */
+  focused = 0;
+
+  focus() {
+    this.focused++;
   }
 
   /** `to` is the editor's own optional: left off, the text is inserted. */
