@@ -71,6 +71,11 @@ interface VimAdapter {
   Vim?: { handleKey: (adapter: unknown, key: string, from: string) => void };
 }
 
+/** The adapter itself, which carries the same handler on the class it is of. */
+interface Adapter {
+  constructor?: VimAdapter;
+}
+
 /** A chapter a note is being written into, as the command reads it. */
 export interface NoteTarget {
   view: MarkdownView;
@@ -941,22 +946,25 @@ export default class KingdoneChapelPlugin extends Plugin {
    * as commands instead. So the mode follows the cursor.
    *
    * Vim is Obsidian's own setting rather than this plugin's, and the editor it
-   * hands over says nothing about it: the mode lives in the CodeMirror 5
-   * adapter the Vim extension keeps beside the view, which Obsidian publishes
-   * as `CodeMirrorAdapter`. Everything here is asked for rather than assumed —
-   * an editor with Vim turned off carries no adapter, and a version of the app
-   * that keeps it elsewhere is left alone rather than crashed on.
+   * hands over says nothing about it. What does say is the CodeMirror 5 adapter
+   * the Vim extension keeps beside the view: the extension is what puts it
+   * there, so an editor carrying one is an editor in Vim mode, and the setting
+   * itself is never asked for — it can be read under a name the app is free to
+   * change, and the adapter is the thing that has to be there anyway.
+   *
+   * The key handler is reached two ways, because the app has published it both:
+   * `CodeMirrorAdapter` on the window, and the adapter's own class. Either
+   * answers; neither being there leaves the editor alone rather than crashing
+   * on it.
    */
   startTyping(editor: Editor) {
-    const config = this.app.vault as unknown as {
-      getConfig?: (key: string) => unknown;
-    };
-    if (!config.getConfig || config.getConfig('vimMode') !== true) return;
+    const adapter = (editor as unknown as { cm?: { cm?: Adapter } }).cm?.cm;
+    if (!adapter) return;
 
-    const adapter = (editor as unknown as { cm?: { cm?: unknown } }).cm?.cm;
-    const vim = (window as unknown as { CodeMirrorAdapter?: VimAdapter })
-      .CodeMirrorAdapter?.Vim;
-    if (!adapter || !vim) return;
+    const published = (window as unknown as { CodeMirrorAdapter?: VimAdapter })
+      .CodeMirrorAdapter;
+    const vim = published?.Vim || adapter.constructor?.Vim;
+    if (!vim) return;
 
     vim.handleKey(adapter, 'i', 'mapping');
   }

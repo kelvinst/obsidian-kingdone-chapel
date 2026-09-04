@@ -2380,7 +2380,6 @@ describe('a note written in a Vim editor', () => {
 
   it('is typed straight away, the mode switched before the cursor moves', () => {
     const asked = vim();
-    world.vault.config.set('vimMode', true);
     const { view, editor } = editing();
     world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
 
@@ -2388,40 +2387,28 @@ describe('a note written in a Vim editor', () => {
     expect(editor.getLine(editor.cursor.line)).toBe('> ');
   });
 
-  it('leaves an editor that is not in Vim mode alone', () => {
+  it('leaves an editor keeping no adapter — no Vim — alone', () => {
     const asked = vim();
-    world.vault.config.set('vimMode', false);
-    const { view } = editing();
-    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
-
-    expect(asked.keys).toEqual([]);
-  });
-
-  it('leaves an app that does not answer for the setting alone', () => {
-    const asked = vim();
-    world.vault.config.set('vimMode', true);
-    // An own property, which is what shadows the one the class carries: an
-    // older app answering no such question at all.
-    const shadow = world.vault as { getConfig?: unknown };
-    shadow.getConfig = undefined;
-    const { view } = editing();
-    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
-    delete shadow.getConfig;
-
-    expect(asked.keys).toEqual([]);
-  });
-
-  it('leaves an editor keeping no adapter alone', () => {
-    const asked = vim();
-    world.vault.config.set('vimMode', true);
     const { view } = editing(null);
     world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
 
     expect(asked.keys).toEqual([]);
   });
 
-  it('leaves an app publishing no Vim of its own alone', () => {
-    world.vault.config.set('vimMode', true);
+  it('asks the adapter for the Vim the app publishes nowhere', () => {
+    const keys: string[] = [];
+    class Adapter {
+      static Vim = {
+        handleKey: (_cm: unknown, key: string) => keys.push(key),
+      };
+    }
+    const { view } = editing(new Adapter());
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+
+    expect(keys).toEqual(['i']);
+  });
+
+  it('leaves an editor whose Vim is nowhere to be asked for alone', () => {
     const { view, editor } = editing();
     world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
 
