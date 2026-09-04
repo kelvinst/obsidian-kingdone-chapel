@@ -18,7 +18,7 @@ export default defineConfig({
     // A git worktree checked out under the repo is another copy of this
     // project, with its own tests answering to its own source. Running them
     // from here reads as this suite failing, which is a branch nobody is on.
-    exclude: [...configDefaults.exclude, '**/.worktrees/**'],
+    exclude: [...configDefaults.exclude, '**/worktrees/**', '**/.worktrees/**'],
     coverage: {
       provider: 'v8',
       // Every source file, not only the ones a test happened to import — a

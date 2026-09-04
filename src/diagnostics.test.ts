@@ -243,6 +243,21 @@ describe('all', () => {
     ).toEqual(['book-conflict', 'unanchored-verse']);
   });
 
+  it('drops what it read under a version the vault has stopped holding', async () => {
+    const world = harness({
+      ...vault,
+      [chapterPath('NVI', 1, 'GEN', 1)]: '1. Um',
+    });
+    await world.plugin.diagnostics.ofChapter(
+      fileAt(world, chapterPath('NVI', 1, 'GEN', 1)),
+    );
+    // The folder the versions were found in, renamed in the settings: NVI is
+    // no longer a version, and a row still naming it is about another vault.
+    world.plugin.settings.translationsFolder = 'Bíblias';
+    world.plugin.invalidateIndex();
+    expect(world.plugin.diagnostics.all()).toEqual([]);
+  });
+
   it('drops what it held about a file that has gone away', async () => {
     const world = harness({
       ...vault,
@@ -307,6 +322,26 @@ describe('topping the results up', () => {
     world.metadataCache.trigger('changed', file, '', {});
     await flush();
     expect(world.plugin.diagnostics.all().map((d) => d.verse)).toEqual([1]);
+  });
+
+  it('keeps up with a chapter that declares its own folder a version', async () => {
+    const world = harness({
+      ...vault,
+      [chapterPath('NVI', 1, 'GEN', 1)]: '1. Um ^nvi-gen-1-1',
+    });
+    const path = chapterPath('NVI', 1, 'GEN', 1);
+    world.metadataCache.frontmatter.set(path, { bible: true, code: 'NVI' });
+    await world.plugin.onload();
+    const file = fileAt(world, path);
+    expect(await world.plugin.diagnostics.ofChapter(file)).toEqual([]);
+
+    world.vault.write(path, '1. Um ^nvi-gen-1-1\n2. Dois');
+    world.metadataCache.trigger('changed', file, '', {
+      frontmatter: { bible: true, code: 'NVI' },
+    });
+    await flush();
+
+    expect(world.plugin.diagnostics.all().map((d) => d.verse)).toEqual([2]);
   });
 
   it('leaves a chapter it was never asked about unread', async () => {
