@@ -1,5 +1,5 @@
 /**
- * The `~sub~`, `^sup^` and `..small..` syntax: three marks Obsidian has no
+ * The `~sub~`, `^sup^` and `,,small,,` syntax: three marks Obsidian has no
  * Markdown for.
  *
  * Notes want all three often enough — a verse number beside a word, a footnote
@@ -46,14 +46,15 @@ export const MARKS: Mark[] = [
  * besides, so `~~riscado~~` stays strikethrough.
  *
  * A small is the exception to holding its own delimiter: prose is full of single
- * dots, so only a doubled one closes a run. Neither end of one may touch a
- * third, so an ellipsis is three dots and not a run of one.
+ * commas, so only a doubled one closes a run — a decimal `1,5`, a list, a
+ * reference written `Sl 1,2,3`, all left as they are. Neither end may touch a
+ * third comma either, for the same reason the others may not touch their own.
  *
  * Nothing in any of them is written as `.`, which would not match the newline a
  * soft line break joins as.
  */
 const RUN =
-  /(?<!~)~([^~\s](?:[^~]*?[^~\s])?)~(?!~)|\^([^^\s](?:[^^]*?[^^\s])?)\^|\.\.(?![\s.])((?:(?!\.\.)[\s\S])*?[^\s])\.\.(?!\.)/g;
+  /(?<!~)~([^~\s](?:[^~]*?[^~\s])?)~(?!~)|\^([^^\s](?:[^^]*?[^^\s])?)\^|,,(?![\s,])((?:(?!,,)[\s\S])*?[^\s]),,(?!,)/g;
 
 /** Where one run sits, delimiters and all, and what it is marked as. */
 export interface Run {

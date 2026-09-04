@@ -178,7 +178,7 @@ export default class KingdoneChapelPlugin extends Plugin {
 
     this.registerEditorSuggest(new ReferenceSuggest(this));
 
-    // The note's own `~sub~`, `^sup^` and `..small..`, in every rendered note
+    // The note's own `~sub~`, `^sup^` and `,,small,,`, in every rendered note
     // rather than only in a chapter: a mark belongs wherever one is written.
     // Once for reading a note and once for writing it, the two views of a note
     // being drawn by different halves of the app.

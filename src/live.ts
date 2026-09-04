@@ -51,7 +51,7 @@ const LABEL = '\uFFFD';
  *
  * Maths is held to Obsidian's own rule, that a dollar opening or closing it
  * touches what it delimits. Two dollars written as money would otherwise pair
- * off and blank out everything between them, `..Custa $5.. e $6` losing the
+ * off and blank out everything between them, `,,Custa $5,, e $6` losing the
  * exclamations that close the aside along with the rest.
  */
 const NOT_PROSE =
@@ -121,7 +121,7 @@ function unquoted(text: string): string {
  *
  * The stand-in is as long as what it replaces, so a run's place in the source
  * is still its place after masking — and being a character no delimiter can be
- * read from, `..rode `ls` agora..` stays one aside, and `..Refs: [[Sl 26.4]]...`
+ * read from, `,,rode `ls` agora,,` stays one aside, and `,,Refs: [[Sl 26.4]].,,`
  * one aside holding a link, without either being read for delimiters.
  */
 function mask(text: string): string {

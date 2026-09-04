@@ -122,28 +122,27 @@ tag in the middle of its prose. These write them instead:
 | -------------- | --------------------------------- |
 | `H~2~O`        | `H<sub>2</sub>O`                  |
 | `2^10^`        | `2<sup>10</sup>`                  |
-| `..uma nota..` | the run at `0.75em`, for an aside |
+| `,,uma nota,,` | the run at `0.75em`, for an aside |
 
 The sub and sup delimiters are the ones Pandoc and markdown-it use, so a note carrying them
 still reads as intended outside your vault. `~~strikethrough~~` is untouched — a tilde may
 not touch another — and neither is a delimiter written as itself: no run may open or close on
-a space, so `de ~ a ~` and `um verso.. e outro..` stay exactly as typed, and an ellipsis is
-three dots rather than a run of one — `Espere... não` is left alone. A single dot inside a run
-is kept; only a doubled one closes it.
+a space, so `de ~ a ~` and `um verso,, e outro,,` stay exactly as typed. A single comma inside
+a run is kept; only a doubled one closes it, so a decimal `1,5`, a list, and a reference
+written `Sl 1,2,3` are all left as they are.
 
 A run reaches as far as bold and italic do, and stops where they stop. It crosses a soft line
 break and the middle of a link or an emphasis, so a pair of lines is one aside:
 
 ```markdown
-..Refs: [[Sl 26.4]]; [[Jr 15.17]].
-Notas: [[n1]]; [[n2]]...
+,,Refs: [[Sl 26.4]]; [[Jr 15.17]].
+Notas: [[n1]]; [[n2]].,,
 ```
 
 But it never leaves its paragraph, so a blank line ends an aside.
 
 Code and maths are left exactly as written, and a run may reach across an inline `` `code` ``
-without its contents being read for delimiters — so a `..` written as a path, in a code block
-or between backticks, is never read as an aside.
+without its contents being read for delimiters.
 
 Both views draw them. Reading view rewrites the note; in live preview the run is styled where
 it stands and its delimiters are hidden until the cursor is inside it — the way Obsidian
