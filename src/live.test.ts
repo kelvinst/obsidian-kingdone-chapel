@@ -124,6 +124,24 @@ describe('build', () => {
     ]);
   });
 
+  it('reads a pipe line underlined by a rule as the heading it is', () => {
+    // `---` under a line makes it a heading, not a header: a row of dashes
+    // vouches for a table only when it carries a pipe of its own.
+    expect(read(below('| !!a | b!! | mesmo', '---'))).toEqual([
+      'hidden:!!',
+      'kcp-small:a | b',
+      'hidden:!!',
+    ]);
+  });
+
+  it('reads a pipe line over a bare bullet as prose', () => {
+    expect(read(below('| !!a | b!! |', '-'))).toEqual([
+      'hidden:!!',
+      'kcp-small:a | b',
+      'hidden:!!',
+    ]);
+  });
+
   it('reads a run written inside one cell', () => {
     expect(read(below('| !!uma nota!! | outra |', '|---|---|'))).toEqual([
       'hidden:!!',
