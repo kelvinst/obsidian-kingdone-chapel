@@ -213,14 +213,12 @@ export function notePlacement(
   }
 
   const quoted = headingAt(lines, outside, quotes);
-  const closes = lines.findIndex(
-    (line, i) => outside[i] && IGNORE_END.test(line),
-  );
+  const closes = lastIgnoreEnd(lines, outside, quoted);
   const heading = `## ${headings[0]}`;
 
   // The verses close with the heading, so the marker that ends the ignored run
   // is written again under it rather than left above the section.
-  if (closes >= 0 && (quoted < 0 || closes < quoted)) {
+  if (closes >= 0) {
     return {
       from: { line: closes, ch: 0 },
       to: { line: closes, ch: lines[closes].length },
@@ -324,14 +322,25 @@ export interface WrittenNote {
   writes: Write[];
   /** The note's own empty line, which is what the reader types the comment into. */
   comment: At;
+  /**
+   * The verses the note was written about: the ones the chapter turned out to
+   * carry, which is what the note quotes and what it was marked on.
+   */
+  verses: string[];
 }
 
-/** Everything one note writes, and where the writing goes on from. */
+/**
+ * Everything one note writes, and where the writing goes on from.
+ *
+ * The verses are asked of the chapter before the note is written, because a
+ * verse the chapter never wrote is a verse the note cannot be about: a version
+ * that merges two verses under one id has no id for the second, and quoting it
+ * would write an embed that resolves to nothing. So the note quotes what it
+ * marked, and says so.
+ */
 export function noteWrites(text: string, note: Note): WrittenNote {
-  const block = noteBlock(note.callout, note.title, note.verses, note.anchor);
-  const placed = notePlacement(text, note.headings, note.quotes, block);
-
   const markers: Write[] = [];
+  const verses: string[] = [];
   for (const verse of note.verses) {
     const write = markerWrite(
       text,
@@ -340,19 +349,26 @@ export function noteWrites(text: string, note: Note): WrittenNote {
       note.label,
       note.markers,
     );
-    if (write) markers.push(write);
+    if (!write) continue;
+    markers.push(write);
+    verses.push(verse);
   }
 
-  // The markers are written above the note, so each of them that opens a line
-  // of its own pushes the note that much further down the chapter. A marker
-  // written into an aside already there leaves the count where it was, however
-  // many lines that aside was wrapped over.
+  const block = noteBlock(note.callout, note.title, verses, note.anchor);
+  const placed = notePlacement(text, note.headings, note.quotes, block);
+
+  // The markers above the note push it that much further down the chapter,
+  // each of them that opens a line of its own. A marker written into an aside
+  // already there leaves the count where it was, however many lines that aside
+  // was wrapped over, and one written below the note moves nothing above it.
   const pushed = markers.reduce(
     (lines, write) =>
-      lines +
-      write.text.split('\n').length -
-      1 -
-      (write.to.line - write.from.line),
+      write.from.line >= placed.from.line
+        ? lines
+        : lines +
+          write.text.split('\n').length -
+          1 -
+          (write.to.line - write.from.line),
     0,
   );
   const written = placed.text.split('\n');
@@ -361,6 +377,7 @@ export function noteWrites(text: string, note: Note): WrittenNote {
   return {
     writes: [placed, ...markers].sort((a, b) => b.from.line - a.from.line),
     comment: { line: placed.from.line + at + pushed, ch: COMMENT.length },
+    verses,
   };
 }
 
@@ -396,18 +413,79 @@ function opened(link: string, marker: string): string {
  * `inside`, an aside's contents, with the link added: onto the end of the note
  * list where the verse already carries one, and as a list of its own after
  * whatever else the aside says where it does not.
+ *
+ * The list is the marker's own, not the whole aside: an aside says its notes
+ * and its refs in whichever order it was written in, and a link added after
+ * the last link of the lot would be filed under the wrong one where the notes
+ * come first.
  */
 function joined(inside: string, link: string, markers: string[]): string {
-  const marked = markers.some((marker) => inside.includes(`**${marker}**`));
-  if (marked) {
-    const end = inside.lastIndexOf(']]') + 2;
-    return `${inside.slice(0, end)}; ${link}${inside.slice(end)}`;
+  const listed = markerList(inside, markers);
+  if (!listed) {
+    // The refs before it close with a full stop, which is what separates the
+    // two lists. One left without it is closed here rather than run into.
+    const said = inside.trimEnd();
+    return `${said}${said.endsWith('.') ? '' : '.'} ${opened(link, markers[0])}`;
   }
 
-  // The refs before it close with a full stop, which is what separates the two
-  // lists. One left without it is closed here rather than run into.
-  const said = inside.trimEnd();
-  return `${said}${said.endsWith('.') ? '' : '.'} ${opened(link, markers[0])}`;
+  const [from, to] = listed;
+  const said = inside.slice(from, to);
+  const found = said.lastIndexOf(']]');
+  // A list naming no note yet — one whose link was deleted, or a placeholder
+  // written by hand — has nothing to add to, so the link goes at the end of
+  // what it does say, in front of the full stop that closes it.
+  const end = from + (found < 0 ? closing(said) : found + 2);
+  return `${inside.slice(0, end)}; ${link}${inside.slice(end)}`;
+}
+
+/**
+ * Where a marker list ends: past everything it says, but in front of the
+ * whitespace and the full stop that close it, which belong to the list as a
+ * whole rather than to its last entry.
+ */
+function closing(said: string): number {
+  const end = said.trimEnd().length;
+  return end > 0 && said[end - 1] === '.' ? end - 1 : end;
+}
+
+/**
+ * Where the note list of an aside opens and ends, or null where the aside
+ * keeps none. It runs from its own label to the next one — `**Refs**`, or
+ * anything else the aside names — and to the end of the aside where it is the
+ * last thing said.
+ */
+function markerList(
+  inside: string,
+  markers: string[],
+): [number, number] | null {
+  for (const marker of markers) {
+    const label = `**${marker}**`;
+    const at = inside.indexOf(label);
+    if (at < 0) continue;
+    const next = inside.indexOf('**', at + label.length);
+    return [at, next < 0 ? inside.length : next];
+  }
+  return null;
+}
+
+/**
+ * The last `prettier-ignore-end` before the quotes, or -1 for none.
+ *
+ * The last rather than the first: a chapter may keep Prettier off something
+ * well before its verses — a table above them, say — and the marker that ends
+ * that has nothing to do with the verses. The one the notes close is the last
+ * before the quotes, which is the one the verses are wrapped in.
+ */
+function lastIgnoreEnd(
+  lines: string[],
+  outside: boolean[],
+  quoted: number,
+): number {
+  const from = (quoted < 0 ? lines.length : quoted) - 1;
+  for (let i = from; i >= 0; i--) {
+    if (outside[i] && IGNORE_END.test(lines[i])) return i;
+  }
+  return -1;
 }
 
 /** Where a section named by any of `headings` opens, or -1 for none. */

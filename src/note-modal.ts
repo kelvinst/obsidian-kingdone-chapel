@@ -32,9 +32,13 @@ export class WriteNoteModal extends Modal {
     this.number = this.next(this.kind);
   }
 
-  /** The number the chapter has going spare for a kind. */
+  /**
+   * The number the chapter has going spare for a kind, read off the chapter as
+   * it stands: the command may have been offered long before it was run.
+   */
   next(kind: NoteKind): number {
-    return nextNoteNumber(this.target.text, this.target.prefix, kind.letter);
+    const editor = this.target.view.editor;
+    return nextNoteNumber(editor.getValue(), this.target.prefix, kind.letter);
   }
 
   /** What a kind is called, in the language the plugin writes. */
