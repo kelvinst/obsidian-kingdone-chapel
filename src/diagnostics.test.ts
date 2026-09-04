@@ -258,6 +258,20 @@ describe('all', () => {
     expect(world.plugin.diagnostics.all()).toEqual([]);
   });
 
+  it('drops what it read of a path the vault no longer answers for', async () => {
+    const world = harness({
+      ...vault,
+      [chapterPath('NVI', 1, 'GEN', 1)]: '1. Um',
+    });
+    const path = chapterPath('NVI', 1, 'GEN', 1);
+    await world.plugin.diagnostics.ofChapter(fileAt(world, path));
+    // A folder renamed in the file explorer: the vault says so of the folder
+    // and not of each note under it, so nothing forgot this path.
+    world.vault.remove(path);
+    world.plugin.invalidateIndex();
+    expect(world.plugin.diagnostics.all()).toEqual([]);
+  });
+
   it('drops what it held about a file that has gone away', async () => {
     const world = harness({
       ...vault,
@@ -321,7 +335,9 @@ describe('topping the results up', () => {
     world.vault.remove(path);
     world.metadataCache.trigger('changed', file, '', {});
     await flush();
-    expect(world.plugin.diagnostics.all().map((d) => d.verse)).toEqual([1]);
+    // The read threw rather than answering, and nothing was left waiting on
+    // it; the row goes with the path the vault has stopped answering for.
+    expect(world.plugin.diagnostics.all()).toEqual([]);
   });
 
   it('keeps up with a chapter that declares its own folder a version', async () => {

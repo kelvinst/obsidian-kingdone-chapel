@@ -231,15 +231,23 @@ export class Diagnostics {
    * any other. So a row naming a code the vault has stopped using is dropped
    * here rather than shown: it was true of a vault that is no longer this one.
    *
-   * Dropped one file at a time, and not by emptying the results whenever the
-   * index is rebuilt — the index goes on every note created, renamed or
-   * deleted, and a sweep of six thousand files is not worth throwing away for
-   * a note written in a folder that is no version at all.
+   * A row is dropped where the file it names has gone, and where the version
+   * it was read under is one the vault no longer holds. One file at a time,
+   * and not by emptying the results whenever the index is rebuilt: the index
+   * goes on every note created, renamed or deleted, and a sweep of six
+   * thousand files is not worth throwing away for a note written in a folder
+   * that is no version at all.
    */
   all(): Diagnostic[] {
     const out = this.structural(); // names the versions the vault holds now
     for (const [path, held] of this.results) {
-      if (held.found.some((row) => !this.plugin.sourceCodes.has(row.version))) {
+      // Gone, or found under a version the vault has stopped using. A path
+      // goes without ever being forgotten: a folder renamed in the explorer
+      // is said of the folder, and not of each note under it.
+      if (
+        !this.plugin.app.vault.getAbstractFileByPath(path) ||
+        held.found.some((row) => !this.plugin.sourceCodes.has(row.version))
+      ) {
         this.results.delete(path);
         continue;
       }
