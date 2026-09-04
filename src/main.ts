@@ -71,9 +71,13 @@ interface VimAdapter {
   Vim?: { handleKey: (adapter: unknown, key: string, from: string) => void };
 }
 
-/** The adapter itself, which carries the same handler on the class it is of. */
+/**
+ * The adapter itself: the class it is of carries the same handler, and its
+ * state says which mode the editor is in.
+ */
 interface Adapter {
   constructor?: VimAdapter;
+  state?: { vim?: { insertMode?: boolean } };
 }
 
 /** A chapter a note is being written into, as the command reads it. */
@@ -934,6 +938,16 @@ export default class KingdoneChapelPlugin extends Plugin {
     // so a cursor set before the switch is pulled back a column by it.
     this.startTyping(editor);
     editor.setCursor(written.comment);
+
+    // And again once the modal has finished closing. It hands the focus back
+    // to the editor after this returns, and a Vim editor taking the focus back
+    // is a Vim editor in normal mode again — so the mode is set once for the
+    // command run without a modal in front of it, and once for the one with.
+    window.setTimeout(() => {
+      editor.focus();
+      this.startTyping(editor);
+      editor.setCursor(written.comment);
+    }, 0);
   }
 
   /**
@@ -956,10 +970,17 @@ export default class KingdoneChapelPlugin extends Plugin {
    * `CodeMirrorAdapter` on the window, and the adapter's own class. Either
    * answers; neither being there leaves the editor alone rather than crashing
    * on it.
+   *
+   * An editor already in insert mode is left as it is, since `i` there is not
+   * a mode but a letter, and the note would open with one.
    */
   startTyping(editor: Editor) {
-    const adapter = (editor as unknown as { cm?: { cm?: Adapter } }).cm?.cm;
-    if (!adapter) return;
+    const held = editor as unknown as { cm?: Adapter & { cm?: Adapter } };
+    // `cm` is the view the editor draws in, and the adapter sits beside it
+    // under the same name; an app handing over the adapter itself is answered
+    // by what it carries rather than by where it was found.
+    const adapter = held.cm?.cm || (held.cm?.state?.vim ? held.cm : null);
+    if (!adapter || adapter.state?.vim?.insertMode) return;
 
     const published = (window as unknown as { CodeMirrorAdapter?: VimAdapter })
       .CodeMirrorAdapter;

@@ -2387,6 +2387,48 @@ describe('a note written in a Vim editor', () => {
     expect(editor.getLine(editor.cursor.line)).toBe('> ');
   });
 
+  it('is set again once the modal has handed the focus back', () => {
+    vi.useFakeTimers();
+    const asked = vim();
+    const { view, editor } = editing();
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+    // The editor is in normal mode again, the way a pane taking the focus
+    // back from a modal is.
+    vi.runAllTimers();
+    vi.useRealTimers();
+
+    expect(asked.keys).toEqual(['i', 'i']);
+    expect(editor.focused).toBe(1);
+    expect(editor.getLine(editor.cursor.line)).toBe('> ');
+  });
+
+  it('leaves an editor already typing where it is', () => {
+    vi.useFakeTimers();
+    const asked = vim();
+    const { view } = editing({ state: { vim: { insertMode: true } } });
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+    vi.runAllTimers();
+    vi.useRealTimers();
+
+    expect(asked.keys).toEqual([]);
+  });
+
+  it('takes the adapter itself where that is what it was handed', () => {
+    const asked = vim();
+    const editor = new FakeEditor(CHAPTER);
+    editor.cm = { state: { vim: { insertMode: false } } };
+    const view = pane(world.app, {
+      file: world.vault.getAbstractFileByPath(
+        chapterPath('NVI', 1, 'GEN', 1),
+      ) as TFile,
+      editor,
+    });
+    editor.at(3);
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+
+    expect(asked.keys).toEqual(['i']);
+  });
+
   it('leaves an editor keeping no adapter — no Vim — alone', () => {
     const asked = vim();
     const { view } = editing(null);
