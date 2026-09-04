@@ -364,3 +364,68 @@ describe('a chapter left mid-edit', () => {
     );
   });
 });
+
+describe('an aside Prettier has wrapped', () => {
+  const mark = (text: string) =>
+    markerWrite(text, 'shedd-psa-1-1', 'shedd-psa-1-n9', 'n9', [
+      'Notas',
+      'Notes',
+    ]);
+
+  it('joins the notes of a verse whose aside opens lines above its id', () => {
+    const text =
+      '![[ARA-19-PSA-001#^ara-psa-1-1|flat]] ,,**Refs**:\n' +
+      '[[Shedd-19-PSA-026#^shedd-psa-26-4|Sl 26.4]];\n' +
+      '[[Shedd-24-JER-015#^shedd-jer-15-17|Jr 15.17]]. **Notas**:\n' +
+      '[[#^shedd-psa-1-n1|n1]]; [[#^shedd-psa-1-n2|n2]].,, ^shedd-psa-1-1\n';
+    expect(applied(text, [mark(text)!])).toBe(
+      '![[ARA-19-PSA-001#^ara-psa-1-1|flat]] ,,**Refs**:\n' +
+        '[[Shedd-19-PSA-026#^shedd-psa-26-4|Sl 26.4]];\n' +
+        '[[Shedd-24-JER-015#^shedd-jer-15-17|Jr 15.17]]. **Notas**:\n' +
+        '[[#^shedd-psa-1-n1|n1]]; [[#^shedd-psa-1-n2|n2]]; ' +
+        '[[#^shedd-psa-1-n9|n9]].,, ^shedd-psa-1-1\n',
+    );
+  });
+
+  it('opens the notes of a verse whose wrapped aside carries only refs', () => {
+    const text =
+      '![[ARA-19-PSA-001#^ara-psa-1-1|flat]] ,,**Refs**:\n' +
+      '[[Shedd-19-PSA-026#^shedd-psa-26-4|Sl 26.4]].,, ^shedd-psa-1-1\n';
+    expect(applied(text, [mark(text)!])).toContain(
+      '[[Shedd-19-PSA-026#^shedd-psa-26-4|Sl 26.4]]. ' +
+        '**Notas**: [[#^shedd-psa-1-n9|n9]].,, ^shedd-psa-1-1',
+    );
+  });
+
+  it('joins a wrapped aside written on the lines above the id', () => {
+    const text =
+      '![[ARA-41-MRK-014#^ara-mrk-14-1|flat]]\n' +
+      ',,**Refs**: [[#^shedd-mat-26-47|Mt 26.47]];\n' +
+      '[[#^shedd-jhn-18-3|Jo 18.3]].,,\n' +
+      '^shedd-psa-1-1\n';
+    expect(applied(text, [mark(text)!])).toContain(
+      '[[#^shedd-jhn-18-3|Jo 18.3]]. **Notas**: [[#^shedd-psa-1-n9|n9]].,,\n' +
+        '^shedd-psa-1-1',
+    );
+  });
+
+  it('writes an aside of its own where a `,,` was left open above', () => {
+    const text = ',,left open\n\n![[x]] ^shedd-psa-1-1\n';
+    expect(applied(text, [mark(text)!])).toContain(
+      '![[x]] ,,**Notas**: [[#^shedd-psa-1-n9|n9]].,, ^shedd-psa-1-1',
+    );
+  });
+});
+
+describe('a verse whose aside was never closed', () => {
+  it('leaves the open mark alone and writes an aside of its own', () => {
+    const text = '![[x]] ,,left open ^shedd-psa-1-1\n';
+    const write = markerWrite(text, 'shedd-psa-1-1', 'shedd-psa-1-n9', 'n9', [
+      'Notas',
+    ]);
+    expect(applied(text, [write!])).toBe(
+      '![[x]] ,,left open ,,**Notas**: [[#^shedd-psa-1-n9|n9]].,, ' +
+        '^shedd-psa-1-1\n',
+    );
+  });
+});

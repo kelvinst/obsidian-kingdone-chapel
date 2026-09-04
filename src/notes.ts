@@ -270,17 +270,52 @@ export function markerWrite(
   // The id closes the line the verse is written on: the aside is on that line,
   // in front of it, or there is none and one is written there.
   if (written) {
-    return line(at, lines, `${marked(written, link, markers)} ^${verse}`);
+    const from = asideFrom(lines, at, written);
+    const said = [...lines.slice(from, at), written].join('\n');
+    return span(from, at, lines, `${marked(said, link, markers)} ^${verse}`);
   }
 
   // The id is on a line of its own, so the aside is the line above it — where
   // that line is one at all, and not the embed the id belongs to.
-  const above = at > 0 ? lines[at - 1] : '';
-  if (ASIDE.test(above)) {
-    return line(at - 1, lines, marked(above, link, markers));
+  if (at > 0) {
+    const from = asideFrom(lines, at - 1, lines[at - 1]);
+    const said = lines.slice(from, at).join('\n');
+    if (ASIDE.test(said)) {
+      return span(from, at - 1, lines, marked(said, link, markers));
+    }
   }
 
   return line(at, lines, `,,${opened(link, markers[0])},,\n${lines[at]}`);
+}
+
+/**
+ * Where the aside closing at `at` opens, which may be further up the chapter
+ * than the line it closes on.
+ *
+ * An aside is written as one thing and read as one, but it is wrapped by
+ * Prettier like any other prose, so a verse carrying refs and notes both may
+ * have its `,,` opened three lines above the `,,` that closes it. Reading only
+ * the closing line would find no aside there and write a second one beside it.
+ *
+ * The count says where it opened: every line up to the one that balances the
+ * marks belongs to the aside. A blank line ends the search, since an aside
+ * never crosses one, and so does a count that never balances — an unclosed
+ * `,,` left mid-edit is not an aside to write into.
+ */
+function asideFrom(lines: string[], at: number, held: string): number {
+  let marks = quiets(held);
+  if (marks % 2 === 0) return at;
+
+  for (let i = at - 1; i >= 0 && lines[i].trim(); i--) {
+    marks += quiets(lines[i]);
+    if (marks % 2 === 0) return i;
+  }
+  return at;
+}
+
+/** How many `,,` a line carries, which is what says whether one is left open. */
+function quiets(line: string): number {
+  return (line.match(/,,/g) || []).length;
 }
 
 /** A note as it goes in: the edits it makes, and where it leaves the cursor. */
@@ -309,9 +344,15 @@ export function noteWrites(text: string, note: Note): WrittenNote {
   }
 
   // The markers are written above the note, so each of them that opens a line
-  // of its own pushes the note that much further down the chapter.
+  // of its own pushes the note that much further down the chapter. A marker
+  // written into an aside already there leaves the count where it was, however
+  // many lines that aside was wrapped over.
   const pushed = markers.reduce(
-    (lines, write) => lines + write.text.split('\n').length - 1,
+    (lines, write) =>
+      lines +
+      write.text.split('\n').length -
+      1 -
+      (write.to.line - write.from.line),
     0,
   );
   const written = placed.text.split('\n');
@@ -323,13 +364,18 @@ export function noteWrites(text: string, note: Note): WrittenNote {
   };
 }
 
-/** One whole line replaced by `text`, which may itself be more than one line. */
-function line(at: number, lines: string[], text: string): Write {
+/** A run of whole lines replaced by `text`, which is as many lines as it likes. */
+function span(from: number, to: number, lines: string[], text: string): Write {
   return {
-    from: { line: at, ch: 0 },
-    to: { line: at, ch: lines[at].length },
+    from: { line: from, ch: 0 },
+    to: { line: to, ch: lines[to].length },
     text,
   };
+}
+
+/** One whole line replaced by `text`, which may itself be more than one line. */
+function line(at: number, lines: string[], text: string): Write {
+  return span(at, at, lines, text);
 }
 
 /** `held`, with the note's link in its aside — or with an aside, where it has none. */
