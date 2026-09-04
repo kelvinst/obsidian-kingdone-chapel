@@ -444,23 +444,19 @@ export default class KingdoneChapelPlugin extends Plugin {
   }
 
   /**
-   * Panes this view was in and lost, from a load that is over.
+   * Panes that carry this view type without holding the view itself.
    *
-   * Obsidian keeps a pane whose plugin went away: the leaf stays in the
-   * workspace carrying the view type it was showing, but what is in it is a
-   * placeholder, which is why the tab turns into a ghost icon labelled with
-   * the raw type. `getLeavesOfType` asks the pane's contents what they are and
-   * so walks straight past those, leaving the saved state as the only place
-   * that still says the pane was ours.
+   * A pane whose plugin went away keeps the type it was showing and turns
+   * into a ghost icon labelled with that raw type. The type is no help in
+   * finding those: Obsidian reads a pane's type off whatever is in it, and a
+   * pane Obsidian has merely put off building reports the same type as one
+   * this plugin was unloaded out of. Only what is inside separates them,
+   * which is the reading `refreshViews` already goes by.
    */
   staleViewLeaves(): WorkspaceLeaf[] {
-    const live = new Set(this.app.workspace.getLeavesOfType(VIEW_TYPE));
-    const stale: WorkspaceLeaf[] = [];
-    this.app.workspace.iterateAllLeaves((leaf) => {
-      if (live.has(leaf)) return;
-      if (leaf.getViewState().type === VIEW_TYPE) stale.push(leaf);
-    });
-    return stale;
+    return this.app.workspace
+      .getLeavesOfType(VIEW_TYPE)
+      .filter((leaf) => !(leaf.view instanceof KingdoneChapelView));
   }
 
   /**
@@ -483,12 +479,17 @@ export default class KingdoneChapelPlugin extends Plugin {
   async adoptStaleViewsNow(reveal: boolean): Promise<void> {
     const stale = this.staleViewLeaves();
     if (!stale.length) return;
-    const adopted = this.app.workspace.getLeavesOfType(VIEW_TYPE).length
-      ? 0
-      : 1;
-    for (const leaf of stale.slice(adopted)) leaf.detach();
+    // Building the view is what tells the two apart. A pane Obsidian was only
+    // putting off comes back holding the real thing and is a pane in use; a
+    // pane left behind by a load that is over has nothing to come back to.
+    for (const leaf of stale) await leaf.loadIfDeferred();
+    const ghosts = this.staleViewLeaves();
+    if (!ghosts.length) return;
+    const live = this.app.workspace.getLeavesOfType(VIEW_TYPE).length;
+    const adopted = ghosts.length < live ? 0 : 1;
+    for (const leaf of ghosts.slice(adopted)) leaf.detach();
     if (adopted)
-      await stale[0].setViewState({ type: VIEW_TYPE, active: reveal });
+      await ghosts[0].setViewState({ type: VIEW_TYPE, active: reveal });
   }
 
   async activateView(reveal = true): Promise<WorkspaceLeaf | null> {

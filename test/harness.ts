@@ -232,17 +232,19 @@ export class FakeMetadataCache extends Emitter {
 }
 
 export interface FakeLeaf {
-  /** What the pane is showing — what `getLeavesOfType` goes by. */
-  type: string;
   /**
-   * The type the workspace has saved for the pane, which outlives what is in
-   * it: a pane whose plugin was unloaded keeps this and shows a placeholder.
+   * The type the pane reports — what `getLeavesOfType` goes by. A pane whose
+   * plugin was unloaded still reports it, which is why the type alone cannot
+   * say whether the view itself is there.
    */
-  state: string;
+  type: string;
   view: unknown;
+  /** What building the view puts in the pane, for one Obsidian deferred. */
+  deferredView: unknown;
   app: unknown;
   setViewState: (state: { type: string; active?: boolean }) => Promise<void>;
   getViewState: () => { type: string };
+  loadIfDeferred: () => Promise<void>;
   detach: () => void;
 }
 
@@ -270,20 +272,31 @@ export class FakeWorkspace extends Emitter {
   /**
    * A pane of `type`, in the workspace, holding `view`.
    *
-   * `state` is the type the workspace saved for it, which is `type` unless a
-   * caller wants the two apart — a pane an unloaded plugin left behind.
+   * `deferredView` is what Obsidian would build for a pane it had put off
+   * building — pass one for a deferred pane, leave it out for a pane holding
+   * nothing to build, which is what an unloaded plugin leaves behind.
    */
-  addLeaf(type: string, view: unknown = null, state = type): FakeLeaf {
+  addLeaf(
+    type: string,
+    view: unknown = null,
+    deferredView: unknown = null,
+  ): FakeLeaf {
     const leaf: FakeLeaf = {
       type,
-      state,
       view,
+      deferredView,
       app: this.app,
       setViewState: async (next) => {
         leaf.type = next.type;
-        leaf.state = next.type;
       },
-      getViewState: () => ({ type: leaf.state }),
+      // Obsidian reads this off the pane's contents rather than storing it.
+      getViewState: () => ({ type: leaf.type }),
+      loadIfDeferred: async () => {
+        if (leaf.deferredView) {
+          leaf.view = leaf.deferredView;
+          leaf.deferredView = null;
+        }
+      },
       detach: () => {
         this.leaves = this.leaves.filter((other) => other !== leaf);
         this.detached.push(leaf);
