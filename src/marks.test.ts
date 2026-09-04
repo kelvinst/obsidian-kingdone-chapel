@@ -31,19 +31,24 @@ describe('renderMarks', () => {
     expect(el.textContent).toBe('210 = 1024.');
   });
 
-  it('shrinks a run written between exclamations', () => {
-    const el = rendered('<p>Um verso !!uma nota!! e o resto.</p>');
+  it('shrinks a run written between dots', () => {
+    const el = rendered('<p>Um verso ..uma nota.. e o resto.</p>');
     expect(marks(el)).toEqual(['span:uma nota']);
     expect(el.textContent).toBe('Um verso uma nota e o resto.');
   });
 
-  it('keeps a single exclamation inside a run', () => {
-    const el = rendered('<p>!!Que verso! E que salmo!!</p>');
-    expect(marks(el)).toEqual(['span:Que verso! E que salmo']);
+  it('keeps a single dot inside a run', () => {
+    const el = rendered('<p>..Uma nota. E outra..</p>');
+    expect(marks(el)).toEqual(['span:Uma nota. E outra']);
   });
 
-  it('leaves a sentence that only ends in exclamations alone', () => {
-    const el = rendered('<p>Que verso!! Que salmo!!</p>');
+  it('leaves an ellipsis alone', () => {
+    const el = rendered('<p>Espere... não é uma nota.</p>');
+    expect(marks(el)).toEqual([]);
+  });
+
+  it('leaves a sentence whose clauses only end in dots alone', () => {
+    const el = rendered('<p>Que verso.. Que salmo..</p>');
     expect(marks(el)).toEqual([]);
   });
 
@@ -53,12 +58,12 @@ describe('renderMarks', () => {
   });
 
   it('reads every kind in the order they were written', () => {
-    const el = rendered('<p>x^2^, H~2~O e !!uma nota!!</p>');
+    const el = rendered('<p>x^2^, H~2~O e ..uma nota..</p>');
     expect(marks(el)).toEqual(['sup:2', 'sub:2', 'span:uma nota']);
   });
 
   it('marks a run that is the whole of the text', () => {
-    const el = rendered('<p>!!tudo!!</p>');
+    const el = rendered('<p>..tudo..</p>');
     expect(marks(el)).toEqual(['span:tudo']);
     expect(el.textContent).toBe('tudo');
   });
@@ -70,13 +75,13 @@ describe('renderMarks', () => {
   });
 
   it('carries a run across a soft line break', () => {
-    const el = rendered('<p>!!Refs: Sl 26.4<br>Notas: n1!!</p>');
+    const el = rendered('<p>..Refs: Sl 26.4<br>Notas: n1..</p>');
     expect(marks(el)).toEqual(['span:Refs: Sl 26.4', 'span:Notas: n1']);
     expect(el.querySelector('br')).not.toBeNull();
   });
 
   it('carries a run through the middle of an emphasis', () => {
-    const el = rendered('<p>!!uma <em>nota</em> inteira!!</p>');
+    const el = rendered('<p>..uma <em>nota</em> inteira..</p>');
     expect(marks(el)).toEqual(['span:uma ', 'span:nota', 'span: inteira']);
     expect(el.textContent).toBe('uma nota inteira');
   });
@@ -88,7 +93,7 @@ describe('renderMarks', () => {
   });
 
   it('does not carry a run out of its paragraph', () => {
-    const el = rendered('<p>!!Refs: Sl 26.4</p><p>Notas: n1!!</p>');
+    const el = rendered('<p>..Refs: Sl 26.4</p><p>Notas: n1..</p>');
     expect(marks(el)).toEqual([]);
   });
 
@@ -122,25 +127,25 @@ describe('renderMarks', () => {
   });
 
   it('marks a run holding a link', () => {
-    const el = rendered('<p>!!Refs: <a>Sl 26.4</a>.!!</p>');
+    const el = rendered('<p>..Refs: <a>Sl 26.4</a>...</p>');
     expect(marks(el)).toEqual(['span:Refs: ', 'span:Sl 26.4', 'span:.']);
     expect(el.textContent).toBe('Refs: Sl 26.4.');
   });
 
   it('leaves inline code alone, and reads a run across it', () => {
-    const el = rendered('<p>!!rode <code>a ~b~ c</code> agora!!</p>');
+    const el = rendered('<p>..rode <code>a ~b~ c</code> agora..</p>');
     expect(marks(el)).toEqual(['span:rode ', 'span: agora']);
     expect(el.querySelector('code')?.textContent).toBe('a ~b~ c');
   });
 
   it('leaves a run with nothing but code in it as it was written', () => {
-    const el = rendered('<p>!!<code>ls -la</code>!!</p>');
+    const el = rendered('<p>..<code>ls -la</code>..</p>');
     expect(marks(el)).toEqual([]);
-    expect(el.textContent).toBe('!!ls -la!!');
+    expect(el.textContent).toBe('..ls -la..');
   });
 
   it('leaves a code block alone', () => {
-    const el = rendered('<pre><code>a ~b~ c^d^ e!!f!!g</code></pre>');
+    const el = rendered('<pre><code>a ~b~ c^d^ e..f..g</code></pre>');
     expect(marks(el)).toEqual([]);
   });
 
