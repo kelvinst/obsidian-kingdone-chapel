@@ -42,13 +42,13 @@ describe('build', () => {
   });
 
   it('marks each kind by its own class', () => {
-    expect(read('x^2^ ..nota..')).toEqual([
+    expect(read('x^2^ ,,nota,,')).toEqual([
       'hidden:^',
       'kcp-sup:2',
       'hidden:^',
-      'hidden:..',
+      'hidden:,,',
       'kcp-small:nota',
-      'hidden:..',
+      'hidden:,,',
     ]);
   });
 
@@ -65,28 +65,28 @@ describe('build', () => {
   });
 
   it('carries a run across a line break', () => {
-    expect(read(below('..Refs: Sl 26.4', 'Notas: n1..'))).toEqual([
+    expect(read(below(',,Refs: Sl 26.4', 'Notas: n1,,'))).toEqual([
       'kcp-small-line@L3',
-      'hidden:..',
+      'hidden:,,',
       'kcp-small:Refs: Sl 26.4\nNotas: n1',
-      'hidden:..',
+      'hidden:,,',
       'kcp-small-line@L4',
     ]);
   });
 
   it('does not carry a run across a blank line', () => {
-    expect(read(below('..Refs: Sl 26.4', '', 'Notas: n1..'))).toEqual([]);
+    expect(read(below(',,Refs: Sl 26.4', '', 'Notas: n1,,'))).toEqual([]);
   });
 
   it('does not carry a run from one list item into the next', () => {
-    expect(read(below('- ..nota um', '- nota dois..'))).toEqual([]);
+    expect(read(below('- ,,nota um', '- nota dois,,'))).toEqual([]);
   });
 
   it('carries a run across the lines of one quote', () => {
-    expect(read(below('> ..Refs: Sl 26.4', '> Notas: n1..'))).toEqual([
-      'hidden:..',
+    expect(read(below('> ,,Refs: Sl 26.4', '> Notas: n1,,'))).toEqual([
+      'hidden:,,',
       'kcp-small:Refs: Sl 26.4\n> Notas: n1',
-      'hidden:..',
+      'hidden:,,',
       // The quote's own marker is inside the run, the note having written it
       // between the delimiters, so the line it opens takes the size with it.
       'kcp-small-line@L4',
@@ -94,105 +94,105 @@ describe('build', () => {
   });
 
   it('does not carry a run from a paragraph into the quote under it', () => {
-    expect(read(below('Um verso ..a', '> b.. citado'))).toEqual([]);
+    expect(read(below('Um verso ,,a', '> b,, citado'))).toEqual([]);
   });
 
   it('carries a run on into the line a quote is finished on', () => {
-    expect(read(below('> ..Refs: Sl 26.4', 'Notas: n1..'))).toEqual([
-      'hidden:..',
+    expect(read(below('> ,,Refs: Sl 26.4', 'Notas: n1,,'))).toEqual([
+      'hidden:,,',
       'kcp-small:Refs: Sl 26.4\nNotas: n1',
-      'hidden:..',
+      'hidden:,,',
       'kcp-small-line@L4',
     ]);
   });
 
   it('does not carry a run across a quote of its own', () => {
-    expect(read(below('> ..Refs: Sl 26.4', '>', '> Notas: n1..'))).toEqual([]);
+    expect(read(below('> ,,Refs: Sl 26.4', '>', '> Notas: n1,,'))).toEqual([]);
   });
 
   it('does not carry a run from one table cell into the next', () => {
-    expect(read(below('| ..a | b.. |', '|---|---|'))).toEqual([]);
+    expect(read(below('| ,,a | b,, |', '|---|---|'))).toEqual([]);
   });
 
   it('reads a pipe line no dashes vouch for as the prose it is', () => {
     // No delimiter row under it, so Obsidian draws a paragraph rather than a
     // table, and the pipe is punctuation a run reaches across.
-    expect(read(below('| ..a | b.. | mesmo'))).toEqual([
-      'hidden:..',
+    expect(read(below('| ,,a | b,, | mesmo'))).toEqual([
+      'hidden:,,',
       'kcp-small:a | b',
-      'hidden:..',
+      'hidden:,,',
     ]);
   });
 
   it('reads a pipe line underlined by a rule as the heading it is', () => {
     // `---` under a line makes it a heading, not a header: a row of dashes
     // vouches for a table only when it carries a pipe of its own.
-    expect(read(below('| ..a | b.. | mesmo', '---'))).toEqual([
-      'hidden:..',
+    expect(read(below('| ,,a | b,, | mesmo', '---'))).toEqual([
+      'hidden:,,',
       'kcp-small:a | b',
-      'hidden:..',
+      'hidden:,,',
     ]);
   });
 
   it('reads a pipe line over a bare bullet as prose', () => {
-    expect(read(below('| ..a | b.. |', '-'))).toEqual([
-      'hidden:..',
+    expect(read(below('| ,,a | b,, |', '-'))).toEqual([
+      'hidden:,,',
       'kcp-small:a | b',
-      'hidden:..',
+      'hidden:,,',
     ]);
   });
 
   it('does not let a table vouch for a row written inside a quote', () => {
     // The quote holds no dashes of its own, so what it holds is a paragraph.
-    expect(read(below('| a | b |', '|---|---|', '> | ..c | d.. |'))).toEqual([
-      'hidden:..',
+    expect(read(below('| a | b |', '|---|---|', '> | ,,c | d,, |'))).toEqual([
+      'hidden:,,',
       'kcp-small:c | d',
-      'hidden:..',
+      'hidden:,,',
     ]);
   });
 
   it('does not let a quoted table vouch for a row outside it', () => {
-    expect(read(below('> | a | b |', '> |---|---|', '| ..c | d.. |'))).toEqual([
-      'hidden:..',
+    expect(read(below('> | a | b |', '> |---|---|', '| ,,c | d,, |'))).toEqual([
+      'hidden:,,',
       'kcp-small:c | d',
-      'hidden:..',
+      'hidden:,,',
     ]);
   });
 
   it('reads a run written inside one cell', () => {
-    expect(read(below('| ..uma nota.. | outra |', '|---|---|'))).toEqual([
-      'hidden:..',
+    expect(read(below('| ,,uma nota,, | outra |', '|---|---|'))).toEqual([
+      'hidden:,,',
       'kcp-small:uma nota',
-      'hidden:..',
+      'hidden:,,',
     ]);
   });
 
   it('reads the last cell of a row written without its closing pipe', () => {
-    expect(read(below('| outra | ..uma nota..', '|---|---|'))).toEqual([
-      'hidden:..',
+    expect(read(below('| outra | ,,uma nota,,', '|---|---|'))).toEqual([
+      'hidden:,,',
       'kcp-small:uma nota',
-      'hidden:..',
+      'hidden:,,',
     ]);
   });
 
   it('reads a run across a pipe the cell holds rather than ends on', () => {
-    expect(read(below('| ..a \\| b.. |', '|---|---|'))).toEqual([
-      'hidden:..',
+    expect(read(below('| ,,a \\| b,, |', '|---|---|'))).toEqual([
+      'hidden:,,',
       'kcp-small:a \\| b',
-      'hidden:..',
+      'hidden:,,',
     ]);
   });
 
   it('does not carry a run from one quoted list item into the next', () => {
-    expect(read(below('> - ..nota um', '> - nota dois..'))).toEqual([]);
+    expect(read(below('> - ,,nota um', '> - nota dois,,'))).toEqual([]);
   });
 
   it('does not carry a run out of a quoted heading', () => {
-    expect(read(below('> # Título ..a', '> b.. resto'))).toEqual([]);
+    expect(read(below('> # Título ,,a', '> b,, resto'))).toEqual([]);
   });
 
   it('does not carry a run from one quoted table cell into the next', () => {
-    expect(read(below('> | ..a | b.. |', '> |---|---|'))).toEqual([]);
+    expect(read(below('> | ,,a | b,, |', '> |---|---|'))).toEqual([]);
   });
 
   it('leaves a code block written inside a quote alone', () => {
@@ -220,59 +220,59 @@ describe('build', () => {
   });
 
   it('does not carry a run into a quote written inside a quote', () => {
-    expect(read(below('> ..a', '> > b.. fim'))).toEqual([]);
+    expect(read(below('> ,,a', '> > b,, fim'))).toEqual([]);
   });
 
   it('carries a run on into the line a nested quote is finished on', () => {
-    expect(read(below('> > ..a', '> b.. fim'))).toEqual([
-      'hidden:..',
+    expect(read(below('> > ,,a', '> b,, fim'))).toEqual([
+      'hidden:,,',
       'kcp-small:a\n> b',
-      'hidden:..',
+      'hidden:,,',
     ]);
   });
 
   it("does not carry a run across a nested quote's own blank line", () => {
-    expect(read(below('> > ..a', '> >', '> > b.. fim'))).toEqual([]);
+    expect(read(below('> > ,,a', '> >', '> > b,, fim'))).toEqual([]);
   });
 
   it("does not carry a run out of a callout's title", () => {
-    expect(read(below('> [!note] ..a', '> b.. fim'))).toEqual([]);
+    expect(read(below('> [!note] ,,a', '> b,, fim'))).toEqual([]);
   });
 
   it('reads a run written in the body of a callout', () => {
-    expect(read(below('> [!note] Nota', '> ..uma nota..'))).toEqual([
-      'hidden:..',
+    expect(read(below('> [!note] Nota', '> ,,uma nota,,'))).toEqual([
+      'hidden:,,',
       'kcp-small:uma nota',
-      'hidden:..',
+      'hidden:,,',
     ]);
   });
 
   it('does not carry a run out of a heading underlined with equals', () => {
-    expect(read(below('Título ..a', '===', 'b.. resto'))).toEqual([]);
+    expect(read(below('Título ,,a', '===', 'b,, resto'))).toEqual([]);
   });
 
   it('does not carry a run out of a heading', () => {
-    expect(read(below('# Título ..a', 'b.. resto'))).toEqual([]);
+    expect(read(below('# Título ,,a', 'b,, resto'))).toEqual([]);
   });
 
   it('still reads a run written inside one list item', () => {
-    expect(read(below('- ..uma nota..', '- outra'))).toEqual([
-      'hidden:..',
+    expect(read(below('- ,,uma nota,,', '- outra'))).toEqual([
+      'hidden:,,',
       'kcp-small:uma nota',
-      'hidden:..',
+      'hidden:,,',
     ]);
   });
 
   it('leaves a run with nothing but code in it as it was written', () => {
-    expect(read(below('..`ls -la`..'))).toEqual([]);
+    expect(read(below(',,`ls -la`,,'))).toEqual([]);
   });
 
   it('marks a run that is nothing but a link, which does show', () => {
-    expect(read(below('..[Sl 26.4](x)..'))).toEqual([
+    expect(read(below(',,[Sl 26.4](x),,'))).toEqual([
       'kcp-small-line@L3',
-      'hidden:..',
+      'hidden:,,',
       'kcp-small:[Sl 26.4](x)',
-      'hidden:..',
+      'hidden:,,',
     ]);
   });
 
@@ -281,11 +281,11 @@ describe('build', () => {
   });
 
   it('leaves inline code alone, and reads a run across it', () => {
-    expect(read(below('..rode `a ~b~ c` agora..'))).toEqual([
+    expect(read(below(',,rode `a ~b~ c` agora,,'))).toEqual([
       'kcp-small-line@L3',
-      'hidden:..',
+      'hidden:,,',
       'kcp-small:rode `a ~b~ c` agora',
-      'hidden:..',
+      'hidden:,,',
     ]);
   });
 
@@ -311,11 +311,11 @@ describe('build', () => {
   });
 
   it('reads a run holding a link', () => {
-    expect(read(below('..Refs: [[Sl 26.4|Sl 26.4]]...'))).toEqual([
+    expect(read(below(',,Refs: [[Sl 26.4|Sl 26.4]].,,'))).toEqual([
       'kcp-small-line@L3',
-      'hidden:..',
+      'hidden:,,',
       'kcp-small:Refs: [[Sl 26.4|Sl 26.4]].',
-      'hidden:..',
+      'hidden:,,',
     ]);
   });
 
@@ -324,19 +324,23 @@ describe('build', () => {
   });
 
   it('reads a run holding a price, two dollars being no maths', () => {
-    expect(read(below('..Custa $5.. e $6'))).toEqual([
-      'hidden:..',
+    expect(read(below(',,Custa $5,, e $6'))).toEqual([
+      'hidden:,,',
       'kcp-small:Custa $5',
-      'hidden:..',
+      'hidden:,,',
     ]);
   });
 
-  it('leaves a path written as dots alone', () => {
-    expect(read(below('vá para .. e depois para ../outro'))).toEqual([]);
+  it('leaves a decimal comma alone', () => {
+    expect(read(below('Custa 1,5 e depois 2,3 reais'))).toEqual([]);
   });
 
-  it('leaves an ellipsis alone', () => {
-    expect(read(below('Espere... não é uma nota.'))).toEqual([]);
+  it('leaves a list written with commas alone', () => {
+    expect(read(below('sal, pimenta, e alho'))).toEqual([]);
+  });
+
+  it('leaves the commas of a reference alone', () => {
+    expect(read(below('veja Sl 1,2,3 e @Joao 1.1,2 hoje'))).toEqual([]);
   });
 
   it('leaves strikethrough alone', () => {
@@ -375,7 +379,7 @@ describe('build', () => {
   });
 
   it('finishes a block that straddles the foot of the screen', () => {
-    const doc = below('..um', 'dois', 'tres..');
+    const doc = below(',,um', 'dois', 'tres,,');
     const state = EditorState.create({ doc, selection: { anchor: 0 } });
     // The screen ends inside the aside; the rest of the block is read anyway,
     // a run having to close somewhere for the part on screen to be marked.
@@ -384,7 +388,7 @@ describe('build', () => {
       const what = (v.spec.class as string | undefined) ?? 'hidden';
       if (f !== t) out.push(`${what}:${doc.slice(f, t)}`);
     });
-    expect(out).toEqual(['hidden:..', 'kcp-small:um\ndois\ntres', 'hidden:..']);
+    expect(out).toEqual(['hidden:,,', 'kcp-small:um\ndois\ntres', 'hidden:,,']);
   });
 
   it('reads only what is on screen', () => {
@@ -420,44 +424,44 @@ describe('source mode', () => {
   }
 
   it('keeps the delimiters on the page, and still marks the run', () => {
-    expect(read('Um verso.\n\n..uma nota..', false)).toEqual([
+    expect(read('Um verso.\n\n,,uma nota,,', false)).toEqual([
       'kcp-small-line@line',
       'kcp-small:uma nota',
     ]);
   });
 
   it('hides them in live preview, as before', () => {
-    expect(read('Um verso.\n\n..uma nota..', true)).toEqual([
+    expect(read('Um verso.\n\n,,uma nota,,', true)).toEqual([
       'kcp-small-line@line',
-      'hidden:..',
+      'hidden:,,',
       'kcp-small:uma nota',
-      'hidden:..',
+      'hidden:,,',
     ]);
   });
 });
 
 describe('the spacing of an aside', () => {
   it('gives its size to a line it covers whole', () => {
-    expect(read(below('..very', 'small', 'text..'))).toEqual([
+    expect(read(below(',,very', 'small', 'text,,'))).toEqual([
       'kcp-small-line@L3',
-      'hidden:..',
+      'hidden:,,',
       'kcp-small:very\nsmall\ntext',
-      'hidden:..',
+      'hidden:,,',
       'kcp-small-line@L4',
       'kcp-small-line@L5',
     ]);
   });
 
   it('gives it to one long line too, which the editor wraps on its own', () => {
-    const long = `..${'very '.repeat(40)}long line..`;
+    const long = `,,${'very '.repeat(40)}long line,,`;
     expect(read(below(long))).toContain('kcp-small-line@L3');
   });
 
   it('leaves a line the aside only reaches into at its own size', () => {
-    expect(read(below('Refs: ..uma nota.. e o resto.'))).toEqual([
-      'hidden:..',
+    expect(read(below('Refs: ,,uma nota,, e o resto.'))).toEqual([
+      'hidden:,,',
       'kcp-small:uma nota',
-      'hidden:..',
+      'hidden:,,',
     ]);
   });
 
@@ -517,7 +521,7 @@ describe('LiveMarks', () => {
   }
 
   it('reads the editor again when it is switched to source mode', () => {
-    const note = 'Um verso.\n\n..uma nota..';
+    const note = 'Um verso.\n\n,,uma nota,,';
     const preview = drawing(note, true);
     const marks = new LiveMarks(preview);
     // The line, the run, and the two delimiters taken off the page.
