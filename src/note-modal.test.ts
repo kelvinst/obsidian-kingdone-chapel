@@ -238,3 +238,27 @@ describe('the key that writes it', () => {
     expect(wrote).not.toHaveBeenCalled();
   });
 });
+
+describe('the number it opens on', () => {
+  it('is read off the chapter as it stands when the modal opens', () => {
+    const target = world.plugin.noteTarget(
+      pane(world.app, {
+        file: world.vault.getAbstractFileByPath(
+          chapterPath('NVI', 1, 'GEN', 1),
+        ) as TFile,
+        editor: Object.assign(new FakeEditor(CHAPTER), {
+          cursor: { line: 3, ch: 0 },
+          anchor: { line: 3, ch: 0 },
+        }),
+      }),
+    )!;
+    // Written into after the command was offered, the way a chapter is while
+    // the palette is open.
+    const editor = target.view.editor as unknown as FakeEditor;
+    editor.lines.push('^nvi-gen-1-n9');
+
+    const modal = new WriteNoteModal(world.app, world.plugin, target);
+    modal.open();
+    expect(modal.number).toBe(10);
+  });
+});

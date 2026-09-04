@@ -2428,3 +2428,52 @@ describe('a note written in a Vim editor', () => {
     expect(editor.getLine(editor.cursor.line)).toBe('> ');
   });
 });
+
+describe('a note over a chapter that merged its verses', () => {
+  const KIND = {
+    callout: 'note',
+    letter: 'n',
+    titles: { pt: 'Nota', en: 'Note' },
+  };
+  /** A chapter writing verses 1 and 3, the way a version that merges 1-2 does. */
+  const MERGED =
+    '# Gênesis 1 - NVI\n\n![[a|flat]]\n^nvi-gen-1-1\n\n![[b|flat]]\n^nvi-gen-1-3\n';
+
+  function editing(text: string) {
+    const view = pane(world.app, {
+      file: world.vault.getAbstractFileByPath(
+        chapterPath('NVI', 1, 'GEN', 1),
+      ) as TFile,
+      editor: new FakeEditor(text),
+    });
+    return { view, editor: editorOf(view) };
+  }
+
+  /** The target the command would have built, over verses 1 to 3. */
+  function over(view: ReturnType<typeof editing>['view'], verses: number[]) {
+    return { ...world.plugin.noteTarget(view)!, verses };
+  }
+
+  it('quotes what the chapter has and says what it left out', () => {
+    const { view, editor } = editing(MERGED);
+    editor.at(3);
+    world.plugin.writeNote(over(view, [1, 2, 3]), KIND, 1);
+
+    expect(editor.text).toContain('> > ![[#^nvi-gen-1-1]] ![[#^nvi-gen-1-3]]');
+    expect(editor.text).not.toContain('![[#^nvi-gen-1-2]]');
+    expect(notices[notices.length - 1].message).toBe(
+      'Written without verse 2: this chapter has none.',
+    );
+  });
+
+  it('is not written where the chapter carries none of the verses', () => {
+    const { view, editor } = editing(MERGED);
+    editor.at(3);
+    world.plugin.writeNote(over(view, [8, 9]), KIND, 1);
+
+    expect(editor.text).toBe(MERGED);
+    expect(notices[notices.length - 1].message).toBe(
+      'This chapter writes no verse of verses 8, 9.',
+    );
+  });
+});

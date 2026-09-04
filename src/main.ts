@@ -74,14 +74,18 @@ interface VimAdapter {
 /** A chapter a note is being written into, as the command reads it. */
 export interface NoteTarget {
   view: MarkdownView;
-  /** The chapter as it stands, which is what the next number is read from. */
-  text: string;
   /** What the chapter's verse ids open with: `shedd-psa-1`. */
   prefix: string;
   /** The book as it is named in the note's title. */
   book: string;
   chapter: number;
   verses: number[];
+}
+
+/** A run of verse numbers as a notice says them: `verse 2`, `verses 2, 4`. */
+function said(verses: number[]): string {
+  const one = verses.length === 1;
+  return `${one ? 'verse' : 'verses'} ${verses.join(', ')}`;
 }
 
 /** The version `word` names, matched without case, or null where none does. */
@@ -855,7 +859,6 @@ export default class KingdoneChapelPlugin extends Plugin {
 
     return {
       view,
-      text: editor.getValue(),
       prefix: chapterPrefix(source.code, parsed.book, parsed.chapter),
       book: bookName(parsed.book, nameLang(this.settings.language)),
       chapter: parsed.chapter,
@@ -902,6 +905,21 @@ export default class KingdoneChapelPlugin extends Plugin {
       headings,
       quotes: quoteHeadings(this.settings.language),
     });
+
+    // A version that merges verses writes one id for the run, so a note asked
+    // for the verses either side of a merge is about fewer verses than it was
+    // asked for. It is written about the ones the chapter has, and says which
+    // it left out; asked for none of them, it is not written at all.
+    if (!written.verses.length) {
+      new Notice(`This chapter writes no verse of ${said(target.verses)}.`);
+      return;
+    }
+    if (written.verses.length < target.verses.length) {
+      const missing = target.verses.filter(
+        (verse) => !written.verses.includes(`${target.prefix}-${verse}`),
+      );
+      new Notice(`Written without ${said(missing)}: this chapter has none.`);
+    }
 
     for (const write of written.writes) {
       editor.replaceRange(write.text, write.from, write.to);
