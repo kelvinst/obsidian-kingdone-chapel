@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
@@ -15,6 +15,10 @@ export default defineConfig({
     // part of the module and so cannot come from the stand-in. A no-op under
     // `node`, where the pure modules are tested and there is no DOM to extend.
     setupFiles: ['./test/dom.ts'],
+    // A git worktree checked out under the repo is another copy of this
+    // project, with its own tests answering to its own source. Running them
+    // from here reads as this suite failing, which is a branch nobody is on.
+    exclude: [...configDefaults.exclude, '**/.worktrees/**'],
     coverage: {
       provider: 'v8',
       // Every source file, not only the ones a test happened to import — a

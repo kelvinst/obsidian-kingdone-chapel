@@ -56,3 +56,5 @@
 sync.remote: "https://doltremoteapi.dolthub.com/kelvinst/obsidian-kingdone-chapel"
 
 export.git-add: false
+
+validation.on-create: "warn"
