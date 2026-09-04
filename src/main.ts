@@ -482,7 +482,11 @@ export default class KingdoneChapelPlugin extends Plugin {
     // Building the view is what tells the two apart. A pane Obsidian was only
     // putting off comes back holding the real thing and is a pane in use; a
     // pane left behind by a load that is over has nothing to come back to.
-    for (const leaf of stale) await leaf.loadIfDeferred();
+    // Asking is only possible from 1.7.2, which is where panes started being
+    // put off at all, and the manifest goes back further than that: an app too
+    // old to answer is one with nothing to ask about, and what is left in the
+    // pane settles it on its own.
+    for (const leaf of stale) await leaf.loadIfDeferred?.();
     const ghosts = this.staleViewLeaves();
     if (!ghosts.length) return;
     const live = this.app.workspace.getLeavesOfType(VIEW_TYPE).length;
