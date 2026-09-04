@@ -103,8 +103,13 @@ const TABLE_ROW = /^\s*\|/;
  * or one lazily continuing the paragraph above it — was cut into cells the
  * reader never sees, a run spanning the pipe marked when the note is read and
  * lost while it is written.
+ *
+ * A pipe of its own is wanted as well as the dashes: a row of dashes alone is
+ * the rule under a heading written the other way, and the line above one is
+ * that heading, not a header. `TABLE_ROW` asks the header to open on a pipe,
+ * so the row vouching for it carries one too.
  */
-const DELIMITER_ROW = /^\s*\|?[\s:-]*-[\s:|-]*$/;
+const DELIMITER_ROW = /^(?=.*\|)[\s:|-]*-[\s:|-]*$/;
 
 /** What a line says once its quote markers are taken off. */
 function unquoted(text: string): string {
