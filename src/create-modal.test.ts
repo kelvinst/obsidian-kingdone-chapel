@@ -338,10 +338,10 @@ describe('writing the version', () => {
         '\n' +
         '## [[ARA-41-MRK-014|ARA]]\n' +
         '\n' +
-        '![[ARA-41-MRK-014#^ara-mrk-14-1]]\n' +
+        '![[ARA-41-MRK-014#^ara-mrk-14-1|flat]]\n' +
         '^shedd-mrk-14-1\n' +
         '\n' +
-        '![[ARA-41-MRK-014#^ara-mrk-14-2]]\n' +
+        '![[ARA-41-MRK-014#^ara-mrk-14-2|flat]]\n' +
         '^shedd-mrk-14-2\n',
     );
   });
@@ -365,10 +365,10 @@ describe('writing the version', () => {
         '\n' +
         '## [[ARA-41-MRK-014|ARA]]\n' +
         '\n' +
-        '![[ARA-41-MRK-014#^ara-mrk-14-1]]\n' +
+        '![[ARA-41-MRK-014#^ara-mrk-14-1|flat]]\n' +
         '^shedd-mrk-14-1\n' +
         '\n' +
-        '![[ARA-41-MRK-014#^ara-mrk-14-2]]\n' +
+        '![[ARA-41-MRK-014#^ara-mrk-14-2|flat]]\n' +
         '^shedd-mrk-14-2\n',
     );
   });
@@ -384,8 +384,8 @@ describe('writing the version', () => {
     await write();
 
     const note = wrote('Comentarios/Shedd/Shedd-41-MRK-014.md') as string;
-    expect(note).toContain('![[ARA-41-MRK-014#^ara-mrk-14-1]]');
-    expect(note).toContain('![[ARA-41-MRK-014#^ara-mrk-14-2]]');
+    expect(note).toContain('![[ARA-41-MRK-014#^ara-mrk-14-1|flat]]');
+    expect(note).toContain('![[ARA-41-MRK-014#^ara-mrk-14-2|flat]]');
   });
 
   it('says how many it wrote, and reads the vault again', async () => {

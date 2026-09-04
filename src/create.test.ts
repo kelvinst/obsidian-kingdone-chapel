@@ -66,10 +66,10 @@ describe('chapterNote', () => {
         '\n' +
         '## [[ARA-41-MRK-014|ARA]]\n' +
         '\n' +
-        '![[ARA-41-MRK-014#^ara-mrk-14-1]]\n' +
+        '![[ARA-41-MRK-014#^ara-mrk-14-1|flat]]\n' +
         '^shedd-mrk-14-1\n' +
         '\n' +
-        '![[ARA-41-MRK-014#^ara-mrk-14-2]]\n' +
+        '![[ARA-41-MRK-014#^ara-mrk-14-2|flat]]\n' +
         '^shedd-mrk-14-2\n',
     );
   });
@@ -92,6 +92,24 @@ describe('chapterNote', () => {
     expect(
       chapterNote('Marcos 14', 'ARA-41-MRK-014', 'ARA', [], 'Shedd', 'MRK', 14),
     ).toBe('# Marcos 14\n\n## [[ARA-41-MRK-014|ARA]]\n\n');
+  });
+
+  it('marks every embed flat, so a verse of it is framed once', () => {
+    const note = chapterNote(
+      'Marcos 14',
+      'ARA-41-MRK-014',
+      'ARA',
+      [
+        { verse: 1, anchor: 'ara-mrk-14-1' },
+        { verse: 2, anchor: 'ara-mrk-14-2' },
+      ],
+      'Shedd',
+      'MRK',
+      14,
+    );
+
+    expect(note.match(/!\[\[[^\]]+\|flat\]\]/g)).toHaveLength(2);
+    expect(note).not.toMatch(/!\[\[[^\]|]+\]\]/);
   });
 });
 

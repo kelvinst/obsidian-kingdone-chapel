@@ -50,10 +50,10 @@ block id of the new version's own:
 
 ## [[ARA-41-MRK-014|ARA]]
 
-![[ARA-41-MRK-014#^ara-mrk-14-1]]
+![[ARA-41-MRK-014#^ara-mrk-14-1|flat]]
 ^shedd-mrk-14-1
 
-![[ARA-41-MRK-014#^ara-mrk-14-2]]
+![[ARA-41-MRK-014#^ara-mrk-14-2|flat]]
 ^shedd-mrk-14-2
 ```
 
@@ -61,6 +61,10 @@ The id sits on the line under its embed, with a blank line before the next: the 
 the block above it, so anything you write between the two is written inside that verse — and
 `@Shedd Mc 14.1` links straight to it. The text itself is never copied, only embedded, so the
 new version stays notes about a translation rather than another copy of one.
+
+Each embed is marked [`flat`](#-references), so a verse of the new version is framed once by
+whatever quotes it rather than twice — once for the version and once for the translation
+inside it.
 
 A note declaring the folder is written beside the chapters, so the new version is
 [one the plugin knows](#versions-kept-somewhere-else) wherever you put it:
