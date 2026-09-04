@@ -69,14 +69,25 @@ export interface Run {
 }
 
 /**
- * Every run in `text`, in the order they were written, counted from `offset`.
+ * Every run in `text`, in the order they were written, counted from `offset`,
+ * each followed by whatever runs are written inside it.
+ *
+ * A mark holds another often enough — a formula inside an aside, a verse number
+ * inside one — and the scan only ever reads what a run opens on, so the content
+ * of one has to be read again to find what it holds. What comes back is flat:
+ * every run carries where it sits, and a run written inside another simply sits
+ * inside it.
+ *
+ * The scan of a text finishes before any of that begins. `RUN` keeps its own
+ * place between calls, so reading a run's content while still walking the text
+ * around it would move the place the outer walk was holding.
  *
  * The text handed over is one block's worth and no more. Nothing here knows
  * where a paragraph ends, so a caller that lets two of them through will get a
  * run spanning both.
  */
 export function runsIn(text: string, offset = 0): Run[] {
-  const out: Run[] = [];
+  const found: Run[] = [];
   RUN.lastIndex = 0;
   let match = RUN.exec(text);
   while (match) {
@@ -85,7 +96,7 @@ export function runsIn(text: string, offset = 0): Run[] {
     const delimiter = (match[0].length - match[group].length) / 2;
     const from = offset + match.index;
     const to = from + match[0].length;
-    out.push({
+    found.push({
       from,
       to,
       contentFrom: from + delimiter,
@@ -93,6 +104,19 @@ export function runsIn(text: string, offset = 0): Run[] {
       mark: MARKS[group - 1],
     });
     match = RUN.exec(text);
+  }
+
+  const out: Run[] = [];
+  for (const run of found) {
+    out.push(run);
+    // Its content, which is shorter than the run by both delimiters, so this
+    // walks down to a text no run can be read out of and stops.
+    out.push(
+      ...runsIn(
+        text.slice(run.contentFrom - offset, run.contentTo - offset),
+        run.contentFrom,
+      ),
+    );
   }
   return out;
 }

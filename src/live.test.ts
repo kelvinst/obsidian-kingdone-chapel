@@ -41,6 +41,18 @@ describe('build', () => {
     ]);
   });
 
+  it('marks a run written inside another', () => {
+    expect(read(below(',,Água é H~2~O,,'))).toEqual([
+      'kcp-small-line@L3',
+      'hidden:,,',
+      'kcp-small:Água é H~2~O',
+      'hidden:,,',
+      'hidden:~',
+      'kcp-sub:2',
+      'hidden:~',
+    ]);
+  });
+
   it('marks each kind by its own class', () => {
     expect(read('x^2^ ,,nota,,')).toEqual([
       'hidden:^',

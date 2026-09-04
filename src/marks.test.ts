@@ -57,6 +57,30 @@ describe('renderMarks', () => {
     expect(marks(el)).toEqual([]);
   });
 
+  it('marks a run written inside another', () => {
+    const el = rendered('<p>,,Água é H~2~O e 2^10^,,</p>');
+    expect(el.innerHTML).toBe(
+      '<p><span class="kcp-small">Água é H<sub class="kcp-sub">2</sub>' +
+        'O e 2<sup class="kcp-sup">10</sup></span></p>',
+    );
+  });
+
+  it('marks a run that is nothing but another', () => {
+    // Both open on the same character, so the wider has to be built first.
+    const el = rendered('<p>,,~2~,,</p>');
+    expect(el.innerHTML).toBe(
+      '<p><span class="kcp-small"><sub class="kcp-sub">2</sub></span></p>',
+    );
+  });
+
+  it('carries a nested run across a line break', () => {
+    const el = rendered('<p>,,uma nota H~2~O<br>e mais 2^10^ fim,,</p>');
+    expect(el.innerHTML).toBe(
+      '<p><span class="kcp-small">uma nota H<sub class="kcp-sub">2</sub>O</span>' +
+        '<br><span class="kcp-small">e mais 2<sup class="kcp-sup">10</sup> fim</span></p>',
+    );
+  });
+
   it('reads every kind in the order they were written', () => {
     const el = rendered('<p>x^2^, H~2~O e ,,uma nota,,</p>');
     expect(marks(el)).toEqual(['sup:2', 'sub:2', 'span:uma nota']);
