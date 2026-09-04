@@ -2007,3 +2007,63 @@ describe('reading the cursor where the block cache cannot answer', () => {
     expect(world.plugin.blockVerse(file, 2)).toBe(3);
   });
 });
+
+describe('resolveEmbeds', () => {
+  let file: TFile;
+
+  beforeEach(() => {
+    file = world.vault.getAbstractFileByPath(
+      chapterPath('NVI', 1, 'GEN', 1),
+    ) as TFile;
+  });
+
+  it('leaves a verse that writes its own words alone', async () => {
+    expect(await world.plugin.resolveEmbeds(GEN_1[0], file)).toBe(GEN_1[0]);
+  });
+
+  it('answers an embed with the verse it points at', async () => {
+    const text = '![[ARA-01-GEN-001#^ara-gen-1-1|flat]]';
+    expect(await world.plugin.resolveEmbeds(text, file)).toBe(
+      'No princípio, criou Deus.',
+    );
+  });
+
+  it('keeps whatever was written beside the embed', async () => {
+    const text = '![[ARA-01-GEN-001#^ara-gen-1-1]]\n\nUm comentário.';
+    expect(await world.plugin.resolveEmbeds(text, file)).toBe(
+      'No princípio, criou Deus.\n\nUm comentário.',
+    );
+  });
+
+  it('drops an embed no file answers, rather than reading out its markup', async () => {
+    const text = '![[XXX-01-GEN-001#^xxx-gen-1-1]]\n\nUm comentário.';
+    expect(await world.plugin.resolveEmbeds(text, file)).toBe('Um comentário.');
+  });
+
+  it('drops an embed of a file that holds no verses', async () => {
+    world.vault.write(chapterPath('ARA', 1, 'GEN', 1), 'Sem versículos.');
+    world.plugin.chapterCache.clear();
+    const text = '![[ARA-01-GEN-001#^ara-gen-1-1]]\n\nUm comentário.';
+    expect(await world.plugin.resolveEmbeds(text, file)).toBe('Um comentário.');
+  });
+
+  it('follows a version answering a version answering a translation', async () => {
+    world.vault.write(
+      chapterPath('SHEDD', 1, 'GEN', 1),
+      '![[ARA-01-GEN-001#^ara-gen-1-1]]\n^shedd-gen-1-1',
+    );
+    const text = '![[SHEDD-01-GEN-001#^shedd-gen-1-1]]';
+    expect(await world.plugin.resolveEmbeds(text, file)).toBe(
+      'No princípio, criou Deus.',
+    );
+  });
+
+  it('stops where a verse embeds itself rather than reading forever', async () => {
+    world.vault.write(
+      chapterPath('SHEDD', 1, 'GEN', 1),
+      '![[SHEDD-01-GEN-001#^shedd-gen-1-1]]\n^shedd-gen-1-1',
+    );
+    const text = '![[SHEDD-01-GEN-001#^shedd-gen-1-1]]';
+    expect(await world.plugin.resolveEmbeds(text, file)).toBe('');
+  });
+});

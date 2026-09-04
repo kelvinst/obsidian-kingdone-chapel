@@ -57,6 +57,11 @@ const VERSE_SELECTOR = '.markdown-preview-sizer li, .markdown-preview-sizer p';
 const PREVIEW_TOP_OFFSET = 48;
 /** Scroll movement (px) that releases a verse clicked in reading mode. */
 const SCROLL_SLACK = 4;
+/**
+ * A line that is nothing but an embed of another version's verse — the whole
+ * of what a generated version writes where a translation writes words.
+ */
+const EMBED_LINE = /^!\[\[([^\]|#]+)#\^([^\]|]+)(?:\|[^\]]*)?\]\]$/;
 
 /**
  * File `key` in `into`, unless another file already claims it.
@@ -1233,6 +1238,54 @@ export default class KingdoneChapelPlugin extends Plugin {
       if (v.verse < verse && (!best || v.verse > best.verse)) best = v;
     }
     return best || verses[0];
+  }
+
+  /**
+   * The words `text` holds, with every embed of another version's verse
+   * answered by the verse it points at.
+   *
+   * A generated version writes no text of its own: each of its verses is an
+   * embed of the translation it answers, with its own block id under it, and
+   * `parseVerses` reads that embed line as the verse's text. That is the
+   * honest answer about the file and the wrong thing to hand a reader — the
+   * sidebar only gets away with it because it renders the embed. Anywhere the
+   * words themselves are wanted, follow the link instead.
+   *
+   * An embed nothing answers is dropped rather than read out as markup, and a
+   * verse embedding its way back to itself stops where it comes round.
+   */
+  async resolveEmbeds(
+    text: string,
+    from: TFile,
+    seen: Set<string> = new Set(),
+  ): Promise<string> {
+    const out: string[] = [];
+    for (const line of text.split('\n')) {
+      const embed = EMBED_LINE.exec(line.trim());
+      out.push(
+        embed ? await this.embedded(embed[1], embed[2], from, seen) : line,
+      );
+    }
+    return out.join('\n').trim();
+  }
+
+  /** The verse an embed points at, followed through whatever it embeds in turn. */
+  private async embedded(
+    path: string,
+    id: string,
+    from: TFile,
+    seen: Set<string>,
+  ): Promise<string> {
+    const key = `${path}#${id}`;
+    if (seen.has(key)) return '';
+    const dest = this.app.metadataCache.getFirstLinkpathDest(
+      getLinkpath(path),
+      from.path,
+    );
+    if (!dest) return '';
+    const verse = await this.verseIn(dest, verseInId(id));
+    if (!verse) return '';
+    return this.resolveEmbeds(verse.text, dest, new Set(seen).add(key));
   }
 
   /** One entry per available version for `loc`, for the sidebar and the picker. */

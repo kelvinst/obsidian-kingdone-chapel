@@ -148,8 +148,7 @@ export class KingdoneChapelView extends ItemView {
 
     card.onclick = (evt) => {
       if (evt.altKey) {
-        navigator.clipboard.writeText(item.text);
-        new Notice(`Copied ${item.label}`);
+        this.copy(item);
         return;
       }
       this.plugin.jumpTo(
@@ -158,6 +157,25 @@ export class KingdoneChapelView extends ItemView {
         evt.ctrlKey || evt.metaKey ? 'tab' : false,
       );
     };
+  }
+
+  /**
+   * Put a card's verse on the clipboard — the words it shows rather than the
+   * source that produced them, since a version built on a translation writes
+   * its verses as embeds and an embed pasted anywhere is not a verse.
+   *
+   * A card with nothing behind it says so instead of claiming a copy.
+   */
+  async copy(item: VersionItem) {
+    const text = item.text
+      ? await this.plugin.resolveEmbeds(item.text, item.file)
+      : '';
+    if (!text) {
+      new Notice(`${item.label} has nothing to copy here.`);
+      return;
+    }
+    await navigator.clipboard.writeText(text);
+    new Notice(`Copied ${item.label}`);
   }
 
   async onClose() {
