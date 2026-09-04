@@ -141,6 +141,9 @@ Notas: [[n1]]; [[n2]].,,
 
 But it never leaves its paragraph, so a blank line ends an aside.
 
+A mark may hold another, and each is drawn as itself: `,,Água é H~2~O,,` is an aside with a
+subscript inside it, not an aside with two tildes in it.
+
 Code and maths are left exactly as written, and a run may reach across an inline `` `code` ``
 without its contents being read for delimiters.
 

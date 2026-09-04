@@ -167,27 +167,52 @@ function covered(block: Block, from: number, to: number): boolean {
   );
 }
 
-/** Rebuild one text node as its marks and the plain text between them. */
-function rewrite(node: Text, ops: Op[]) {
-  const value = node.data;
-  const doc = node.ownerDocument;
+/**
+ * `value`'s `from`-`to` as marks and the plain text between them, taking the
+ * ops from `cursor` on and leaving it past the last one used.
+ *
+ * A mark may hold another — a formula inside an aside — so the ops are a tree
+ * rather than a list, and one that opens inside another is built inside it. The
+ * ops of a run written inside another follow it, and each is enclosed by it, so
+ * the mark being built simply takes whatever it reaches over.
+ */
+function fill(
+  doc: Document,
+  value: string,
+  ops: Op[],
+  cursor: { at: number },
+  from: number,
+  to: number,
+): DocumentFragment {
   const out = doc.createDocumentFragment();
-  let at = 0;
-  for (const op of ops) {
-    if (op.from > at)
+  let at = from;
+  while (cursor.at < ops.length && ops[cursor.at].from < to) {
+    const op = ops[cursor.at++];
+    if (op.from > at) {
       out.appendChild(doc.createTextNode(value.slice(at, op.from)));
+    }
     if (op.mark) {
       const mark = doc.createElement(op.mark.tag);
       // Its own class as well as the tag, so the plugin's styling stays off a
       // `<sub>` or `<sup>` a note writes by hand.
       mark.className = op.mark.cls;
-      mark.textContent = value.slice(op.from, op.to);
+      mark.appendChild(fill(doc, value, ops, cursor, op.from, op.to));
       out.appendChild(mark);
     }
     at = op.to;
   }
-  if (at < value.length) out.appendChild(doc.createTextNode(value.slice(at)));
-  node.replaceWith(out);
+  if (at < to) out.appendChild(doc.createTextNode(value.slice(at, to)));
+  return out;
+}
+
+/** Rebuild one text node as its marks and the plain text between them. */
+function rewrite(node: Text, ops: Op[]) {
+  // In the order they are written, and where two open together the wider
+  // first, so a mark is built before whatever it holds.
+  ops.sort((a, b) => a.from - b.from || b.to - a.to);
+  node.replaceWith(
+    fill(node.ownerDocument, node.data, ops, { at: 0 }, 0, node.data.length),
+  );
 }
 
 /** Mark every run in the text gathered so far, across the nodes it came from. */
