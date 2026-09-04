@@ -1237,6 +1237,17 @@ export default class KingdoneChapelPlugin extends Plugin {
    * (versions like MENS merge verses under a single number).
    */
   async verseIn(file: TFile, verse: number | null): Promise<Verse | null> {
+    const match = await this.verseLineIn(file, verse);
+    if (!match) return null;
+    const text = await this.resolveEmbeds(match.text, file);
+    return text === match.text ? match : { verse: match.verse, text };
+  }
+
+  /** The verse as the file writes it, before any embed it holds is followed. */
+  private async verseLineIn(
+    file: TFile,
+    verse: number | null,
+  ): Promise<Verse | null> {
     const verses = await this.chapterVerses(file);
     if (!verses.length) return null;
     if (!verse) return verses[0];
@@ -1257,7 +1268,8 @@ export default class KingdoneChapelPlugin extends Plugin {
    * `parseVerses` reads that embed line as the verse's text. That is the
    * honest answer about the file and the wrong thing to hand a reader — the
    * sidebar only gets away with it because it renders the embed. Anywhere the
-   * words themselves are wanted, follow the link instead.
+   * words themselves are wanted, follow the link instead, which is why
+   * `verseIn` hands every caller what this answers.
    *
    * An embed nothing answers is dropped rather than read out as markup, and a
    * verse embedding its way back to itself stops where it comes round.
@@ -1296,9 +1308,13 @@ export default class KingdoneChapelPlugin extends Plugin {
     // first one — a verse nobody pointed at.
     const wanted = verseInId(id);
     if (wanted === null) return '';
-    const verse = await this.verseIn(dest, wanted);
-    if (!verse) return '';
-    return this.resolveEmbeds(verse.text, dest, new Set(seen).add(key));
+    // The embed names one verse, so it is that verse or none: the nearest
+    // verse before it answers a reader asking for a passage, not a link.
+    const found = (await this.chapterVerses(dest)).find(
+      (v) => v.verse === wanted,
+    );
+    if (!found) return '';
+    return this.resolveEmbeds(found.text, dest, new Set(seen).add(key));
   }
 
   /** One entry per available version for `loc`, for the sidebar and the picker. */
