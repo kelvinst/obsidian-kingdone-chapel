@@ -429,3 +429,103 @@ describe('a verse whose aside was never closed', () => {
     );
   });
 });
+
+describe('an aside written in some other order', () => {
+  const mark = (text: string) =>
+    markerWrite(text, 'shedd-psa-1-1', 'shedd-psa-1-n9', 'n9', [
+      'Notas',
+      'Notes',
+    ]);
+
+  it('adds the note to the list of notes, not to the refs after it', () => {
+    const text =
+      '![[x]] ,,**Notas**: [[#^shedd-psa-1-n1|n1]]. **Refs**: ' +
+      '[[Shedd-19-PSA-026#^shedd-psa-26-4|Sl 26.4]].,, ^shedd-psa-1-1\n';
+    expect(applied(text, [mark(text)!])).toBe(
+      '![[x]] ,,**Notas**: [[#^shedd-psa-1-n1|n1]]; ' +
+        '[[#^shedd-psa-1-n9|n9]]. **Refs**: ' +
+        '[[Shedd-19-PSA-026#^shedd-psa-26-4|Sl 26.4]].,, ^shedd-psa-1-1\n',
+    );
+  });
+
+  it('adds it to the end of a list that names no note yet', () => {
+    const text = '![[x]] ,,**Notas**: pendente,, ^shedd-psa-1-1\n';
+    expect(applied(text, [mark(text)!])).toBe(
+      '![[x]] ,,**Notas**: pendente; [[#^shedd-psa-1-n9|n9]],, ' +
+        '^shedd-psa-1-1\n',
+    );
+  });
+
+  it('writes in front of the full stop a bare list closes with', () => {
+    const text =
+      '![[x]] ,,**Notas**: a escrever. **Refs**: nenhuma.,, ^shedd-psa-1-1\n';
+    expect(applied(text, [mark(text)!])).toContain(
+      ',,**Notas**: a escrever; [[#^shedd-psa-1-n9|n9]]. **Refs**: nenhuma.,,',
+    );
+  });
+});
+
+describe('a chapter that keeps Prettier off more than its verses', () => {
+  const headings = ['Notas', 'Notes'];
+  const quotes = ['Citações', 'Quotes'];
+  const block =
+    '<!-- prettier-ignore -->\n> [!note]+ Nota 1\n^shedd-psa-1-n1\n';
+
+  it('closes the verses with the last of the markers, not the first', () => {
+    const text =
+      '# Salmos 1\n\n<!-- prettier-ignore-start -->\n| a | b |\n' +
+      '<!-- prettier-ignore-end -->\n\n<!-- prettier-ignore-start -->\n\n' +
+      '![[x]]\n^shedd-psa-1-1\n<!-- prettier-ignore-end -->\n';
+    const lines = applied(text, [
+      notePlacement(text, headings, quotes, block),
+    ]).split('\n');
+
+    expect(lines.indexOf('## Notas')).toBeGreaterThan(
+      lines.indexOf('^shedd-psa-1-1'),
+    );
+    expect(lines.filter((line) => line === '## Notas')).toHaveLength(1);
+  });
+});
+
+describe('a note over verses a chapter never wrote', () => {
+  const note = {
+    callout: 'note',
+    title: 'Nota 1 - Salmos 1.1-3',
+    verses: ['shedd-psa-1-1', 'shedd-psa-1-2', 'shedd-psa-1-3'],
+    anchor: 'shedd-psa-1-n1',
+    label: 'n1',
+    markers: ['Notas'],
+    headings: ['Notas'],
+    quotes: ['Citações'],
+  };
+
+  it('quotes the verses it marked and no others', () => {
+    const text =
+      '# Salmos 1\n\n![[x]]\n^shedd-psa-1-1\n\n![[y]]\n^shedd-psa-1-3\n';
+    const written = noteWrites(text, note);
+
+    expect(written.verses).toEqual(['shedd-psa-1-1', 'shedd-psa-1-3']);
+    expect(applied(text, written.writes)).toContain(
+      '> > ![[#^shedd-psa-1-1]] ![[#^shedd-psa-1-3]]\n',
+    );
+  });
+
+  it('is about nothing where the chapter carries none of them', () => {
+    const text = '# Salmos 1\n\n![[x]]\n^shedd-psa-2-1\n';
+    expect(noteWrites(text, note).verses).toEqual([]);
+  });
+
+  it('leaves the cursor on its own line where the notes come first', () => {
+    const text =
+      '# Salmos 1\n\n## Notas\n\nnada ainda\n\n## Versos\n\n![[x]]\n' +
+      '^shedd-psa-1-1\n';
+    const { writes, comment } = noteWrites(text, {
+      ...note,
+      verses: ['shedd-psa-1-1'],
+    });
+    const lines = applied(text, writes).split('\n');
+
+    expect(lines[comment.line]).toBe('> ');
+    expect(lines[comment.line + 1]).toBe('^shedd-psa-1-n1');
+  });
+});
