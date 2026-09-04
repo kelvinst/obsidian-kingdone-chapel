@@ -232,7 +232,10 @@ export default class KingdoneChapelPlugin extends Plugin {
       this.app.metadataCache.on('changed', (file, _data, cache) => {
         const front = cache.frontmatter;
         const declares = front ? declaresSource(front) : false;
-        if (declares || this.declaringNotes.has(file.path)) moved(file);
+        // Named without the file: a chapter file may be the note that declares
+        // its own folder, and forgetting it here would leave the refresh below
+        // with nothing to read again.
+        if (declares || this.declaringNotes.has(file.path)) moved();
         // A chapter already read is read again, so what is known of it keeps
         // up with the note. One never read stays unread: an edit is no reason
         // to read the whole vault in.

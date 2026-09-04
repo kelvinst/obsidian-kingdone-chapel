@@ -192,7 +192,9 @@ export class Diagnostics {
     const out: Diagnostic[] = [];
 
     for (const [key, files] of this.plugin.chapterConflicts) {
-      const at = key.indexOf('/');
+      // The last slash, not the first: what a version is called is written in
+      // a note, and the chapter part after it is always one segment.
+      const at = key.lastIndexOf('/');
       out.push({
         kind: key.slice(at + 1).startsWith('book:')
           ? 'book-conflict'
@@ -221,10 +223,28 @@ export class Diagnostics {
     return out;
   }
 
-  /** The structural rows, and every chapter read so far. */
+  /**
+   * The structural rows, and every chapter read so far.
+   *
+   * A chapter is read under the version that held it, and which folders are
+   * versions is decided by the settings and by notes that can be written like
+   * any other. So a row naming a code the vault has stopped using is dropped
+   * here rather than shown: it was true of a vault that is no longer this one.
+   *
+   * Dropped one file at a time, and not by emptying the results whenever the
+   * index is rebuilt — the index goes on every note created, renamed or
+   * deleted, and a sweep of six thousand files is not worth throwing away for
+   * a note written in a folder that is no version at all.
+   */
   all(): Diagnostic[] {
-    const out = this.structural();
-    for (const held of this.results.values()) out.push(...held.found);
+    const out = this.structural(); // names the versions the vault holds now
+    for (const [path, held] of this.results) {
+      if (held.found.some((row) => !this.plugin.sourceCodes.has(row.version))) {
+        this.results.delete(path);
+        continue;
+      }
+      out.push(...held.found);
+    }
     return out;
   }
 
