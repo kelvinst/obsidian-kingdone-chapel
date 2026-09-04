@@ -2350,19 +2350,35 @@ describe('a note written in a Vim editor', () => {
     titles: { pt: 'Nota', en: 'Note' },
   };
 
-  /** The Vim extension as the app publishes it, and the keys it was handed. */
-  function vim(): { keys: string[] } {
+  /**
+   * The Vim extension as the app publishes it, and the keys it was handed. It
+   * answers the key by typing, the way the real one does, unless `deaf`.
+   */
+  function vim(deaf = false): { keys: string[] } {
     const keys: string[] = [];
     (window as unknown as { CodeMirrorAdapter?: unknown }).CodeMirrorAdapter = {
-      Vim: { handleKey: (_cm: unknown, key: string) => keys.push(key) },
+      Vim: {
+        handleKey: (
+          cm: { state: { vim: { insertMode: boolean } } },
+          key: string,
+        ) => {
+          keys.push(key);
+          if (!deaf) cm.state.vim.insertMode = true;
+        },
+      },
     };
     return { keys };
   }
 
+  /** An editor in Vim mode, as one that has never been typed into reads. */
+  function adapterOf(insertMode = false) {
+    return { state: { vim: { insertMode } } };
+  }
+
   /** A pane over the chapter, with the cursor in verse 1. */
-  function editing(adapter: object | null = {}) {
+  function editing(adapter: object | null = adapterOf(), dom?: HTMLElement) {
     const editor = new FakeEditor(CHAPTER);
-    if (adapter) editor.cm = { cm: adapter };
+    if (adapter) editor.cm = { cm: adapter, contentDOM: dom };
     const view = pane(world.app, {
       file: world.vault.getAbstractFileByPath(
         chapterPath('NVI', 1, 'GEN', 1),
@@ -2383,7 +2399,7 @@ describe('a note written in a Vim editor', () => {
     const { view, editor } = editing();
     world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
 
-    expect(asked.keys).toEqual(['i']);
+    expect(asked.keys).toEqual(['a']);
     expect(editor.getLine(editor.cursor.line)).toBe('> ');
   });
 
@@ -2397,7 +2413,8 @@ describe('a note written in a Vim editor', () => {
     vi.runAllTimers();
     vi.useRealTimers();
 
-    expect(asked.keys).toEqual(['i', 'i']);
+    // Once as the note is written, and not again: the editor is still typing.
+    expect(asked.keys).toEqual(['a']);
     expect(editor.focused).toBe(1);
     expect(editor.getLine(editor.cursor.line)).toBe('> ');
   });
@@ -2405,7 +2422,7 @@ describe('a note written in a Vim editor', () => {
   it('leaves an editor already typing where it is', () => {
     vi.useFakeTimers();
     const asked = vim();
-    const { view } = editing({ state: { vim: { insertMode: true } } });
+    const { view } = editing(adapterOf(true));
     world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
     vi.runAllTimers();
     vi.useRealTimers();
@@ -2416,7 +2433,7 @@ describe('a note written in a Vim editor', () => {
   it('takes the adapter itself where that is what it was handed', () => {
     const asked = vim();
     const editor = new FakeEditor(CHAPTER);
-    editor.cm = { state: { vim: { insertMode: false } } };
+    editor.cm = adapterOf();
     const view = pane(world.app, {
       file: world.vault.getAbstractFileByPath(
         chapterPath('NVI', 1, 'GEN', 1),
@@ -2426,7 +2443,7 @@ describe('a note written in a Vim editor', () => {
     editor.at(3);
     world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
 
-    expect(asked.keys).toEqual(['i']);
+    expect(asked.keys).toEqual(['a']);
   });
 
   it('leaves an editor keeping no adapter — no Vim — alone', () => {
@@ -2440,14 +2457,39 @@ describe('a note written in a Vim editor', () => {
   it('asks the adapter for the Vim the app publishes nowhere', () => {
     const keys: string[] = [];
     class Adapter {
+      state = { vim: { insertMode: false } };
       static Vim = {
-        handleKey: (_cm: unknown, key: string) => keys.push(key),
+        handleKey: (cm: Adapter, key: string) => {
+          keys.push(key);
+          cm.state.vim.insertMode = true;
+        },
       };
     }
     const { view } = editing(new Adapter());
     world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
 
-    expect(keys).toEqual(['i']);
+    expect(keys).toEqual(['a']);
+  });
+
+  it('presses the key itself where the handler did not take', () => {
+    const asked = vim(true);
+    const typed: string[] = [];
+    const dom = document.createElement('div');
+    dom.addEventListener('keydown', (evt) => typed.push(evt.key));
+    const { view } = editing(adapterOf(), dom);
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+
+    expect(asked.keys).toEqual(['a']);
+    expect(typed).toEqual(['a']);
+  });
+
+  it('has no key to press where the editor draws in nothing it can reach', () => {
+    const asked = vim(true);
+    const { view, editor } = editing();
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+
+    expect(asked.keys).toEqual(['a']);
+    expect(editor.getLine(editor.cursor.line)).toBe('> ');
   });
 
   it('leaves an editor whose Vim is nowhere to be asked for alone', () => {

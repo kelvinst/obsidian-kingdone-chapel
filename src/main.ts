@@ -78,6 +78,8 @@ interface VimAdapter {
 interface Adapter {
   constructor?: VimAdapter;
   state?: { vim?: { insertMode?: boolean } };
+  /** The element the editor is typed into, where this is the view itself. */
+  contentDOM?: HTMLElement;
 }
 
 /** A chapter a note is being written into, as the command reads it. */
@@ -933,11 +935,8 @@ export default class KingdoneChapelPlugin extends Plugin {
     for (const write of written.writes) {
       editor.replaceRange(write.text, write.from, write.to);
     }
-    // Insert mode first, then the cursor: normal mode holds the cursor on a
-    // character, and the line the note is typed into has none past the space,
-    // so a cursor set before the switch is pulled back a column by it.
-    this.startTyping(editor);
     editor.setCursor(written.comment);
+    this.startTyping(editor);
 
     // And again once the modal has finished closing. It hands the focus back
     // to the editor after this returns, and a Vim editor taking the focus back
@@ -945,8 +944,8 @@ export default class KingdoneChapelPlugin extends Plugin {
     // command run without a modal in front of it, and once for the one with.
     window.setTimeout(() => {
       editor.focus();
-      this.startTyping(editor);
       editor.setCursor(written.comment);
+      this.startTyping(editor);
     }, 0);
   }
 
@@ -971,23 +970,43 @@ export default class KingdoneChapelPlugin extends Plugin {
    * answers; neither being there leaves the editor alone rather than crashing
    * on it.
    *
-   * An editor already in insert mode is left as it is, since `i` there is not
-   * a mode but a letter, and the note would open with one.
+   * An editor already typing is left as it is, since the key is a letter there
+   * rather than a mode, and the note would open with one.
+   *
+   * `a` rather than `i`: normal mode holds the cursor on a character, so the
+   * cursor set on the note's line is pulled back off the space that ends it,
+   * and appending after that space is what lands where the note is typed.
+   *
+   * The handler is asked first and the key itself sent second, because the
+   * handler is the quiet way and does not always take — the extension listens
+   * for the key on the editor's own element, which is what a reader pressing
+   * `a` would reach.
    */
   startTyping(editor: Editor) {
     const held = editor as unknown as { cm?: Adapter & { cm?: Adapter } };
     // `cm` is the view the editor draws in, and the adapter sits beside it
     // under the same name; an app handing over the adapter itself is answered
     // by what it carries rather than by where it was found.
-    const adapter = held.cm?.cm || (held.cm?.state?.vim ? held.cm : null);
-    if (!adapter || adapter.state?.vim?.insertMode) return;
+    const view = held.cm;
+    const adapter = view?.cm || (view?.state?.vim ? view : null);
+    if (!adapter?.state?.vim || adapter.state.vim.insertMode) return;
 
     const published = (window as unknown as { CodeMirrorAdapter?: VimAdapter })
       .CodeMirrorAdapter;
     const vim = published?.Vim || adapter.constructor?.Vim;
-    if (!vim) return;
+    if (vim) vim.handleKey(adapter, 'a', 'mapping');
+    if (adapter.state.vim.insertMode) return;
 
-    vim.handleKey(adapter, 'i', 'mapping');
+    const typing = view?.contentDOM;
+    if (!typing) return;
+    typing.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'a',
+        code: 'KeyA',
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
   }
 
   /**

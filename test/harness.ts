@@ -356,7 +356,7 @@ export class FakeEditor {
    * Vim extension keeps beside it. Left off unless a test is about Vim: an
    * editor with Vim turned off carries no adapter either.
    */
-  cm?: { cm?: unknown; state?: unknown };
+  cm?: { cm?: unknown; state?: unknown; contentDOM?: HTMLElement };
   cursor: EditorPosition = { line: 0, ch: 0 };
   anchor: EditorPosition = { line: 0, ch: 0 };
   selected = false;
