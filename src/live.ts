@@ -88,16 +88,6 @@ const NEW_BLOCK = /^\s*(?:[-*+] |\d+[.)] |#{1,6} |\||---|\[!|=+\s*$)/;
  */
 const ONE_LINE = /^\s*(?:#{1,6} |---|\[!|=+\s*$)/;
 
-/**
- * An embed, which is a block of its own wherever it is written.
- *
- * Reading view draws an embed's content in a frame, and the text either side of
- * it is no part of one paragraph with it: a run opened before an embed is
- * finished before it, whatever the note wrote after. Marked `flat` or not —
- * the frame is a matter of styling, and the content is a block either way.
- */
-const EMBED = /!\[\[[^\]\n]*\]\]/g;
-
 /** A line drawn as a table row, whose cells are blocks of their own. */
 const TABLE_ROW = /^\s*\|/;
 
@@ -219,29 +209,6 @@ function markCells(
   if (at < line.to) markBlock(state, at, line.to, visible, hiding, into);
 }
 
-/** Mark the stretches of a line lying either side of the embeds written in it. */
-function markAround(
-  state: EditorState,
-  line: { from: number; to: number; text: string },
-  visible: readonly { from: number; to: number }[],
-  hiding: boolean,
-  into: Range<Decoration>[],
-) {
-  let at = line.from;
-  EMBED.lastIndex = 0;
-  for (
-    let found = EMBED.exec(line.text);
-    found;
-    found = EMBED.exec(line.text)
-  ) {
-    const start = line.from + found.index;
-    if (start > at) markBlock(state, at, start, visible, hiding, into);
-    at = start + found[0].length;
-  }
-  // And what follows the last of them, an embed being free to end the line.
-  if (at < line.to) markBlock(state, at, line.to, visible, hiding, into);
-}
-
 /**
  * Every decoration the marks ask for, over what `visible` covers.
  *
@@ -312,11 +279,6 @@ export function build(
     if (NEW_BLOCK.test(said)) close();
     if (TABLE_ROW.test(said)) {
       markCells(state, line, visible, hiding, into);
-      continue;
-    }
-    if (line.text.includes('![[')) {
-      close();
-      markAround(state, line, visible, hiding, into);
       continue;
     }
     if (from === null) from = line.from;
