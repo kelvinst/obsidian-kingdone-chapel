@@ -75,6 +75,12 @@ export interface Quoted {
  * by its own block id on the next line down, with a blank line before the one
  * after: the id belongs to the block above it, so writing between the two is
  * writing inside the verse, which is the whole point of the file.
+ *
+ * Every embed is marked `flat`, which is what this vault's stylesheet reads to
+ * draw an embed no bar and no indent of its own. A version made of embeds is
+ * framed twice over otherwise — once by whatever quotes one of its verses, and
+ * once by the translation inside it — and the marker is an ordinary link
+ * alias, so a note written this way still opens anywhere.
  */
 export function chapterNote(
   title: string,
@@ -89,7 +95,8 @@ export function chapterNote(
   const body = verses
     .map(
       (v) =>
-        `![[${source}#^${v.anchor}]]\n^${verseId(code, book, chapter, v.verse)}\n`,
+        `![[${source}#^${v.anchor}|flat]]\n` +
+        `^${verseId(code, book, chapter, v.verse)}\n`,
     )
     .join('\n');
   return `${head}\n${body}`;
