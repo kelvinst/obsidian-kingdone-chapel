@@ -142,6 +142,23 @@ describe('build', () => {
     ]);
   });
 
+  it('does not let a table vouch for a row written inside a quote', () => {
+    // The quote holds no dashes of its own, so what it holds is a paragraph.
+    expect(read(below('| a | b |', '|---|---|', '> | !!c | d!! |'))).toEqual([
+      'hidden:!!',
+      'kcp-small:c | d',
+      'hidden:!!',
+    ]);
+  });
+
+  it('does not let a quoted table vouch for a row outside it', () => {
+    expect(read(below('> | a | b |', '> |---|---|', '| !!c | d!! |'))).toEqual([
+      'hidden:!!',
+      'kcp-small:c | d',
+      'hidden:!!',
+    ]);
+  });
+
   it('reads a run written inside one cell', () => {
     expect(read(below('| !!uma nota!! | outra |', '|---|---|'))).toEqual([
       'hidden:!!',
