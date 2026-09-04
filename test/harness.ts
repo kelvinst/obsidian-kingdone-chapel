@@ -259,6 +259,8 @@ export class FakeWorkspace extends Emitter {
   revealed: FakeLeaf[] = [];
   /** Every pane closed, in order — what a cleanup actually took away. */
   detached: FakeLeaf[] = [];
+  /** The view builders `registerView` recorded, as Obsidian's registry holds. */
+  viewFactories: Map<string, (leaf: unknown) => unknown> | null = null;
   /** The leaf `getRightLeaf` hands back, or null for a workspace with none. */
   rightLeaf: FakeLeaf | null = null;
   /** Whether `onLayoutReady` runs its callback, or holds it back. */
@@ -288,6 +290,11 @@ export class FakeWorkspace extends Emitter {
       app: this.app,
       setViewState: async (next) => {
         leaf.type = next.type;
+        // Obsidian builds the view for the type as it sets the state. A type
+        // nothing has registered leaves the pane holding nothing, which is
+        // the pane an unloaded plugin leaves behind.
+        const build = this.viewFactories?.get(next.type);
+        if (build) leaf.view = build(leaf);
       },
       // Obsidian reads this off the pane's contents rather than storing it.
       getViewState: () => ({ type: leaf.type }),
@@ -463,6 +470,9 @@ export function harness(
   // reads them back rather than starting over from the defaults.
   plugin.data = { ...settings };
   plugin.chapterCache = new Map();
+  // What `registerView` records is what a pane is built from, so the workspace
+  // reads the plugin's own map the way Obsidian reads its view registry.
+  app.workspace.viewFactories = plugin.views;
   return {
     plugin,
     app: app as unknown as App,

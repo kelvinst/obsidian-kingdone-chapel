@@ -494,7 +494,13 @@ export default class KingdoneChapelPlugin extends Plugin {
 
   async activateView(reveal = true): Promise<WorkspaceLeaf | null> {
     await this.adoptStaleViews(reveal);
-    const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE);
+    // A pane answers with this view's type from the moment it is saved under
+    // it, whether or not the view is in there, so a pane the adoption could
+    // not fill would come back from `getLeavesOfType` as one to open — and
+    // opening it shows the ghost tab rather than the versions.
+    const existing = this.app.workspace
+      .getLeavesOfType(VIEW_TYPE)
+      .filter((leaf) => leaf.view instanceof KingdoneChapelView);
     if (existing.length) {
       if (reveal) this.app.workspace.revealLeaf(existing[0]);
       return existing[0];
