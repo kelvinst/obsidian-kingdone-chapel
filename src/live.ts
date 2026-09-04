@@ -254,6 +254,7 @@ export function build(
   const into: Range<Decoration>[] = [];
   let code = false;
   let table = false;
+  let tableDepth = 0;
   let depth = 0;
   let codeDepth = 0;
   let from: number | null = null;
@@ -312,14 +313,16 @@ export function build(
     if (NEW_BLOCK.test(said)) close();
 
     // A table opens on a row the dashes vouch for, and every row after it is
-    // one until something that is not a row ends it.
+    // one until something that is not a row ends it — every row written as
+    // deep as the header was, a quote holding a table of its own or none.
     const row =
       TABLE_ROW.test(said) &&
-      (table ||
+      ((table && quoted === tableDepth) ||
         (number < state.doc.lines &&
           DELIMITER_ROW.test(unquoted(state.doc.line(number + 1).text))));
     if (row) {
       table = true;
+      tableDepth = quoted;
       close();
       markCells(state, line, visible, hiding, into);
       continue;
