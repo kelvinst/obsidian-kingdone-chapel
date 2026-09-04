@@ -373,6 +373,37 @@ describe('writing the version', () => {
     );
   });
 
+  it('quotes a gap between two anchored verses under its own id', async () => {
+    world.vault.write(
+      'Bibles/ARA/ARA-41-MRK-014.md',
+      '1. Dali a dois dias. ^ara-mrk-14-1\n\n2. Pois diziam.\n\n3. Estando ele. ^ara-mrk-14-3\n',
+    );
+    world.metadataCache.blocks.set('Bibles/ARA/ARA-41-MRK-014.md', [
+      'ara-mrk-14-1',
+      'ara-mrk-14-3',
+    ]);
+    world.plugin.invalidateIndex();
+
+    await write();
+
+    // `findAnchors` answers verse 2 with verse 1's anchor. Quoting that would
+    // read verse 1's words under verse 2's heading, so verse 2 names its own.
+    expect(wrote('Comentarios/Shedd/Shedd-41-MRK-014.md')).toBe(
+      '# Marcos 14\n' +
+        '\n' +
+        '## [[ARA-41-MRK-014|ARA]]\n' +
+        '\n' +
+        '![[ARA-41-MRK-014#^ara-mrk-14-1|flat]]\n' +
+        '^shedd-mrk-14-1\n' +
+        '\n' +
+        '![[ARA-41-MRK-014#^ara-mrk-14-2|flat]]\n' +
+        '^shedd-mrk-14-2\n' +
+        '\n' +
+        '![[ARA-41-MRK-014#^ara-mrk-14-3|flat]]\n' +
+        '^shedd-mrk-14-3\n',
+    );
+  });
+
   it('quotes every verse of a chapter the translation never anchored at all', async () => {
     world.vault.write(
       'Bibles/ARA/ARA-41-MRK-014.md',
