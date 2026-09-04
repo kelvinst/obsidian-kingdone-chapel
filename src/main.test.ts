@@ -1692,8 +1692,9 @@ describe('onload', () => {
     world.workspace.rightLeaf = world.workspace.addLeaf('empty');
     await world.plugin.onload();
     await vi.waitFor(() =>
-      expect(world.workspace.getLeavesOfType(VIEW_TYPE)).toEqual([ghost]),
+      expect(ghost.view).toBeInstanceOf(KingdoneChapelView),
     );
+    expect(world.workspace.getLeavesOfType(VIEW_TYPE)).toEqual([ghost]);
     expect(world.workspace.detached).toEqual([]);
   });
 
