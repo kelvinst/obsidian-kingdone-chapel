@@ -1348,13 +1348,6 @@ function liveLeaf() {
   return leaf;
 }
 
-/** A pane Obsidian has only put off building, which comes back on demand. */
-function deferredLeaf() {
-  const leaf = world.workspace.addLeaf(VIEW_TYPE);
-  leaf.deferredView = new KingdoneChapelView(leaf as never, world.plugin);
-  return leaf;
-}
-
 describe('activateView', () => {
   it('reveals the sidebar that is already open', async () => {
     const leaf = liveLeaf();
@@ -1714,19 +1707,28 @@ describe('onload', () => {
     expect(world.workspace.detached).toEqual(panes.slice(1));
   });
 
-  it('builds nothing for a pane that stays shut', async () => {
-    const pane = deferredLeaf();
+  it('builds nothing for a pane the sidebar stays shut over', async () => {
+    const pane = ghostLeaf();
     await world.plugin.onload();
     expect(pane.view).toBeNull();
     expect(world.workspace.revealed).toEqual([]);
   });
 
-  it('leaves a pane Obsidian only put off building where it is', async () => {
-    const deferred = deferredLeaf();
+  it('opens the one pane it finds rather than closing it', async () => {
+    const pane = ghostLeaf();
     await world.plugin.onload();
     await world.plugin.activateView();
     expect(world.workspace.detached).toEqual([]);
-    expect(world.workspace.revealed).toEqual([deferred]);
+    expect(world.workspace.revealed).toEqual([pane]);
+  });
+
+  it('keeps the pane in use over an empty one sitting above it', async () => {
+    const ghost = ghostLeaf();
+    const live = liveLeaf();
+    await world.plugin.onload();
+    await world.plugin.activateView();
+    expect(world.workspace.getLeavesOfType(VIEW_TYPE)).toEqual([live]);
+    expect(world.workspace.detached).toEqual([ghost]);
   });
 
   it('keeps the pane it has, and drops the leftovers beside it', async () => {

@@ -239,12 +239,9 @@ export interface FakeLeaf {
    */
   type: string;
   view: unknown;
-  /** What building the view puts in the pane, for one Obsidian deferred. */
-  deferredView: unknown;
   app: unknown;
   setViewState: (state: { type: string; active?: boolean }) => Promise<void>;
   getViewState: () => { type: string };
-  loadIfDeferred: () => Promise<void>;
   detach: () => void;
 }
 
@@ -274,19 +271,14 @@ export class FakeWorkspace extends Emitter {
   /**
    * A pane of `type`, in the workspace, holding `view`.
    *
-   * `deferredView` is what Obsidian would build for a pane it had put off
-   * building — pass one for a deferred pane, leave it out for a pane holding
-   * nothing to build, which is what an unloaded plugin leaves behind.
+   * A pane holding nothing is what an unloaded plugin leaves behind, and also
+   * what Obsidian has yet to build — it reads the same either way, which is
+   * what the plugin has to work with.
    */
-  addLeaf(
-    type: string,
-    view: unknown = null,
-    deferredView: unknown = null,
-  ): FakeLeaf {
+  addLeaf(type: string, view: unknown = null): FakeLeaf {
     const leaf: FakeLeaf = {
       type,
       view,
-      deferredView,
       app: this.app,
       setViewState: async (next) => {
         leaf.type = next.type;
@@ -298,12 +290,6 @@ export class FakeWorkspace extends Emitter {
       },
       // Obsidian reads this off the pane's contents rather than storing it.
       getViewState: () => ({ type: leaf.type }),
-      loadIfDeferred: async () => {
-        if (leaf.deferredView) {
-          leaf.view = leaf.deferredView;
-          leaf.deferredView = null;
-        }
-      },
       detach: () => {
         this.leaves = this.leaves.filter((other) => other !== leaf);
         this.detached.push(leaf);
@@ -315,10 +301,6 @@ export class FakeWorkspace extends Emitter {
 
   getLeavesOfType(type: string): FakeLeaf[] {
     return this.leaves.filter((leaf) => leaf.type === type);
-  }
-
-  iterateAllLeaves(each: (leaf: FakeLeaf) => void) {
-    for (const leaf of [...this.leaves]) each(leaf);
   }
 
   getActiveViewOfType<T>(ctor: new (...args: never[]) => T): T | null {
