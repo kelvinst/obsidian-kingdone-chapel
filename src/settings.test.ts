@@ -6,6 +6,7 @@ import type { Harness } from '../test/harness';
 import { DEFAULT_SETTINGS } from './types';
 import type { KingdoneChapelSettings } from './types';
 import { KingdoneChapelSettingTab } from './settings';
+import { DEFAULT_NOTE_KINDS } from './notes';
 
 /** The block of one setting, found by the name written above it. */
 function setting(container: HTMLElement, name: string): HTMLElement {
@@ -202,7 +203,7 @@ describe('the headings', () => {
   it('breaks the references and the sidebar out of the rest', () => {
     expect(
       Array.from(containerEl.querySelectorAll('h3')).map((h) => h.textContent),
-    ).toEqual(['References', 'Sidebar']);
+    ).toEqual(['References', 'Notes', 'Sidebar']);
   });
 });
 
@@ -283,5 +284,97 @@ describe('the duplicate files', () => {
     expect(items).toEqual([
       'Bibles/NVI/NVI-01-GEN-001.md  |  Bibles/NVI/copy/NVI-01-GEN-001.md',
     ]);
+  });
+});
+
+describe('the kinds of note', () => {
+  /** The rows the tab draws, one per kind. */
+  function rows(): HTMLElement[] {
+    return Array.from(
+      containerEl.querySelectorAll<HTMLElement>('.kcp-note-kind'),
+    );
+  }
+
+  /** The fields of one row: callout, letter, and a title per language. */
+  function fields(at: number): HTMLInputElement[] {
+    return Array.from(rows()[at].querySelectorAll<HTMLInputElement>('input'));
+  }
+
+  /** A button of the tab, or of one row, found by what is written on it. */
+  function button(text: string, within: HTMLElement = containerEl) {
+    const found = Array.from(
+      within.querySelectorAll<HTMLButtonElement>('button'),
+    ).find((el) => el.textContent === text);
+    if (!found) throw new Error(`no button reading ${text}`);
+    return found;
+  }
+
+  it('draws the three it ships with, as they are written', () => {
+    expect(rows()).toHaveLength(3);
+    expect(fields(0).map((f) => f.value)).toEqual([
+      'note',
+      'n',
+      'Nota',
+      'Note',
+    ]);
+    expect(fields(1).map((f) => f.value)).toEqual([
+      'homiletica',
+      'h',
+      'Nótula Homilética',
+      'Homiletic Note',
+    ]);
+  });
+
+  it('saves a callout, a letter and a title as they are typed', async () => {
+    const [callout, letter, pt, en] = fields(0);
+    callout.value = 'comentario';
+    change(callout, 'input');
+    letter.value = 'c';
+    change(letter, 'input');
+    pt.value = 'Comentário';
+    change(pt, 'input');
+    en.value = 'Commentary';
+    change(en, 'input');
+
+    await vi.waitFor(() =>
+      expect(world.plugin.settings.noteKinds[0]).toEqual({
+        callout: 'comentario',
+        letter: 'c',
+        titles: { pt: 'Comentário', en: 'Commentary' },
+      }),
+    );
+    expect(world.plugin.settings.noteKinds).toHaveLength(3);
+  });
+
+  it('adds a kind with nothing written in it yet', async () => {
+    button('Add').dispatchEvent(new Event('click'));
+    await vi.waitFor(() => expect(rows()).toHaveLength(4));
+    expect(world.plugin.settings.noteKinds[3]).toEqual({
+      callout: 'note',
+      letter: 'n',
+      titles: { pt: '', en: '' },
+    });
+  });
+
+  it('drops the kind whose row is removed', async () => {
+    button('Remove', rows()[1]).dispatchEvent(new Event('click'));
+    await vi.waitFor(() => expect(rows()).toHaveLength(2));
+    expect(world.plugin.settings.noteKinds.map((kind) => kind.callout)).toEqual(
+      ['note', 'revisores'],
+    );
+  });
+
+  it('puts the three back where a vault has written over them', async () => {
+    world.plugin.settings.noteKinds = [];
+    tab.display();
+    expect(rows()).toHaveLength(3); // the ones it falls back on, undrawn
+
+    button('Reset').dispatchEvent(new Event('click'));
+    await vi.waitFor(() =>
+      expect(world.plugin.settings.noteKinds).toHaveLength(3),
+    );
+    expect(world.plugin.data).toMatchObject({
+      noteKinds: DEFAULT_NOTE_KINDS,
+    });
   });
 });

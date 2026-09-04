@@ -473,7 +473,8 @@ export interface BookMatch {
   abbr: string | null;
 }
 
-const LANGS: Lang[] = ['pt', 'en'];
+/** The languages the plugin reads and writes, in the order it falls back on. */
+export const LANGS: Lang[] = ['pt', 'en'];
 
 /**
  * Languages a query is read in, from the preferred one a reader may have set.
@@ -517,6 +518,27 @@ export function quoteHeadings(preferred: Lang | ''): string[] {
   return [
     QUOTES[lang],
     ...LANGS.filter((other) => other !== lang).map((other) => QUOTES[other]),
+  ];
+}
+
+/** The heading a chapter keeps its notes under, in each language written here. */
+export const NOTES: Record<Lang, string> = { pt: 'Notas', en: 'Notes' };
+
+/**
+ * The headings a chapter may already be keeping its notes under, the one to
+ * write first. The same answer `quoteHeadings` gives for the quotes, and for
+ * the same reason: a chapter written before the language was chosen keeps its
+ * notes where they are rather than gaining a second heading saying the same
+ * thing.
+ *
+ * It names the marker in the verse's aside as well as the section at the foot
+ * of the chapter — one word for the one thing, wherever it is said.
+ */
+export function noteHeadings(preferred: Lang | ''): string[] {
+  const lang = nameLang(preferred);
+  return [
+    NOTES[lang],
+    ...LANGS.filter((other) => other !== lang).map((other) => NOTES[other]),
   ];
 }
 

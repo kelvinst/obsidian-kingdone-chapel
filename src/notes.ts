@@ -1,0 +1,437 @@
+/**
+ * Writing a note on a verse of a version.
+ *
+ * A version generated from a translation is a chapter of embeds, each carrying
+ * a block id of its own so that whatever is written about a verse can point at
+ * it. The writing itself is what this file is for: a commentary note, a
+ * homiletic outline, a reviewer's remark — each of them a callout at the foot
+ * of the chapter, under `## Notas`, and a link up in the verse's own aside
+ * saying it is there.
+ *
+ * Doing it by hand is four steps — find the next free number, write the
+ * callout, write the anchor, go back up and mark the verse — and every one of
+ * them is easy to get subtly wrong. So the shape is written here, as functions
+ * over the chapter's text: the command reads the verse, asks which kind of
+ * note and which number, and applies what these hand back.
+ */
+import type { Lang } from './books';
+import { outsideFences } from './utils';
+
+/** A range of the chapter to be replaced, in the editor's own terms. */
+export interface At {
+  line: number;
+  ch: number;
+}
+
+/** One edit the command makes: `text` in place of everything `from` to `to`. */
+export interface Write {
+  from: At;
+  to: At;
+  text: string;
+}
+
+/** One kind of note: what it is called, what it is written as, how it is named. */
+export interface NoteKind {
+  /** Obsidian callout the note is written as: `note`, `homiletica`. */
+  callout: string;
+  /** Letter its anchors carry, which is what tells one kind's numbers apart. */
+  letter: string;
+  /** What it is called, by language: `Nota`, `Note`. */
+  titles: Record<Lang, string>;
+}
+
+/**
+ * The kinds a note may be written as, as they stand in a vault that has said
+ * nothing: the three the Shedd commentary is written with.
+ *
+ * They are settings rather than a fixed list because the callouts are a
+ * vault's own — `homiletica` and `revisores` are named in this vault's
+ * stylesheet and nowhere else — and a commentary keeping some other set of
+ * notes has no way of writing them otherwise.
+ */
+export const DEFAULT_NOTE_KINDS: NoteKind[] = [
+  { callout: 'note', letter: 'n', titles: { pt: 'Nota', en: 'Note' } },
+  {
+    callout: 'homiletica',
+    letter: 'h',
+    titles: { pt: 'Nótula Homilética', en: 'Homiletic Note' },
+  },
+  {
+    callout: 'revisores',
+    letter: 'r',
+    titles: { pt: 'Nota dos Revisores', en: "Reviewers' Note" },
+  },
+];
+
+/** The block ids a chapter's verses carry, up to the verse number itself. */
+export function chapterPrefix(
+  version: string,
+  book: string,
+  chapter: number,
+): string {
+  return `${version}-${book}-${chapter}`.toLowerCase();
+}
+
+/** Everything a note is written from, once the reader has answered. */
+export interface Note {
+  callout: string;
+  /** The callout's title: `Nota 2 - Salmos 1.1`. */
+  title: string;
+  /** Block ids of the verses it covers, in the order they are read. */
+  verses: string[];
+  /** The note's own block id. */
+  anchor: string;
+  /** What the marker links read as: `n2`. */
+  label: string;
+  /** The word a marker list opens with; the first is the one written. */
+  markers: string[];
+  /** The headings the notes are kept under; the first is the one written. */
+  headings: string[];
+  /** The headings the quotes are kept under, which the notes go in front of. */
+  quotes: string[];
+}
+
+/** The note's own line, left empty for the comment and for the cursor. */
+const COMMENT = '> ';
+
+/** The heading level a section of a chapter is opened at, and the one above it. */
+const SECTION = /^#{1,2}\s/;
+/** A second-level heading, whatever it is named. */
+const HEADING = /^##\s+(.+?)\s*$/;
+/** The comment that keeps Prettier off the block under it. */
+const IGNORE = /^<!--\s*prettier-ignore\s*-->$/;
+/** The comment that closes the run of verses Prettier is kept out of. */
+const IGNORE_END = /^<!--\s*prettier-ignore-end\s*-->$/;
+/** The aside a verse carries its refs and its notes in: `,,…,,`. */
+const ASIDE = /^(.*),,([^]*),,(\s*)$/;
+
+/** The block id a note carries: the chapter it is in, its kind and its number. */
+export function noteAnchor(
+  prefix: string,
+  letter: string,
+  number: number,
+): string {
+  return `${prefix}-${letter}${number}`;
+}
+
+/**
+ * The number the next note of a kind takes: one past the highest already
+ * written, or one where the chapter carries none.
+ *
+ * Past the highest rather than into the first gap, because the numbers are
+ * only ever this chapter's own where the version was written here. A
+ * commentary printed with its own numbering — Marcos 14 opening at 26, because
+ * that is where the book's notes had got to — has to go on from where it is,
+ * and a gap left in the middle of such a run is a note that is yet to be
+ * copied in rather than a number going spare.
+ */
+export function nextNoteNumber(
+  text: string,
+  prefix: string,
+  letter: string,
+): number {
+  const lines = text.split('\n');
+  const outside = outsideFences(lines);
+  const named = new RegExp(`\\^${escape(prefix)}-${escape(letter)}(\\d+)$`);
+  let highest = 0;
+  lines.forEach((line, i) => {
+    if (!outside[i]) return;
+    const found = line.trimEnd().match(named);
+    if (found) highest = Math.max(highest, Number(found[1]));
+  });
+  return highest + 1;
+}
+
+/**
+ * The note itself, as it is written under the heading: the callout, a
+ * collapsed quote of every verse it is about, a line for the comment, and the
+ * anchor the markers point at.
+ *
+ * `<!-- prettier-ignore -->` opens it because the callout is written the way it
+ * is read — the blank quote lines, the nesting, the anchor under the block
+ * rather than inside it — and Prettier would tidy every one of those away.
+ *
+ * The verses are embedded by their own ids alone, without the file in front of
+ * them: a note lives in the chapter whose verses it quotes, so the shorter form
+ * says the same thing and goes on saying it if the chapter is ever renamed.
+ */
+export function noteBlock(
+  callout: string,
+  title: string,
+  verses: string[],
+  anchor: string,
+): string {
+  const quoted = verses.map((id) => `![[#^${id}]]`).join(' ');
+  return (
+    '<!-- prettier-ignore -->\n' +
+    `> [!${callout}]+ ${title}\n` +
+    '>\n' +
+    '> > [!quote]-\n' +
+    '> >\n' +
+    `> > ${quoted}\n` +
+    '>\n' +
+    // The line the comment is typed into, left with the space the cursor lands
+    // after so that typing carries straight on from the quote.
+    `${COMMENT}\n` +
+    `^${anchor}\n`
+  );
+}
+
+/**
+ * Where `block` goes in `text`, and what has to be written there for it to land
+ * under the heading the chapter keeps its notes under.
+ *
+ * The section sits between the verses and the quotes: the verses are what the
+ * notes are about, and the quotes are what the notes refer to, so a note
+ * written between the two reads in the order it was written in. A chapter that
+ * has the section already gets the note at the end of it; one that has not gets
+ * the section too.
+ *
+ * Where the verses are wrapped in `prettier-ignore-start`/`-end`, the heading
+ * goes inside that wrapper, immediately before the marker that closes it: the
+ * heading closes the verses, and the notes below it are each ignored on their
+ * own.
+ */
+export function notePlacement(
+  text: string,
+  headings: string[],
+  quotes: string[],
+  block: string,
+): Write {
+  const lines = text.split('\n');
+  const outside = outsideFences(lines);
+  const body = block.replace(/\n$/, '');
+  const at = headingAt(lines, outside, headings);
+
+  if (at >= 0) {
+    const end = sectionEnd(lines, outside, at);
+    return {
+      from: { line: end, ch: lines[end].length },
+      to: { line: end, ch: lines[end].length },
+      text: `${gapAt(lines, end)}${body}${tailAt(lines, end)}`,
+    };
+  }
+
+  const quoted = headingAt(lines, outside, quotes);
+  const closes = lines.findIndex(
+    (line, i) => outside[i] && IGNORE_END.test(line),
+  );
+  const heading = `## ${headings[0]}`;
+
+  // The verses close with the heading, so the marker that ends the ignored run
+  // is written again under it rather than left above the section.
+  if (closes >= 0 && (quoted < 0 || closes < quoted)) {
+    return {
+      from: { line: closes, ch: 0 },
+      to: { line: closes, ch: lines[closes].length },
+      text: `${heading}\n${lines[closes]}\n\n${body}${tailAt(lines, closes)}`,
+    };
+  }
+
+  const last = quoted < 0 ? lines.length - 1 : lastBefore(lines, quoted);
+  const line = beforeFence(outside, last);
+  return {
+    from: { line, ch: lines[line].length },
+    to: { line, ch: lines[line].length },
+    text: `${gapAt(lines, line)}${heading}\n\n${body}${tailAt(lines, line)}`,
+  };
+}
+
+/**
+ * The marker a note leaves on one verse, or null where the chapter carries no
+ * such verse — a note over a range asked for more verses than were written.
+ *
+ * The marker goes in the verse's aside, alongside the refs when there are any:
+ * the aside is what a verse says about itself, and a second note on the same
+ * verse joins the list rather than opening one of its own.
+ *
+ * Both layouts the vault holds are answered. A verse written as an embed, its
+ * aside and its id one under the other gets the marker on its own line; one
+ * written all on the one line keeps it there.
+ */
+export function markerWrite(
+  text: string,
+  verse: string,
+  anchor: string,
+  label: string,
+  markers: string[],
+): Write | null {
+  const lines = text.split('\n');
+  const outside = outsideFences(lines);
+  const at = lines.findIndex(
+    (line, i) => outside[i] && line.trimEnd().endsWith(`^${verse}`),
+  );
+  if (at < 0) return null;
+
+  const link = `[[#^${anchor}|${label}]]`;
+  const held = lines[at].trimEnd();
+  const written = held.slice(0, held.length - verse.length - 1).trimEnd();
+
+  // The id closes the line the verse is written on: the aside is on that line,
+  // in front of it, or there is none and one is written there.
+  if (written) {
+    return line(at, lines, `${marked(written, link, markers)} ^${verse}`);
+  }
+
+  // The id is on a line of its own, so the aside is the line above it — where
+  // that line is one at all, and not the embed the id belongs to.
+  const above = at > 0 ? lines[at - 1] : '';
+  if (ASIDE.test(above)) {
+    return line(at - 1, lines, marked(above, link, markers));
+  }
+
+  return line(at, lines, `,,${opened(link, markers[0])},,\n${lines[at]}`);
+}
+
+/** A note as it goes in: the edits it makes, and where it leaves the cursor. */
+export interface WrittenNote {
+  /** Last in the chapter first, so that each still lands where it was measured. */
+  writes: Write[];
+  /** The note's own empty line, which is what the reader types the comment into. */
+  comment: At;
+}
+
+/** Everything one note writes, and where the writing goes on from. */
+export function noteWrites(text: string, note: Note): WrittenNote {
+  const block = noteBlock(note.callout, note.title, note.verses, note.anchor);
+  const placed = notePlacement(text, note.headings, note.quotes, block);
+
+  const markers: Write[] = [];
+  for (const verse of note.verses) {
+    const write = markerWrite(
+      text,
+      verse,
+      note.anchor,
+      note.label,
+      note.markers,
+    );
+    if (write) markers.push(write);
+  }
+
+  // The markers are written above the note, so each of them that opens a line
+  // of its own pushes the note that much further down the chapter.
+  const pushed = markers.reduce(
+    (lines, write) => lines + write.text.split('\n').length - 1,
+    0,
+  );
+  const written = placed.text.split('\n');
+  const at = written.lastIndexOf(COMMENT);
+
+  return {
+    writes: [placed, ...markers].sort((a, b) => b.from.line - a.from.line),
+    comment: { line: placed.from.line + at + pushed, ch: COMMENT.length },
+  };
+}
+
+/** One whole line replaced by `text`, which may itself be more than one line. */
+function line(at: number, lines: string[], text: string): Write {
+  return {
+    from: { line: at, ch: 0 },
+    to: { line: at, ch: lines[at].length },
+    text,
+  };
+}
+
+/** `held`, with the note's link in its aside — or with an aside, where it has none. */
+function marked(held: string, link: string, markers: string[]): string {
+  const aside = held.match(ASIDE);
+  if (!aside) return `${held.trimEnd()} ,,${opened(link, markers[0])},,`;
+
+  const [, before, inside, after] = aside;
+  return `${before},,${joined(inside, link, markers)},,${after}`;
+}
+
+/** What a marker list reads as when the verse is being marked for the first time. */
+function opened(link: string, marker: string): string {
+  return `**${marker}**: ${link}.`;
+}
+
+/**
+ * `inside`, an aside's contents, with the link added: onto the end of the note
+ * list where the verse already carries one, and as a list of its own after
+ * whatever else the aside says where it does not.
+ */
+function joined(inside: string, link: string, markers: string[]): string {
+  const marked = markers.some((marker) => inside.includes(`**${marker}**`));
+  if (marked) {
+    const end = inside.lastIndexOf(']]') + 2;
+    return `${inside.slice(0, end)}; ${link}${inside.slice(end)}`;
+  }
+
+  // The refs before it close with a full stop, which is what separates the two
+  // lists. One left without it is closed here rather than run into.
+  const said = inside.trimEnd();
+  return `${said}${said.endsWith('.') ? '' : '.'} ${opened(link, markers[0])}`;
+}
+
+/** Where a section named by any of `headings` opens, or -1 for none. */
+function headingAt(
+  lines: string[],
+  outside: boolean[],
+  headings: string[],
+): number {
+  const wanted = headings.map((heading) => heading.toLowerCase());
+  return lines.findIndex((line, i) => {
+    if (!outside[i]) return false;
+    const named = line.match(HEADING);
+    return named !== null && wanted.includes(named[1].toLowerCase());
+  });
+}
+
+/**
+ * The last line of the section opening at `at` — the last one a note of its own
+ * is written after.
+ *
+ * The blank lines before the next heading separate the two rather than
+ * belonging to the section, and so does a `prettier-ignore` left standing in
+ * front of that heading: it is the heading's own, and a note written under it
+ * would be written between the comment and what it was there for.
+ */
+function sectionEnd(lines: string[], outside: boolean[], at: number): number {
+  let end = lines.length - 1;
+  for (let i = at + 1; i < lines.length; i++) {
+    if (outside[i] && SECTION.test(lines[i])) {
+      end = i - 1;
+      break;
+    }
+  }
+  while (end > at && !lines[end].trim()) end--;
+  if (end > at && IGNORE.test(lines[end].trim())) end--;
+  while (end > at && !lines[end].trim()) end--;
+  return beforeFence(outside, end);
+}
+
+/** The last line saying anything before `at`, which is what a section follows. */
+function lastBefore(lines: string[], at: number): number {
+  let end = at - 1;
+  while (end > 0 && !lines[end].trim()) end--;
+  return end;
+}
+
+/**
+ * The line to write at, backed out of a code block someone left open: a note
+ * written inside a fence carries no block id, so a line that landed in one
+ * retreats to the last line before the fence opened.
+ */
+function beforeFence(outside: boolean[], at: number): number {
+  let line = at;
+  while (line > 0 && !outside[line]) line--;
+  return line;
+}
+
+/** The blank line a note needs behind it, where the chapter leaves none. */
+function tailAt(lines: string[], line: number): string {
+  if (line === lines.length - 1) return '\n';
+  return lines[line + 1].trim() ? '\n' : '';
+}
+
+/** The blank line a note needs in front of it, however the chapter reads there. */
+function gapAt(lines: string[], line: number): string {
+  if (lines[line].trim()) return '\n\n';
+  return line > 0 && lines[line - 1].trim() ? '\n' : '';
+}
+
+/** A name written into a pattern, with whatever it carries taken literally. */
+function escape(raw: string): string {
+  return raw.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
+}

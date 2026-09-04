@@ -1,6 +1,8 @@
 import type { TFile } from 'obsidian';
 
 import type { Lang } from './books';
+import { DEFAULT_NOTE_KINDS } from './notes';
+import type { NoteKind } from './notes';
 
 export const VIEW_TYPE = 'kingdone-chapel-view';
 
@@ -22,6 +24,11 @@ export interface KingdoneChapelSettings {
   showBreadcrumbs: boolean;
   /** Whether the book dropdown breaks the testaments down into their divisions. */
   bookCategories: boolean;
+  /**
+   * The kinds of note a verse may be given, in the order they are offered. The
+   * first is the one a note is written as unless another is picked.
+   */
+  noteKinds: NoteKind[];
 }
 
 export const DEFAULT_SETTINGS: KingdoneChapelSettings = {
@@ -35,6 +42,7 @@ export const DEFAULT_SETTINGS: KingdoneChapelSettings = {
   openSidebarOnStart: false,
   showBreadcrumbs: true,
   bookCategories: false,
+  noteKinds: DEFAULT_NOTE_KINDS,
 };
 
 /** Where the reader is: a chapter file, plus the verse under the cursor. */
