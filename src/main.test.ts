@@ -1680,6 +1680,21 @@ describe('onload', () => {
     expect(world.workspace.detached).toEqual([]);
   });
 
+  it('takes one back on an app too old to put panes off', async () => {
+    world.plugin.data = { openSidebarOnStart: true };
+    const ghost = ghostLeaf();
+    // Panes are only put off from 1.7.2, and the manifest goes back further:
+    // an older app has nothing to ask, and no method to ask it with.
+    (ghost as { loadIfDeferred?: unknown }).loadIfDeferred = undefined;
+    world.workspace.rightLeaf = world.workspace.addLeaf('empty');
+    await world.plugin.onload();
+    await vi.waitFor(() =>
+      expect(ghost.view).toBeInstanceOf(KingdoneChapelView),
+    );
+    expect(world.workspace.getLeavesOfType(VIEW_TYPE)).toEqual([ghost]);
+    expect(world.workspace.detached).toEqual([]);
+  });
+
   it('closes the panes every reload before it left behind', async () => {
     world.plugin.data = { openSidebarOnStart: true };
     const ghosts = [ghostLeaf(), ghostLeaf(), ghostLeaf()];
