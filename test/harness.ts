@@ -281,6 +281,10 @@ export class FakeWorkspace extends Emitter {
       view,
       app: this.app,
       setViewState: async (next) => {
+        // Obsidian builds the view before the pane answers with the new type,
+        // so a pane being opened is not one of that type yet. Anything that
+        // looks while this is in flight has to see what Obsidian would.
+        await Promise.resolve();
         leaf.type = next.type;
         // Obsidian builds the view for the type as it sets the state. A type
         // nothing has registered leaves the pane holding nothing, which is

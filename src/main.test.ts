@@ -1371,6 +1371,29 @@ describe('activateView', () => {
     world.plugin.unload();
   });
 
+  it('opens one pane where two calls overlap', async () => {
+    world.workspace.rightLeaf = world.workspace.addLeaf('empty');
+    const opened = vi.spyOn(world.workspace, 'getRightLeaf');
+    // The start asks quietly, and a click lands before that has finished.
+    const quiet = world.plugin.activateView(false);
+    const clicked = world.plugin.activateView();
+    const [first, second] = await Promise.all([quiet, clicked]);
+    expect(opened).toHaveBeenCalledTimes(1);
+    expect(second).toBe(first);
+    // The click joined the quiet one, and still asked for the sidebar.
+    expect(world.workspace.revealed).toEqual([first]);
+  });
+
+  it('joins an opening that found no room, and reveals nothing', async () => {
+    const opened = vi.spyOn(world.workspace, 'getRightLeaf');
+    const first = world.plugin.activateView();
+    const second = world.plugin.activateView();
+    expect(await first).toBeNull();
+    expect(await second).toBeNull();
+    expect(opened).toHaveBeenCalledTimes(1);
+    expect(world.workspace.revealed).toEqual([]);
+  });
+
   it('opens one on the right where there is none', async () => {
     const leaf = world.workspace.addLeaf('empty');
     world.workspace.rightLeaf = leaf;
