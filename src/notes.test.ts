@@ -529,3 +529,29 @@ describe('a note over verses a chapter never wrote', () => {
     expect(lines[comment.line + 1]).toBe('^shedd-psa-1-n1');
   });
 });
+
+describe('two verses one aside is read as covering', () => {
+  it('marks the first of them and leaves the second out', () => {
+    // No blank line between the two, so the aside of the second is read back
+    // into the line the first closes on: one write over the other's lines.
+    const text =
+      '![[x]] ,,**Refs**:\n' +
+      '[[a]].,, ^shedd-psa-1-1\n' +
+      '[[b]].,, ^shedd-psa-1-2\n';
+    const written = noteWrites(text, {
+      callout: 'note',
+      title: 'Nota 1 - Salmos 1.1,2',
+      verses: ['shedd-psa-1-1', 'shedd-psa-1-2'],
+      anchor: 'shedd-psa-1-n1',
+      label: 'n1',
+      markers: ['Notas'],
+      headings: ['Notas'],
+      quotes: ['Citações'],
+    });
+
+    expect(written.verses).toEqual(['shedd-psa-1-1']);
+    const marked = applied(text, written.writes);
+    expect(marked.match(/\[\[#\^shedd-psa-1-n1\|n1\]\]/g)).toHaveLength(1);
+    expect(marked).toContain('^shedd-psa-1-2');
+  });
+});
