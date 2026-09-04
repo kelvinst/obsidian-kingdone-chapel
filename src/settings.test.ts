@@ -57,6 +57,7 @@ function withKelvin(): KingdoneChapelSettingTab {
   });
   w.metadataCache.frontmatter.set('Notas/Kelvin/Kelvin.md', {
     bible: true,
+    code: 'Kelvin',
     complete: false,
   });
   const drawn = new KingdoneChapelSettingTab(w.app, w.plugin);

@@ -901,6 +901,7 @@ describe('a number read against the passage the note is about', () => {
     });
     made.world.metadataCache.frontmatter.set('Notas/Kelvin/Kelvin.md', {
       bible: true,
+      code: 'Kelvin',
       complete: false,
     });
     made.world.plugin.invalidateIndex();

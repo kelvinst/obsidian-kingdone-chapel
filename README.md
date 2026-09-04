@@ -270,33 +270,43 @@ as they are not: a study Bible is a version verse for verse, but it belongs with
 commentaries rather than with the translation it is built on.
 
 So a folder can say it is a version itself. Any note sitting **directly in the folder** — the
-one it probably already keeps — saying `bible` in its frontmatter makes that folder a
-version, wherever in the vault it is and however deeply it is buried:
+one it probably already keeps — saying `bible` in its frontmatter and naming a `code` makes
+that folder a version, wherever in the vault it is and however deeply it is buried:
 
 ```yaml
 ---
 bible: true
-group: Editions
 code: Shedd
+group: Editions
 name: Bíblia Shedd
 ---
 ```
 
-| Key           |                                                                                                                                                                                                            |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bible`       | Declares the folder a version. Written at all is enough; `bible: false` is the one way to write it and mean no.                                                                                            |
-| `complete`    | Whether the version answers for the whole Bible. Read off where the folder sits when left out — see below.                                                                                                 |
-| `group`       | The heading the version is listed under. No heading when left out.                                                                                                                                         |
-| `code`        | What the version's file names start with, and what `@ARA Joao 1.1` calls it. The folder's name when left out, so a folder may be called `Almeida Revista e Atualizada` and still hold `ARA-01-GEN-001.md`. |
-| `name`        | Name to show wherever the version is named. The code when left out.                                                                                                                                        |
-| `translation` | Which translation a generated version was written from. Recorded by the create command for the reader; the plugin does not read it back.                                                                   |
+The `code` is what makes a file the version's own: a note under that folder belongs to Shedd
+when it is named `Shedd-41-MRK-014`, and is an ordinary note when it is named anything else.
+So the folder can hold more than the version, and the code has to be written rather than read
+off the folder's name — a folder can be called whatever you like.
 
-Only `bible` is required — the rest are read off where the folder sits and what it is called
-when they are left out, so the shortest declaration is `bible: true` and nothing else. It is
-a key of its own rather than one of the others doing double duty, because presence is what
-declares and every note in the vault is asked: `code`, `name` and `group` are among the most
-written frontmatter keys there are, and reading one of them as the marker would have vaults
-growing versions they never asked for.
+| Key           |                                                                                                                                                                                      |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `bible`       | Declares the folder a version, together with `code`. Written at all is enough; `bible: false` is the one way to write it and mean no.                                                |
+| `complete`    | Whether the version answers for the whole Bible. Read off where the folder sits when left out — see below.                                                                           |
+| `group`       | The heading the version is listed under. No heading when left out.                                                                                                                   |
+| `code`        | **Required.** What the version's file names start with, and what `@ARA Joao 1.1` calls it. A folder may be called `Almeida Revista e Atualizada` and still hold `ARA-01-GEN-001.md`. |
+| `name`        | Name to show wherever the version is named. The code when left out.                                                                                                                  |
+| `translation` | Which translation a generated version was written from. Recorded by the create command for the reader; the plugin does not read it back.                                             |
+
+`bible` and `code` are what a note has to say; the rest are read off where the folder sits
+and what it is called, so the shortest declaration is those two lines. `bible` is a key of
+its own rather than one of the others doing double duty, because presence is what declares
+and every note in the vault is asked: `code`, `name` and `group` are among the most written
+frontmatter keys there are, and reading one of them as the marker would have vaults growing
+versions they never asked for. `code` has to be written because nothing else can supply it —
+the folder's own name is a name someone chose for a folder, and the vault root has none at
+all.
+
+A note that says `bible` and names no code declares nothing, and the folder stays an ordinary
+folder.
 
 The heading is the vault's to name, not the plugin's: `Editions`, `Comentários`, anything —
 except the one the translations folder gives its own, which the plugin writes in the language
