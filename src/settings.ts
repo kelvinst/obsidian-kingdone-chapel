@@ -42,8 +42,9 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
         'Folder holding one folder per translation (ARA, NVI, ...), which are listed ' +
           'under a heading of their own. Inside each of them, folders are ignored — only ' +
           'file names matter. A version kept anywhere else — a study Bible filed with the ' +
-          'commentaries, say — says so in its own note instead, with `bible: true` in the ' +
-          'frontmatter, and heads itself.',
+          'commentaries, say — says so in its own note instead, with `bible: true` and a ' +
+          '`code` in the frontmatter, and heads itself. The code is what its file names ' +
+          'start with, which is what says which notes under that folder are its own.',
       )
       .addText((text) =>
         text

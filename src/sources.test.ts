@@ -84,6 +84,7 @@ describe('collectSources', () => {
       vault([
         note('Igreja/Comentarios/Shedd/Shedd.md', shedd, {
           bible: true,
+          code: 'Shedd',
           group: 'Editions',
         }),
       ]),
@@ -127,6 +128,7 @@ describe('collectSources', () => {
       vault([
         note('Notes/Shedd/Shedd.md', shedd, {
           bible: true,
+          code: 'Shedd',
           name: 'Shedd',
         }),
       ]),
@@ -168,7 +170,9 @@ describe('collectSources', () => {
   it('takes the key written with nothing after it', () => {
     const shedd = folder('Notes/Shedd');
     const found = collect(
-      vault([note('Notes/Shedd/Shedd.md', shedd, { bible: null })]),
+      vault([
+        note('Notes/Shedd/Shedd.md', shedd, { bible: null, code: 'Shedd' }),
+      ]),
       'Bibles',
     );
 
@@ -179,7 +183,7 @@ describe('collectSources', () => {
     const shedd = folder('Notes/Shedd');
     const found = collect(
       vault([
-        note('Notes/Shedd/Shedd.md', shedd, { bible: false, name: 'Shedd' }),
+        note('Notes/Shedd/Shedd.md', shedd, { bible: false, code: 'Shedd' }),
       ]),
       'Bibles',
     );
@@ -191,7 +195,11 @@ describe('collectSources', () => {
     const notes = folder('Notas/Kelvin');
     const found = collect(
       vault([
-        note('Notas/Kelvin/Kelvin.md', notes, { bible: true, complete: false }),
+        note('Notas/Kelvin/Kelvin.md', notes, {
+          bible: true,
+          code: 'Kelvin',
+          complete: false,
+        }),
       ]),
       'Bibles',
     );
@@ -202,7 +210,9 @@ describe('collectSources', () => {
   it('takes a version declared away from the translations for a partial one', () => {
     const shedd = folder('Notes/Shedd');
     const found = collect(
-      vault([note('Notes/Shedd/Shedd.md', shedd, { bible: true })]),
+      vault([
+        note('Notes/Shedd/Shedd.md', shedd, { bible: true, code: 'Shedd' }),
+      ]),
       'Bibles',
     );
 
@@ -213,7 +223,10 @@ describe('collectSources', () => {
     const bibles = folder('Bibles');
     const ara = folder('Bibles/ARA', bibles);
     const found = collect(
-      vault([note('Bibles/ARA/ARA.md', ara, { bible: true })], bibles),
+      vault(
+        [note('Bibles/ARA/ARA.md', ara, { bible: true, code: 'ARA' })],
+        bibles,
+      ),
       'Bibles',
     );
 
@@ -224,7 +237,11 @@ describe('collectSources', () => {
     const shedd = folder('Notes/Shedd');
     const found = collect(
       vault([
-        note('Notes/Shedd/Shedd.md', shedd, { bible: true, complete: true }),
+        note('Notes/Shedd/Shedd.md', shedd, {
+          bible: true,
+          code: 'Shedd',
+          complete: true,
+        }),
       ]),
       'Bibles',
     );
@@ -240,6 +257,7 @@ describe('collectSources', () => {
         [
           note('Bibles/Rascunho/Rascunho.md', draft, {
             bible: true,
+            code: 'Rascunho',
             complete: false,
           }),
         ],
@@ -251,9 +269,29 @@ describe('collectSources', () => {
     expect(found.get('Bibles/Rascunho')).toMatchObject({ complete: false });
   });
 
+  it('ignores a note that declares a folder but names no code', () => {
+    const shedd = folder('Notes/Shedd');
+    const found = collect(
+      vault([note('Notes/Shedd/Shedd.md', shedd, { bible: true })]),
+      'Bibles',
+    );
+
+    expect(found.size).toBe(0);
+  });
+
+  it('ignores a note at the top of the vault, which can name no code', () => {
+    const root = folder('/');
+    const found = collect(
+      vault([note('Biblia.md', root, { bible: true })]),
+      'Bibles',
+    );
+
+    expect(found.size).toBe(0);
+  });
+
   it('ignores a declaring note that is in no folder at all', () => {
     const found = collect(
-      vault([note('loose.md', null, { bible: true, group: 'Editions' })]),
+      vault([note('loose.md', null, { bible: true, code: 'Shedd' })]),
       'Bibles',
     );
 
@@ -264,8 +302,16 @@ describe('collectSources', () => {
     const shedd = folder('Notes/Shedd');
     const found = collect(
       vault([
-        note('Notes/Shedd/Shedd.md', shedd, { bible: true, group: 'Editions' }),
-        note('Notes/Shedd/also.md', shedd, { bible: true, group: 'Notes' }),
+        note('Notes/Shedd/Shedd.md', shedd, {
+          bible: true,
+          code: 'Shedd',
+          group: 'Editions',
+        }),
+        note('Notes/Shedd/also.md', shedd, {
+          bible: true,
+          code: 'Shedd',
+          group: 'Notes',
+        }),
       ]),
       'Bibles',
     );
@@ -306,6 +352,7 @@ describe('collectSources', () => {
         [
           note('Bibles/ARA/ARA.md', ara, {
             bible: true,
+            code: 'ARA',
             group: 'Translations',
           }),
         ],

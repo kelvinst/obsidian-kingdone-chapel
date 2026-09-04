@@ -1490,7 +1490,7 @@ describe('onload', () => {
       'changed',
       { path: 'Estudos/Shedd/Shedd.md' },
       '',
-      { frontmatter: { bible: true, group: 'Edições' } },
+      { frontmatter: { bible: true, code: 'Shedd', group: 'Edições' } },
     );
 
     expect(world.plugin.bibleIndex).toBeNull();
@@ -1826,6 +1826,7 @@ describe('a version that declares itself', () => {
     );
     world.metadataCache.frontmatter.set('Estudos/Shedd/Shedd.md', {
       bible: true,
+      code: 'Shedd',
       group: 'Edições',
       name: 'Bíblia Shedd',
     });
@@ -1882,6 +1883,7 @@ describe('a version that says it is not the whole Bible', () => {
     );
     world.metadataCache.frontmatter.set('Notas/Kelvin/Kelvin.md', {
       bible: true,
+      code: 'Kelvin',
       complete: false,
     });
     world.plugin.invalidateIndex();

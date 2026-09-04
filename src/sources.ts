@@ -8,15 +8,23 @@
  * translation it is based on.
  *
  * So a folder says so itself, in the note it already keeps. Any note sitting
- * directly in a folder and saying `bible` in its frontmatter makes that folder
- * a version, wherever in the vault it is and however deeply it is buried:
+ * directly in a folder, saying `bible` in its frontmatter and naming a `code`,
+ * makes that folder a version, wherever in the vault it is and however deeply
+ * it is buried:
  *
  *     ---
  *     bible: true
- *     group: Editions
  *     code: Shedd
+ *     group: Editions
  *     name: Bíblia Shedd
  *     ---
+ *
+ * The `code` is the whole of what makes a file the version's own: a note under
+ * that folder belongs to Shedd when it is named `Shedd-41-MRK-014`, and is an
+ * ordinary note when it is named anything else. So the folder holds the
+ * version without having to hold only the version, and a code has to be
+ * written rather than read off the folder's name — a folder can be called what
+ * it likes, and the vault root is called nothing at all.
  *
  * `group` is the heading it is listed under, so the grouping is the vault's to
  * name — `Translations`, `Editions`, `Comentários`, anything — rather than a
@@ -69,13 +77,24 @@ export const COMPLETE_KEY = 'complete';
 /**
  * Whether a note's frontmatter says the folder it sits in is a version.
  *
- * Written at all is enough — `bible: true` reads best and is what the create
- * command writes, but a key on its own is a key someone meant. `bible: false`
- * is the one way to write it and mean no, so a note can turn itself off
- * without the key having to be deleted and remembered.
+ * Two things said, and both are needed. `bible` written at all is enough for
+ * the first — `bible: true` reads best and is what the create command writes,
+ * but a key on its own is a key someone meant, and `bible: false` is the one
+ * way to write it and mean no, so a note can turn itself off without the key
+ * having to be deleted and remembered.
+ *
+ * The second is `code`, which the folder cannot answer for. A version is known
+ * by what its files are named, and a folder that names no code is a folder
+ * with no way of saying which files under it are its own — the vault root
+ * above all, whose name is nothing at all, and which would otherwise take
+ * every note in the vault for a chapter of a version called ``.
  */
 export function declaresSource(front: Record<string, unknown>): boolean {
-  return SOURCE_KEY in front && front[SOURCE_KEY] !== false;
+  return (
+    SOURCE_KEY in front &&
+    front[SOURCE_KEY] !== false &&
+    text(front.code) !== ''
+  );
 }
 
 /** A folder holding one version's notes, and how it is named and listed. */
@@ -84,9 +103,13 @@ export interface Source {
   path: string;
   /**
    * Name the version's files are prefixed with, and the key it is known by
-   * everywhere else. The folder's name unless `code` says otherwise, so a
+   * everywhere else.
+   *
+   * It is what says which files under the folder are the version's, so a
    * folder may be called `Almeida Revista e Atualizada` and still hold
-   * `ARA-01-GEN-001.md`.
+   * `ARA-01-GEN-001.md`, and a note under it called anything else is a note
+   * rather than a chapter. A declaring note has to write it; a folder that is
+   * a version by sitting in the translations folder is named by the folder.
    */
   code: string;
   /** Name to show wherever the version is named. */
@@ -173,11 +196,10 @@ export function collectSources(
 /**
  * Read a declaring note's frontmatter, filling in what it leaves out.
  *
- * Every key is optional — the folder's own name is a code, and a code is a
- * label — so the least a folder can say is `bible` and nothing else, and be
- * read entirely off where it sits and what it is called. A folder naming no
- * `group` is listed under no heading, the same as one in no folder the
- * settings name.
+ * `bible` and `code` are what a note has to say; the rest it may leave out. A
+ * code is a label, so a version naming no `name` is shown as its code, and a
+ * folder naming no `group` is listed under no heading, the same as one in no
+ * folder the settings name.
  *
  * `complete` is the one key read against where the folder sits rather than
  * against a default: `filed` is the translations folder's own subfolders, and
@@ -189,7 +211,7 @@ function declared(
   declaredBy: string,
   filed: Set<string>,
 ): Source {
-  const code = text(front.code) || folder.name;
+  const code = text(front.code);
   return {
     path: folder.path,
     code,
