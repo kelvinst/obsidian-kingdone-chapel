@@ -1336,17 +1336,45 @@ describe('keepVerse', () => {
   });
 });
 
+/** A pane the last load left behind: ours by type, with no view to build. */
+function ghostLeaf() {
+  return world.workspace.addLeaf(VIEW_TYPE);
+}
+
+/** A pane holding the view for real, the way an open sidebar does. */
+function liveLeaf() {
+  const leaf = world.workspace.addLeaf(VIEW_TYPE);
+  leaf.view = new KingdoneChapelView(leaf as never, world.plugin);
+  return leaf;
+}
+
+/** A pane Obsidian has only put off building, which comes back on demand. */
+function deferredLeaf() {
+  const leaf = world.workspace.addLeaf(VIEW_TYPE);
+  leaf.deferredView = new KingdoneChapelView(leaf as never, world.plugin);
+  return leaf;
+}
+
 describe('activateView', () => {
   it('reveals the sidebar that is already open', async () => {
-    const leaf = world.workspace.addLeaf(VIEW_TYPE);
+    const leaf = liveLeaf();
     expect(await world.plugin.activateView()).toBe(leaf);
     expect(world.workspace.revealed).toEqual([leaf]);
   });
 
   it('leaves an open sidebar where it is when told to', async () => {
-    world.workspace.addLeaf(VIEW_TYPE);
+    liveLeaf();
     await world.plugin.activateView(false);
     expect(world.workspace.revealed).toEqual([]);
+  });
+
+  it('opens no pane that carries the type without the view', async () => {
+    const ghost = ghostLeaf();
+    const right = world.workspace.addLeaf('empty');
+    world.workspace.rightLeaf = right;
+    expect(await world.plugin.activateView()).toBe(right);
+    expect(world.workspace.revealed).toEqual([right]);
+    expect(world.workspace.revealed).not.toContain(ghost);
   });
 
   it('opens one on the right where there is none', async () => {
@@ -1640,25 +1668,6 @@ describe('onload', () => {
     await world.plugin.onload();
     expect(world.workspace.getLeavesOfType(VIEW_TYPE)).toHaveLength(0);
   });
-
-  /** A pane the last load left behind: ours by type, with no view to build. */
-  function ghostLeaf() {
-    return world.workspace.addLeaf(VIEW_TYPE);
-  }
-
-  /** A pane holding the view for real, the way a live one does. */
-  function liveLeaf() {
-    const leaf = world.workspace.addLeaf(VIEW_TYPE);
-    leaf.view = new KingdoneChapelView(leaf as never, world.plugin);
-    return leaf;
-  }
-
-  /** A pane Obsidian has only put off building, which comes back on demand. */
-  function deferredLeaf() {
-    const leaf = world.workspace.addLeaf(VIEW_TYPE);
-    leaf.deferredView = new KingdoneChapelView(leaf as never, world.plugin);
-    return leaf;
-  }
 
   it('moves back into the pane the last load left behind', async () => {
     world.plugin.data = { openSidebarOnStart: true };
