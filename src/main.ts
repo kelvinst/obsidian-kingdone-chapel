@@ -111,8 +111,6 @@ export default class KingdoneChapelPlugin extends Plugin {
   lastLocation: Location | null = null;
   /** Verse clicked in reading mode, held until that pane scrolls again. */
   previewLock: { path: string; verse: number; scrollTop: number } | null = null;
-  /** An `adoptStaleViews` in flight, so a call arriving mid-adoption waits on it instead of racing it. */
-  pendingAdoption: Promise<void> | null = null;
 
   async onload() {
     const stored = ((await this.loadData()) || {}) as Record<string, unknown>;
@@ -263,9 +261,9 @@ export default class KingdoneChapelPlugin extends Plugin {
     // Whether or not the sidebar opens by itself: the panes left over from the
     // last load are in the workspace either way, and only this plugin knows
     // they were its own.
-    this.app.workspace.onLayoutReady(async () => {
-      if (this.settings.openSidebarOnStart) await this.activateView(false);
-      else await this.adoptStaleViews();
+    this.app.workspace.onLayoutReady(() => {
+      if (this.settings.openSidebarOnStart) this.activateView(false);
+      else this.keepOneViewPane();
     });
   }
 
@@ -444,74 +442,36 @@ export default class KingdoneChapelPlugin extends Plugin {
   }
 
   /**
-   * Panes that carry this view type without holding the view itself.
+   * Leave one pane of this view in the workspace, and close the rest.
    *
-   * A pane whose plugin went away keeps the type it was showing and turns
-   * into a ghost icon labelled with that raw type. The type is no help in
-   * finding those: Obsidian reads a pane's type off whatever is in it, and a
-   * pane Obsidian has merely put off building reports the same type as one
-   * this plugin was unloaded out of. Only what is inside separates them,
-   * which is the reading `refreshViews` already goes by.
-   */
-  staleViewLeaves(): WorkspaceLeaf[] {
-    return this.app.workspace
-      .getLeavesOfType(VIEW_TYPE)
-      .filter((leaf) => !(leaf.view instanceof KingdoneChapelView));
-  }
-
-  /**
-   * Take the abandoned panes back, one at most.
+   * Every reload leaves its pane behind — and reloads come thick, since Hot
+   * Reload fires on each `npm run vault` build — so the sidebar ends up with a
+   * row of them. What is in them says nothing about that: one Obsidian has yet
+   * to build reads the same as one this plugin was unloaded out of, and both
+   * read differently from a pane that came back holding the view. Since only
+   * ever one was opened, only ever one is kept, whichever of the three it is.
    *
-   * Every reload leaves one behind — and reloads come thick, since Hot Reload
-   * fires on each `npm run vault` build — so opening the sidebar without
-   * looking at them stacks a live pane beside a row of ghosts that grows by
-   * one each time. Move back into the first, unless a live pane is already
-   * open, and close the rest.
+   * Nothing is built here. A pane the user has not asked for is one Obsidian
+   * was right to leave alone, and filling it is `activateView`'s to do, when
+   * the sidebar is being opened for real.
    */
-  async adoptStaleViews(reveal = false): Promise<void> {
-    if (this.pendingAdoption) return this.pendingAdoption;
-    this.pendingAdoption = this.adoptStaleViewsNow(reveal).finally(() => {
-      this.pendingAdoption = null;
-    });
-    return this.pendingAdoption;
-  }
-
-  async adoptStaleViewsNow(reveal: boolean): Promise<void> {
-    const stale = this.staleViewLeaves();
-    if (!stale.length) return;
-    // Building the view is what tells the two apart. A pane Obsidian was only
-    // putting off comes back holding the real thing and is a pane in use; a
-    // pane left behind by a load that is over has nothing to come back to.
-    // Asking is only possible from 1.7.2, which is where panes started being
-    // put off at all, and the manifest goes back further than that: an app too
-    // old to answer is one with nothing to ask about, and what is left in the
-    // pane settles it on its own.
-    for (const leaf of stale) await leaf.loadIfDeferred?.();
-    const ghosts = this.staleViewLeaves();
-    if (!ghosts.length) return;
-    const live = this.app.workspace.getLeavesOfType(VIEW_TYPE).length;
-    const adopted = ghosts.length < live ? 0 : 1;
-    for (const leaf of ghosts.slice(adopted)) leaf.detach();
-    if (adopted)
-      await ghosts[0].setViewState({ type: VIEW_TYPE, active: reveal });
+  keepOneViewPane() {
+    const panes = this.app.workspace.getLeavesOfType(VIEW_TYPE);
+    for (const leaf of panes.slice(1)) leaf.detach();
   }
 
   async activateView(reveal = true): Promise<WorkspaceLeaf | null> {
-    await this.adoptStaleViews(reveal);
+    this.keepOneViewPane();
     // A pane answers with this view's type from the moment it is saved under
-    // it, whether or not the view is in there, so a pane the adoption could
-    // not fill would come back from `getLeavesOfType` as one to open — and
-    // opening it shows the ghost tab rather than the versions.
-    const existing = this.app.workspace
-      .getLeavesOfType(VIEW_TYPE)
-      .filter((leaf) => leaf.view instanceof KingdoneChapelView);
-    if (existing.length) {
-      if (reveal) this.app.workspace.revealLeaf(existing[0]);
-      return existing[0];
-    }
-    const leaf = this.app.workspace.getRightLeaf(false);
+    // it, whether or not the view is in there, so the one left over may be a
+    // ghost tab, or one Obsidian has yet to build, or the sidebar already in
+    // use. Either way it is the pane to open, and setting the state again is
+    // what fills the two that are empty.
+    const [pane] = this.app.workspace.getLeavesOfType(VIEW_TYPE);
+    const leaf = pane ?? this.app.workspace.getRightLeaf(false);
     if (!leaf) return null;
-    await leaf.setViewState({ type: VIEW_TYPE, active: reveal });
+    if (!(leaf.view instanceof KingdoneChapelView))
+      await leaf.setViewState({ type: VIEW_TYPE, active: reveal });
     if (reveal) this.app.workspace.revealLeaf(leaf);
     return leaf;
   }

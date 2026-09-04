@@ -1368,13 +1368,14 @@ describe('activateView', () => {
     expect(world.workspace.revealed).toEqual([]);
   });
 
-  it('opens no pane that carries the type without the view', async () => {
+  it('fills the pane that carries the type rather than opening another', async () => {
     const ghost = ghostLeaf();
-    const right = world.workspace.addLeaf('empty');
-    world.workspace.rightLeaf = right;
-    expect(await world.plugin.activateView()).toBe(right);
-    expect(world.workspace.revealed).toEqual([right]);
-    expect(world.workspace.revealed).not.toContain(ghost);
+    world.workspace.rightLeaf = world.workspace.addLeaf('empty');
+    await world.plugin.onload();
+    expect(await world.plugin.activateView()).toBe(ghost);
+    expect(ghost.view).toBeInstanceOf(KingdoneChapelView);
+    expect(world.workspace.revealed).toEqual([ghost]);
+    world.plugin.unload();
   });
 
   it('opens one on the right where there is none', async () => {
@@ -1680,21 +1681,6 @@ describe('onload', () => {
     expect(world.workspace.detached).toEqual([]);
   });
 
-  it('takes one back on an app too old to put panes off', async () => {
-    world.plugin.data = { openSidebarOnStart: true };
-    const ghost = ghostLeaf();
-    // Panes are only put off from 1.7.2, and the manifest goes back further:
-    // an older app has nothing to ask, and no method to ask it with.
-    (ghost as { loadIfDeferred?: unknown }).loadIfDeferred = undefined;
-    world.workspace.rightLeaf = world.workspace.addLeaf('empty');
-    await world.plugin.onload();
-    await vi.waitFor(() =>
-      expect(ghost.view).toBeInstanceOf(KingdoneChapelView),
-    );
-    expect(world.workspace.getLeavesOfType(VIEW_TYPE)).toEqual([ghost]);
-    expect(world.workspace.detached).toEqual([]);
-  });
-
   it('closes the panes every reload before it left behind', async () => {
     world.plugin.data = { openSidebarOnStart: true };
     const ghosts = [ghostLeaf(), ghostLeaf(), ghostLeaf()];
@@ -1717,13 +1703,22 @@ describe('onload', () => {
     expect(world.workspace.revealed).toEqual([]);
   });
 
-  it('makes a call that arrives mid-adoption wait on the one already running', async () => {
-    const ghost = ghostLeaf();
-    const first = world.plugin.adoptStaleViews();
-    const second = world.plugin.adoptStaleViews();
-    await Promise.all([first, second]);
-    expect(world.workspace.getLeavesOfType(VIEW_TYPE)).toEqual([ghost]);
-    expect(world.workspace.detached).toEqual([]);
+  it('closes the panes a restart brought back to life', async () => {
+    // A pane that came back holding the view is still one pane too many: the
+    // sidebar was only ever opened once, however well the rest ended up.
+    const panes = [liveLeaf(), liveLeaf(), liveLeaf()];
+    await world.plugin.onload();
+    await vi.waitFor(() =>
+      expect(world.workspace.getLeavesOfType(VIEW_TYPE)).toEqual([panes[0]]),
+    );
+    expect(world.workspace.detached).toEqual(panes.slice(1));
+  });
+
+  it('builds nothing for a pane that stays shut', async () => {
+    const pane = deferredLeaf();
+    await world.plugin.onload();
+    expect(pane.view).toBeNull();
+    expect(world.workspace.revealed).toEqual([]);
   });
 
   it('leaves a pane Obsidian only put off building where it is', async () => {
