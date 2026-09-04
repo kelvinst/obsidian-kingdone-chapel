@@ -111,6 +111,8 @@ export default class KingdoneChapelPlugin extends Plugin {
   lastLocation: Location | null = null;
   /** Verse clicked in reading mode, held until that pane scrolls again. */
   previewLock: { path: string; verse: number; scrollTop: number } | null = null;
+  /** The pane being opened, for a call that arrives while one is under way. */
+  pendingActivation: Promise<WorkspaceLeaf | null> | null = null;
 
   async onload() {
     const stored = ((await this.loadData()) || {}) as Record<string, unknown>;
@@ -466,7 +468,30 @@ export default class KingdoneChapelPlugin extends Plugin {
     for (const leaf of panes) if (leaf !== keep) leaf.detach();
   }
 
+  /**
+   * Open the sidebar, or join the opening already under way.
+   *
+   * A pane is asked for by the ribbon, by the command, and by the start
+   * itself, and none of the three waits for the others. A pane being made is
+   * not a pane of this view yet — it says so only once its view is built — so
+   * two of them overlapping each find nothing and each open one, which is the
+   * row of tabs this all exists to stop. The second waits on the first
+   * instead, and asks for the sidebar to come up if that is what it came for
+   * and the call it joined was the quiet one at startup.
+   */
   async activateView(reveal = true): Promise<WorkspaceLeaf | null> {
+    if (this.pendingActivation) {
+      const joined = await this.pendingActivation;
+      if (joined && reveal) this.app.workspace.revealLeaf(joined);
+      return joined;
+    }
+    this.pendingActivation = this.openViewPane(reveal).finally(() => {
+      this.pendingActivation = null;
+    });
+    return this.pendingActivation;
+  }
+
+  async openViewPane(reveal: boolean): Promise<WorkspaceLeaf | null> {
     this.keepOneViewPane();
     // A pane answers with this view's type from the moment it is saved under
     // it, whether or not the view is in there, so the one left over may be a
