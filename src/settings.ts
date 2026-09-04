@@ -1,7 +1,10 @@
 import { PluginSettingTab, Setting } from 'obsidian';
 import type { App } from 'obsidian';
 
+import { LANGS } from './books';
 import type { Lang } from './books';
+import { DEFAULT_NOTE_KINDS } from './notes';
+import type { NoteKind } from './notes';
 import type { Source } from './sources';
 import type KingdoneChapelPlugin from './main';
 
@@ -127,6 +130,75 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
           });
       });
 
+    containerEl.createEl('h3', { text: 'Notes' });
+
+    new Setting(containerEl)
+      .setName('Kinds of note')
+      .setDesc(
+        'What `Write a note on this verse` offers, and how each kind is written: ' +
+          'the callout it is written as, the letter its anchors carry — `n2`, ' +
+          '`h2`, `r2`, which is what keeps one kind numbered apart from another — ' +
+          'and what it is called in each language. The first is the one offered ' +
+          'first. A callout is a name your theme or your CSS snippet draws; the ' +
+          "ones here are this vault's own.",
+      )
+      .addButton((b) =>
+        b.setButtonText('Add').onClick(async () => {
+          this.plugin.settings.noteKinds = [
+            ...this.plugin.noteKinds(),
+            { callout: 'note', letter: 'n', titles: blankTitles() },
+          ];
+          await this.plugin.saveSettings();
+          this.display();
+        }),
+      )
+      .addButton((b) =>
+        b.setButtonText('Reset').onClick(async () => {
+          this.plugin.settings.noteKinds = DEFAULT_NOTE_KINDS.map((kind) => ({
+            ...kind,
+            titles: { ...kind.titles },
+          }));
+          await this.plugin.saveSettings();
+          this.display();
+        }),
+      );
+
+    this.plugin.noteKinds().forEach((kind, at) => {
+      const setting = new Setting(containerEl)
+        .setClass('kcp-note-kind')
+        .addText((text) =>
+          text
+            .setPlaceholder('callout')
+            .setValue(kind.callout)
+            .onChange((value) => this.setKind(at, { callout: value.trim() })),
+        )
+        .addText((text) =>
+          text
+            .setPlaceholder('n')
+            .setValue(kind.letter)
+            .onChange((value) => this.setKind(at, { letter: value.trim() })),
+        );
+
+      for (const lang of LANGS) {
+        setting.addText((text) =>
+          text
+            .setPlaceholder(lang)
+            .setValue(kind.titles[lang] || '')
+            .onChange((value) => this.setTitle(at, lang, value.trim())),
+        );
+      }
+
+      setting.addButton((b) =>
+        b.setButtonText('Remove').onClick(async () => {
+          this.plugin.settings.noteKinds = this.plugin
+            .noteKinds()
+            .filter((_, i) => i !== at);
+          await this.plugin.saveSettings();
+          this.display();
+        }),
+      );
+    });
+
     containerEl.createEl('h3', { text: 'Sidebar' });
 
     new Setting(containerEl)
@@ -192,6 +264,40 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
       }
     }
   }
+
+  /**
+   * One kind rewritten, with the rest left as they are.
+   *
+   * The rows are read back from the settings on every keystroke rather than
+   * held in the tab, so a row edited while another was added lands on what is
+   * saved rather than on what the tab was drawn from.
+   */
+  /**
+   * One name of one kind rewritten. The other names are read back from what is
+   * saved rather than from the row: the fields answer for one kind between
+   * them, and a row drawn before the other language was typed into carries the
+   * name it was drawn with, which would put it back.
+   */
+  async setTitle(at: number, lang: Lang, title: string) {
+    const kind = this.plugin.noteKinds()[at];
+    await this.setKind(at, { titles: { ...kind.titles, [lang]: title } });
+  }
+
+  async setKind(at: number, over: Partial<NoteKind>) {
+    const kinds = this.plugin
+      .noteKinds()
+      .map((kind, i) => (i === at ? { ...kind, ...over } : kind));
+    this.plugin.settings.noteKinds = kinds;
+    await this.plugin.saveSettings();
+  }
+}
+
+/** A kind with no name yet, in every language the plugin writes. */
+function blankTitles(): Record<Lang, string> {
+  return Object.fromEntries(LANGS.map((lang) => [lang, ''])) as Record<
+    Lang,
+    string
+  >;
 }
 
 /**

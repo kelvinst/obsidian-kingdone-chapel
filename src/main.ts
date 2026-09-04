@@ -20,13 +20,30 @@ import type {
 import {
   chapterFileName,
   chapterKey,
+  hasBlockId,
   parseBookName,
   parseChapterName,
   parseVerseLine,
   parseVerses,
   verseInId,
 } from './utils';
-import { bookName, bookNameAt, nameLang, translationsName } from './books';
+import {
+  bookName,
+  bookNameAt,
+  nameLang,
+  noteHeadings,
+  quoteHeadings,
+  translationsName,
+} from './books';
+import { passageLabel } from './reference';
+import {
+  DEFAULT_NOTE_KINDS,
+  chapterPrefix,
+  noteAnchor,
+  noteWrites,
+} from './notes';
+import type { NoteKind } from './notes';
+import { WriteNoteModal } from './note-modal';
 import { VersionSuggestModal } from './modal';
 import { CreateVersionModal } from './create-modal';
 import { ReferenceSuggest } from './suggest';
@@ -45,6 +62,19 @@ import {
   sourceOf,
 } from './sources';
 import type { Source } from './sources';
+
+/** A chapter a note is being written into, as the command reads it. */
+export interface NoteTarget {
+  view: MarkdownView;
+  /** The chapter as it stands, which is what the next number is read from. */
+  text: string;
+  /** What the chapter's verse ids open with: `shedd-psa-1`. */
+  prefix: string;
+  /** The book as it is named in the note's title. */
+  book: string;
+  chapter: number;
+  verses: number[];
+}
 
 /** The version `word` names, matched without case, or null where none does. */
 function named(versions: string[], word: string): string | null {
@@ -171,6 +201,18 @@ export default class KingdoneChapelPlugin extends Plugin {
           return;
         }
         new CreateVersionModal(this.app, this, sources).open();
+      },
+    });
+
+    this.addCommand({
+      id: 'write-verse-note',
+      name: 'Write a note on this verse',
+      checkCallback: (checking) => {
+        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+        const target = view ? this.noteTarget(view) : null;
+        if (!target) return false;
+        if (!checking) new WriteNoteModal(this.app, this, target).open();
+        return true;
       },
     });
 
@@ -721,8 +763,15 @@ export default class KingdoneChapelPlugin extends Plugin {
     } catch (e) {
       return null;
     }
+    return this.verseAtLine(view, line);
+  }
 
-    // Which block the cursor is in answers both layouts. A version writing no
+  /** The verse `line` belongs to: the block it sits in, else the one above it. */
+  verseAtLine(view: MarkdownView, line: number): number | null {
+    const editor = view.editor;
+    if (!editor) return null;
+
+    // Which block the line is in answers both layouts. A version writing no
     // block ids at all — verses numbered and nothing more — is left to the
     // walk below, which is what it has.
     if (view.file) {
@@ -735,6 +784,121 @@ export default class KingdoneChapelPlugin extends Plugin {
       if (parsed) return parsed.verse;
     }
     return null;
+  }
+
+  /**
+   * The verses a note would be written over: every one the selection touches,
+   * or the one the cursor is in where nothing is selected.
+   *
+   * A note may be about a run of verses — `Nota 1 - Salmos 1.1-3` is one note
+   * marked on three — and the selection is how that run is said, since it is
+   * how the verses are read in the first place. Everything between the two
+   * ends comes with them, whether or not it was dragged over whole.
+   */
+  noteVerses(view: MarkdownView): number[] | null {
+    let from: number;
+    let to: number;
+    // A pane with no editor left in it answers here rather than above: reading
+    // the cursor is what needs one, and a pane torn down mid-command throws
+    // the same way whether the editor went with it or only its document did.
+    try {
+      const editor = view.editor;
+      from = editor.getCursor('from').line;
+      to = editor.somethingSelected() ? editor.getCursor('to').line : from;
+    } catch (e) {
+      return null;
+    }
+
+    const first = this.verseAtLine(view, from);
+    const last = this.verseAtLine(view, to);
+    if (first === null) return null;
+
+    const end = last === null || last < first ? first : last;
+    const verses: number[] = [];
+    for (let verse = first; verse <= end; verse++) verses.push(verse);
+    return verses;
+  }
+
+  /** The kinds of note this vault writes, never empty: the defaults answer for none. */
+  noteKinds(): NoteKind[] {
+    const kinds = this.settings.noteKinds;
+    return kinds && kinds.length ? kinds : DEFAULT_NOTE_KINDS;
+  }
+
+  /**
+   * The chapter a note would be written into, and the verses it would be about,
+   * or null where the pane is not a version's chapter being edited.
+   *
+   * A note is written by hand into the file it belongs to, so it takes an
+   * editor: reading mode has the verse but nowhere to put the writing.
+   */
+  noteTarget(view: MarkdownView): NoteTarget | null {
+    const file = view.file;
+    const editor = view.editor;
+    if (!file || !editor || view.getMode() === 'preview') return null;
+
+    const source = this.sourceFor(file);
+    if (!source) return null;
+    const parsed = parseChapterName(file.basename, source.code);
+    if (!parsed) return null;
+
+    const verses = this.noteVerses(view);
+    if (!verses) return null;
+
+    return {
+      view,
+      text: editor.getValue(),
+      prefix: chapterPrefix(source.code, parsed.book, parsed.chapter),
+      book: bookName(parsed.book, nameLang(this.settings.language)),
+      chapter: parsed.chapter,
+      verses,
+    };
+  }
+
+  /**
+   * Write one note: the callout under the notes heading, and a marker in the
+   * aside of every verse it is about.
+   *
+   * Both halves go in as one edit apiece, last in the chapter first, so that
+   * each write still lands where it was measured. The cursor is left on the
+   * note's own empty line, which is what the reader came here to type into.
+   */
+  writeNote(target: NoteTarget, kind: NoteKind, number: number) {
+    const editor = target.view.editor;
+    if (!editor) return;
+
+    const anchor = noteAnchor(target.prefix, kind.letter, number);
+    const text = editor.getValue();
+    if (hasBlockId(text, anchor)) {
+      new Notice(
+        `This chapter already carries a note ${kind.letter}${number}.`,
+      );
+      return;
+    }
+
+    const lang = nameLang(this.settings.language);
+    const headings = noteHeadings(this.settings.language);
+    const written = noteWrites(text, {
+      callout: kind.callout,
+      title: `${kind.titles[lang] || kind.callout} ${number} - ${passageLabel(
+        target.book,
+        target.chapter,
+        target.verses,
+      )}`,
+      verses: target.verses.map((verse) => `${target.prefix}-${verse}`),
+      anchor,
+      label: `${kind.letter}${number}`,
+      // The marker in a verse's aside is the heading said again, in the one
+      // word the section is named by.
+      markers: headings,
+      headings,
+      quotes: quoteHeadings(this.settings.language),
+    });
+
+    for (const write of written.writes) {
+      editor.replaceRange(write.text, write.from, write.to);
+    }
+    editor.setCursor(written.comment);
   }
 
   /**
