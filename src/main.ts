@@ -457,7 +457,13 @@ export default class KingdoneChapelPlugin extends Plugin {
    */
   keepOneViewPane() {
     const panes = this.app.workspace.getLeavesOfType(VIEW_TYPE);
-    for (const leaf of panes.slice(1)) leaf.detach();
+    // Which one to keep is the one question the contents do answer: a pane
+    // already holding the view is the sidebar in use, and closing it in favour
+    // of an empty one that happens to sit higher up would take away the only
+    // pane there was anything in.
+    const keep =
+      panes.find((leaf) => leaf.view instanceof KingdoneChapelView) ?? panes[0];
+    for (const leaf of panes) if (leaf !== keep) leaf.detach();
   }
 
   async activateView(reveal = true): Promise<WorkspaceLeaf | null> {
