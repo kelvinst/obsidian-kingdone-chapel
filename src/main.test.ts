@@ -2096,7 +2096,7 @@ describe('writing a note on a verse', () => {
   const KIND = {
     callout: 'note',
     letter: 'n',
-    titles: { pt: 'Nota', en: 'Note' },
+    title: 'Nota',
   };
 
   /** A chapter of a version, written the way the generator writes one. */
@@ -2233,8 +2233,8 @@ describe('writing a note on a verse', () => {
 
 describe('a note that cannot be written as asked', () => {
   const KINDS = [
-    { callout: 'note', letter: 'n', titles: { pt: 'Nota', en: 'Note' } },
-    { callout: 'marginalia', letter: 'm', titles: { pt: '', en: '' } },
+    { callout: 'note', letter: 'n', title: 'Nota' },
+    { callout: 'marginalia', letter: 'm', title: '' },
   ];
 
   const CHAPTER =
@@ -2347,7 +2347,7 @@ describe('a note written in a Vim editor', () => {
   const KIND = {
     callout: 'note',
     letter: 'n',
-    titles: { pt: 'Nota', en: 'Note' },
+    title: 'Nota',
   };
 
   /**
@@ -2504,7 +2504,7 @@ describe('a note over a chapter that merged its verses', () => {
   const KIND = {
     callout: 'note',
     letter: 'n',
-    titles: { pt: 'Nota', en: 'Note' },
+    title: 'Nota',
   };
   /** A chapter writing verses 1 and 3, the way a version that merges 1-2 does. */
   const MERGED =
@@ -2553,7 +2553,7 @@ describe('the mode set once the modal is out of the way', () => {
   const KIND = {
     callout: 'note',
     letter: 'n',
-    titles: { pt: 'Nota', en: 'Note' },
+    title: 'Nota',
   };
   const CHAPTER =
     '# Gênesis 1 - NVI\n\n![[ARA-01-GEN-001#^ara-gen-1-1|flat]]\n^nvi-gen-1-1\n';

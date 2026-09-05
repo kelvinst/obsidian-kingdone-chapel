@@ -311,36 +311,28 @@ describe('the kinds of note', () => {
 
   it('draws the three it ships with, as they are written', () => {
     expect(rows()).toHaveLength(3);
-    expect(fields(0).map((f) => f.value)).toEqual([
-      'note',
-      'n',
-      'Nota',
-      'Note',
-    ]);
+    expect(fields(0).map((f) => f.value)).toEqual(['note', 'n', 'Nota']);
     expect(fields(1).map((f) => f.value)).toEqual([
       'homiletica',
       'h',
       'Nótula Homilética',
-      'Homiletic Note',
     ]);
   });
 
-  it('saves a callout, a letter and a title as they are typed', async () => {
-    const [callout, letter, pt, en] = fields(0);
+  it('saves a callout, a letter and a name as they are typed', async () => {
+    const [callout, letter, name] = fields(0);
     callout.value = 'comentario';
     change(callout, 'input');
     letter.value = 'c';
     change(letter, 'input');
-    pt.value = 'Comentário';
-    change(pt, 'input');
-    en.value = 'Commentary';
-    change(en, 'input');
+    name.value = 'Comentário';
+    change(name, 'input');
 
     await vi.waitFor(() =>
       expect(world.plugin.settings.noteKinds[0]).toEqual({
         callout: 'comentario',
         letter: 'c',
-        titles: { pt: 'Comentário', en: 'Commentary' },
+        title: 'Comentário',
       }),
     );
     expect(world.plugin.settings.noteKinds).toHaveLength(3);
@@ -352,7 +344,7 @@ describe('the kinds of note', () => {
     expect(world.plugin.settings.noteKinds[3]).toEqual({
       callout: 'note',
       letter: 'n',
-      titles: { pt: '', en: '' },
+      title: '',
     });
   });
 
@@ -412,27 +404,40 @@ describe('a row of the kinds list', () => {
     );
   }
 
-  it('is named for the kind it is, in the language names are written in', () => {
+  it('is named for the kind it is', () => {
     expect(
       rows().map((row) => row.querySelector('.setting-item-name')?.textContent),
     ).toEqual(['Nota', 'Nótula Homilética', 'Nota dos Revisores']);
   });
 
-  it('says what its fields are, and each field says it again', () => {
-    const row = rows()[0];
-    expect(row.querySelector('.setting-item-description')?.textContent).toBe(
-      'Callout, anchor letter, Portuguese, English',
-    );
+  it('has its columns named once, in the row above them all', () => {
+    const head = containerEl.querySelector<HTMLElement>('.kcp-note-head');
+    expect(head?.querySelector('.setting-item-name')?.textContent).toBe('Kind');
     expect(
-      Array.from(row.querySelectorAll<HTMLInputElement>('input')).map(
+      Array.from(head?.querySelectorAll('.kcp-note-column') || []).map(
+        (column) => column.textContent,
+      ),
+      // The last of them stands over the buttons, and names nothing.
+    ).toEqual(['Callout', 'Anchor letter', 'Name', '']);
+  });
+
+  it('says nothing beside each row that the columns say above it', () => {
+    expect(
+      rows()[0].querySelector('.setting-item-description')?.textContent,
+    ).toBe('');
+  });
+
+  it('names each field again, for the row it is read in', () => {
+    expect(
+      Array.from(rows()[0].querySelectorAll<HTMLInputElement>('input')).map(
         (field) => field.title,
       ),
-    ).toEqual(['Callout', 'Anchor letter', 'Portuguese', 'English']);
+    ).toEqual(['Callout', 'Anchor letter', 'Name']);
   });
 
   it('is named for its callout while it has no name of its own', async () => {
     world.plugin.settings.noteKinds = [
-      { callout: 'marginalia', letter: 'm', titles: { pt: '', en: '' } },
+      { callout: 'marginalia', letter: 'm', title: '' },
     ];
     tab.display();
 

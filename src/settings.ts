@@ -1,7 +1,6 @@
 import { PluginSettingTab, Setting } from 'obsidian';
 import type { App, TextComponent } from 'obsidian';
 
-import { LANGS, nameLang } from './books';
 import type { Lang } from './books';
 import { DEFAULT_NOTE_KINDS } from './notes';
 import type { NoteKind } from './notes';
@@ -136,17 +135,18 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
       .setName('Kinds of note')
       .setDesc(
         'What "Write a note on this verse" offers, one row each, in the order ' +
-          'they are offered in. A row says four things: the callout the note is ' +
+          'they are offered in. A row says three things: the callout the note is ' +
           'written as, the letter its anchors carry — n2, h2, r2, which is what ' +
-          'keeps one kind numbered apart from another — and what the kind is ' +
-          'called in Portuguese and in English. A callout is a name your theme ' +
-          "or your CSS snippet draws; the ones here are this vault's own.",
+          'keeps one kind numbered apart from another — and the name it is ' +
+          'given in the title of every note written as it. A callout is a ' +
+          'name your theme or your CSS snippet draws; the ones here are this ' +
+          "vault's own.",
       )
       .addButton((b) =>
         b.setButtonText('Add').onClick(async () => {
           this.plugin.settings.noteKinds = [
             ...this.plugin.noteKinds(),
-            { callout: 'note', letter: 'n', titles: blankTitles() },
+            { callout: 'note', letter: 'n', title: '' },
           ];
           await this.plugin.saveSettings();
           this.display();
@@ -156,23 +156,30 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
         b.setButtonText('Reset').onClick(async () => {
           this.plugin.settings.noteKinds = DEFAULT_NOTE_KINDS.map((kind) => ({
             ...kind,
-            titles: { ...kind.titles },
           }));
           await this.plugin.saveSettings();
           this.display();
         }),
       );
 
+    // The rows are a table, and a table says its columns once at the top rather
+    // than beside every row of it.
+    const head = new Setting(containerEl)
+      .setClass('kcp-note-head')
+      .setName('Kind');
+    for (const column of COLUMNS) {
+      head.controlEl.createSpan({ text: column, cls: 'kcp-note-column' });
+    }
+    // The column the Remove buttons stand in, which names nothing.
+    head.controlEl.createSpan({ cls: 'kcp-note-column' });
+
     this.plugin.noteKinds().forEach((kind, at) => {
       // Named for the kind it is, so a row says which one it is before any of
-      // its fields are read, and describes its fields in the order they sit
-      // in: four boxes in a line say nothing about themselves.
+      // its fields are read; what the fields themselves are is said once, in
+      // the row above them all.
       const setting = new Setting(containerEl)
         .setClass('kcp-note-kind')
-        .setName(
-          kind.titles[nameLang(this.plugin.settings.language)] || kind.callout,
-        )
-        .setDesc('Callout, anchor letter, Portuguese, English')
+        .setName(kind.title || kind.callout)
         .addText((text) =>
           field(text, 'Callout', 'note')
             .setValue(kind.callout)
@@ -182,15 +189,12 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
           field(text, 'Anchor letter', 'n')
             .setValue(kind.letter)
             .onChange((value) => this.setKind(at, { letter: value.trim() })),
+        )
+        .addText((text) =>
+          field(text, 'Name', 'Nota')
+            .setValue(kind.title)
+            .onChange((value) => this.setKind(at, { title: value.trim() })),
         );
-
-      for (const lang of LANGS) {
-        setting.addText((text) =>
-          field(text, LANG_NAMES[lang], LANG_NAMES[lang])
-            .setValue(kind.titles[lang] || '')
-            .onChange((value) => this.setTitle(at, lang, value.trim())),
-        );
-      }
 
       setting.addButton((b) =>
         b.setButtonText('Remove').onClick(async () => {
@@ -280,17 +284,6 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
    * held in the tab, so a row edited while another was added lands on what is
    * saved rather than on what the tab was drawn from.
    */
-  /**
-   * One name of one kind rewritten. The other names are read back from what is
-   * saved rather than from the row: the fields answer for one kind between
-   * them, and a row drawn before the other language was typed into carries the
-   * name it was drawn with, which would put it back.
-   */
-  async setTitle(at: number, lang: Lang, title: string) {
-    const kind = this.plugin.noteKinds()[at];
-    await this.setKind(at, { titles: { ...kind.titles, [lang]: title } });
-  }
-
   async setKind(at: number, over: Partial<NoteKind>) {
     const kinds = this.plugin
       .noteKinds()
@@ -300,8 +293,8 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
   }
 }
 
-/** What each language is called, for the field a kind's name is typed into. */
-const LANG_NAMES: Record<Lang, string> = { pt: 'Portuguese', en: 'English' };
+/** What a row of the kinds table says, left to right. */
+const COLUMNS = ['Callout', 'Anchor letter', 'Name'];
 
 /**
  * A field of a kind, named twice over: the placeholder says what belongs in it
@@ -312,14 +305,6 @@ function field(text: TextComponent, name: string, example: string) {
   text.inputEl.setAttribute('aria-label', name);
   text.inputEl.title = name;
   return text.setPlaceholder(example);
-}
-
-/** A kind with no name yet, in every language the plugin writes. */
-function blankTitles(): Record<Lang, string> {
-  return Object.fromEntries(LANGS.map((lang) => [lang, ''])) as Record<
-    Lang,
-    string
-  >;
 }
 
 /**

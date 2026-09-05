@@ -389,21 +389,42 @@
 
 /* --- settings: the kinds of note --- */
 
-/* Four short fields and a button on one row. Left to itself the row gives each
-   field the same stretch as a lone text setting, and a callout, a letter and
-   two names are not four of the same thing: the letter is one character wide
-   and reads as a mistake in a box the width of a sentence. */
-.kcp-note-kind .setting-item-control input[type='text'] {
-  width: 9em;
-}
-
-.kcp-note-kind .setting-item-control input[type='text']:nth-child(2) {
-  width: 4em;
-}
-
-/* A row narrower than its fields wraps them under the name rather than
-   squeezing them into nothing. */
+/* The kinds are a table: the same columns in every row, named once in the row
+   above them. A grid rather than the row's own flex, because the names have to
+   stand over the fields they name, and flex lays each row out for itself. The
+   letter gets a column the width of a letter, and the name takes what is
+   left, shrinking rather than pushing the button off the row. */
+.kcp-note-head .setting-item-control,
 .kcp-note-kind .setting-item-control {
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  display: grid;
+  grid-template-columns: minmax(0, 9em) 4em minmax(0, 1fr) auto;
+  gap: var(--size-4-2);
+  align-items: center;
+}
+
+.kcp-note-kind .setting-item-control input[type='text'] {
+  width: 100%;
+  min-width: 0;
+}
+
+/* The names of the columns, which are labels rather than settings: quieter
+   than the rows under them, and cut off rather than wrapping a column wider. */
+.kcp-note-column {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The head is a heading for the rows under it, not a setting of its own, so it
+   loses the line the settings list draws between one setting and the next. */
+.kcp-note-head {
+  border-top: none;
+  padding-bottom: var(--size-2-2);
+}
+
+.kcp-note-head .setting-item-name {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
 }

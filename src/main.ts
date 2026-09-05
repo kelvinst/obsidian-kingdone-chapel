@@ -910,11 +910,10 @@ export default class KingdoneChapelPlugin extends Plugin {
       return;
     }
 
-    const lang = nameLang(this.settings.language);
     const headings = noteHeadings(this.settings.language);
     const written = noteWrites(text, {
       callout: kind.callout,
-      title: `${kind.titles[lang] || kind.callout} ${number} - ${passageLabel(
+      title: `${kind.title || kind.callout} ${number} - ${passageLabel(
         target.book,
         target.chapter,
         target.verses,
