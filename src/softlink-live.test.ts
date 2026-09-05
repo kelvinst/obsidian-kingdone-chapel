@@ -63,6 +63,15 @@ describe('build', () => {
     expect(read(doc, doc.length - 4)).toEqual([]);
   });
 
+  it('gives a token at line 1, column 0 back when the cursor sits there', () => {
+    // Every other test routes through `below`, which keeps the cursor off the
+    // token by starting the note with a plain line above it. A token that
+    // opens the note itself has nothing above it to push the cursor's default
+    // position away, so this is the one place `read`'s own default of 0 lands
+    // on the token rather than beside it.
+    expect(read('((a|1))')).toEqual([]);
+  });
+
   it('gives it back when the selection reaches into it', () => {
     const doc = below('((a|1))');
     const state = EditorState.create({
@@ -95,6 +104,18 @@ describe('build', () => {
     expect(read(below('Escreva `((a|1))` assim.'))).toEqual([]);
   });
 
+  it('leaves a token inside maths alone', () => {
+    expect(read(below('Veja $((a|1))$ assim.'))).toEqual([]);
+  });
+
+  it("leaves a token inside a wikilink's label alone", () => {
+    expect(read(below('[[Sl 1|((a|1))]]'))).toEqual([]);
+  });
+
+  it('leaves a token inside a markdown link alone', () => {
+    expect(read(below('[((a|1))](https://example.com)'))).toEqual([]);
+  });
+
   it('leaves a token inside a fence written inside a callout alone', () => {
     expect(read(below('> [!note]', '> ```', '> ((a|1))', '> ```'))).toEqual([]);
   });
@@ -121,6 +142,47 @@ describe('build', () => {
       count++;
     });
     expect(count).toBe(0);
+  });
+
+  it('reads nothing when nothing is visible at all', () => {
+    // No visible ranges is a viewport of nothing rather than one of everything,
+    // so the bottom it computes is before the very first line.
+    const doc = below('((a|1))');
+    const state = EditorState.create({ doc, selection: { anchor: 0 } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const set = build(state, [], stub() as any, 'a.md');
+    let count = 0;
+    set.between(0, doc.length, () => {
+      count++;
+    });
+    expect(count).toBe(0);
+  });
+
+  it('skips a line sitting in the gap between two visible ranges', () => {
+    // The viewport is not always one span — a folded region splits it into
+    // several, and a line between two of them is neither past the bottom
+    // (which would end the walk outright) nor covered by any range.
+    const doc = below('((a|1))', '((skip|2))', '((c|3))');
+    const state = EditorState.create({ doc, selection: { anchor: 0 } });
+    const first = state.doc.line(3);
+    const last = state.doc.line(5);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const set = build(
+      state,
+      [
+        { from: first.from, to: first.to },
+        { from: last.from, to: last.to },
+      ],
+      stub() as any,
+      'a.md',
+    );
+    const texts: string[] = [];
+    set.between(0, doc.length, (_from, _to, value) => {
+      const widget = value.spec.widget as
+        { link?: { text: string } } | undefined;
+      if (widget) texts.push(widget.link!.text);
+    });
+    expect(texts).toEqual(['1', '3']);
   });
 
   it('still counts a fence opened above what is visible', () => {

@@ -70,4 +70,23 @@ describe('softLinksIn', () => {
   it('trims the display text without moving the token', () => {
     expect(read('((a| 1 ))')).toEqual(['a>1@0-9']);
   });
+
+  it('trims a tab-padded display the same way', () => {
+    expect(read('((a|\t1\t))')).toEqual(['a>1@0-9']);
+  });
+
+  it('refuses a display that trims to nothing', () => {
+    expect(read('((a|  ))')).toEqual([]);
+  });
+
+  it('keeps a display holding its own inner spaces', () => {
+    expect(read('((a|a  b))')).toEqual(['a>a  b@0-10']);
+  });
+
+  it('leaves an unterminated token followed by a long run of spaces alone', () => {
+    // Pinned against a regex that backtracks superlinearly on this shape: an
+    // unclosed `((a|` followed by a long run of spaces once took seconds to
+    // fail on. The assertion is the result, not the time it took to get here.
+    expect(read('((a|' + ' '.repeat(3200))).toEqual([]);
+  });
 });

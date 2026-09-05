@@ -18,7 +18,16 @@ import type { SoftLink } from './softlink';
  * nothing entered the cache, and the note draws no edge.
  */
 
-/** Elements whose text is the note's own literal writing, tokens and all. */
+/**
+ * Elements whose text is the note's own literal writing, tokens and all.
+ *
+ * `marks.ts` reads the same rendered note and handles a link by a `linked`
+ * flag threaded through its walk rather than by name here; this is the one
+ * deliberate divergence from it. `A` is in the list for a case that flag
+ * exists for too: a token written inside a rendered link's own label —
+ * `[((a|1))](https://example.com)` — must not be re-linked, the label being
+ * the anchor's text and not prose of its own to draw over.
+ */
 function verbatim(el: Element): boolean {
   return (
     el.tagName === 'CODE' ||
@@ -43,10 +52,14 @@ export function linkEl(
   sourcePath: string,
 ): HTMLAnchorElement {
   const el = doc.createElement('a');
-  const resolved = app.metadataCache.getFirstLinkpathDest(
-    getLinkpath(link.path),
-    sourcePath,
-  );
+  const linkpath = getLinkpath(link.path);
+  // `((#^shedd-psa-103-10))` names no note, only an anchor into this one, and
+  // `getLinkpath` answers that with `''`. Asking the cache for `''` comes back
+  // null, which would grey out a link that works — Obsidian's own `[[#^x]]`
+  // resolves the same way, into `sourcePath` rather than nowhere.
+  const resolved =
+    linkpath === '' ||
+    app.metadataCache.getFirstLinkpathDest(linkpath, sourcePath) !== null;
   el.className = resolved ? 'internal-link' : 'internal-link is-unresolved';
   el.dataset.href = link.path;
   el.textContent = link.text;

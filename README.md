@@ -178,6 +178,9 @@ it. Where you want the relationship recorded, write a `[[wikilink]]`.
 
 The target may not hold spaces, so ordinary prose in parentheses — `(bla (aside) bla)` — is
 left exactly as written. Tokens inside `` `code` `` and fenced blocks are left alone too.
+
+The display text is plain text: markup written in it, `((a|**1**))`, is not rendered, and in
+reading view it stops the link from being drawn at all.
 Both views draw them: reading view rewrites the note, and in live preview the token is drawn
 as its link until the cursor arrives, when it is handed back for editing.
 

@@ -1432,8 +1432,18 @@ describe('onload', () => {
   it('draws its own links in both views', async () => {
     await world.plugin.onload();
 
-    expect(world.plugin.postProcessors.length).toBe(2);
     expect(world.plugin.editorExtensions.length).toBe(2);
+    // Counting `postProcessors` would pass just as well with the mark
+    // renderer registered twice and the soft-link one dropped, so this runs
+    // each registered post-processor over a token instead and asks whether
+    // any of them drew it as a link.
+    const drew = world.plugin.postProcessors.some((processor) => {
+      const el = document.createElement('div');
+      el.innerHTML = '<p>((Leituras))</p>';
+      processor(el, { sourcePath: 'Estudos/Romanos.md' } as never);
+      return el.querySelectorAll('.internal-link').length === 1;
+    });
+    expect(drew).toBe(true);
   });
 
   it('leaves the folder alone where the new name was saved too', async () => {
