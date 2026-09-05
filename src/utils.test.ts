@@ -403,6 +403,17 @@ describe('parseVerses', () => {
     ]);
   });
 
+  it('carries the lines above an id closing a line that writes on', () => {
+    // How Shedd writes a verse it has refs or notes for: the embed, then an
+    // aside over as many lines as it takes, the id closing the last of them.
+    const verse =
+      '![[ARA-19-PSA-001#^ara-psa-1-1|flat]] ,,**Refs**:\n' +
+      '[[Shedd-19-PSA-026#^shedd-psa-26-4|Sl 26.4]].,,';
+    expect(
+      parseVerses('## Os justos\n\n' + verse + ' ^shedd-psa-1-1\n'),
+    ).toEqual([{ verse: 1, text: verse }]);
+  });
+
   it('leaves a verse that writes itself out alone', () => {
     expect(
       parseVerses('## Uma seção\n1. Falou o SENHOR. ^ara-lev-1-1\n'),
