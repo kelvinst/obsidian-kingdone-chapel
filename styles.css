@@ -389,42 +389,49 @@
 
 /* --- settings: the kinds of note --- */
 
-/* The kinds are a table: the same columns in every row, named once in the row
-   above them. A grid rather than the row's own flex, because the names have to
-   stand over the fields they name, and flex lays each row out for itself. The
-   letter gets a column the width of a letter, and the name takes what is
-   left, shrinking rather than pushing the button off the row. */
-.kcp-note-head .setting-item-control,
-.kcp-note-kind .setting-item-control {
-  display: grid;
-  grid-template-columns: minmax(0, 9em) 4em minmax(0, 1fr) auto;
-  gap: var(--size-4-2);
-  align-items: center;
+/* The kinds are a table, and are drawn as one: a row of settings lays its own
+   info column out as wide as whatever it holds, so columns written that way
+   line up with nothing. */
+.kcp-note-kinds {
+  width: 100%;
+  border-collapse: collapse;
 }
 
-.kcp-note-kind .setting-item-control input[type='text'] {
+.kcp-note-kinds th {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-normal);
+  text-align: left;
+  padding: 0 var(--size-4-2) var(--size-2-2) 0;
+}
+
+.kcp-note-kinds td {
+  padding: var(--size-2-2) var(--size-4-2) var(--size-2-2) 0;
+  vertical-align: middle;
+}
+
+.kcp-note-kinds input[type='text'] {
   width: 100%;
   min-width: 0;
 }
 
-/* The names of the columns, which are labels rather than settings: quieter
-   than the rows under them, and cut off rather than wrapping a column wider. */
-.kcp-note-column {
-  color: var(--text-muted);
-  font-size: var(--font-ui-smaller);
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* The letter is one character, the callout a word, the name a few: the name
+   takes what is left rather than every column sharing the width evenly. */
+.kcp-note-kinds th:nth-child(1),
+.kcp-note-kinds td:nth-child(1) {
+  width: 10em;
+}
+
+.kcp-note-kinds th:nth-child(2),
+.kcp-note-kinds td:nth-child(2) {
+  width: 5em;
+}
+
+/* The button column is as wide as the button, and is the one that ends the
+   row, so nothing follows it. */
+.kcp-note-kinds th:last-child,
+.kcp-note-kinds td:last-child {
+  width: 1%;
+  padding-right: 0;
   white-space: nowrap;
-}
-
-/* The head is a heading for the rows under it, not a setting of its own, so it
-   loses the line the settings list draws between one setting and the next. */
-.kcp-note-head {
-  border-top: none;
-  padding-bottom: var(--size-2-2);
-}
-
-.kcp-note-head .setting-item-name {
-  color: var(--text-muted);
-  font-size: var(--font-ui-smaller);
 }
