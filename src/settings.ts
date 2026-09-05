@@ -1,5 +1,10 @@
-import { PluginSettingTab, Setting } from 'obsidian';
-import type { App, TextComponent } from 'obsidian';
+import {
+  ButtonComponent,
+  PluginSettingTab,
+  Setting,
+  TextComponent,
+} from 'obsidian';
+import type { App } from 'obsidian';
 
 import type { Lang } from './books';
 import { DEFAULT_NOTE_KINDS } from './notes';
@@ -162,42 +167,37 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
         }),
       );
 
-    // The rows are a table, and a table says its columns once at the top rather
-    // than beside every row of it.
-    const head = new Setting(containerEl)
-      .setClass('kcp-note-head')
-      .setName('Kind');
+    // A table, because the rows are one: the settings list lays every row out
+    // for itself — an info column as wide as whatever it holds — so columns
+    // written as settings line up with nothing. A table's own columns are the
+    // one width down the whole of it.
+    const table = containerEl.createEl('table', { cls: 'kcp-note-kinds' });
+    const head = table.createEl('thead').createEl('tr');
     for (const column of COLUMNS) {
-      head.controlEl.createSpan({ text: column, cls: 'kcp-note-column' });
+      head.createEl('th', { text: column });
     }
     // The column the Remove buttons stand in, which names nothing.
-    head.controlEl.createSpan({ cls: 'kcp-note-column' });
+    head.createEl('th');
 
+    const body = table.createEl('tbody');
     this.plugin.noteKinds().forEach((kind, at) => {
-      // Named for the kind it is, so a row says which one it is before any of
-      // its fields are read; what the fields themselves are is said once, in
-      // the row above them all.
-      const setting = new Setting(containerEl)
-        .setClass('kcp-note-kind')
-        .setName(kind.title || kind.callout)
-        .addText((text) =>
-          field(text, 'Callout', 'note')
-            .setValue(kind.callout)
-            .onChange((value) => this.setKind(at, { callout: value.trim() })),
-        )
-        .addText((text) =>
-          field(text, 'Anchor letter', 'n')
-            .setValue(kind.letter)
-            .onChange((value) => this.setKind(at, { letter: value.trim() })),
-        )
-        .addText((text) =>
-          field(text, 'Name', 'Nota')
-            .setValue(kind.title)
-            .onChange((value) => this.setKind(at, { title: value.trim() })),
-        );
+      const row = body.createEl('tr', { cls: 'kcp-note-kind' });
 
-      setting.addButton((b) =>
-        b.setButtonText('Remove').onClick(async () => {
+      field(new TextComponent(row.createEl('td')), 'Callout', 'note')
+        .setValue(kind.callout)
+        .onChange((value) => this.setKind(at, { callout: value.trim() }));
+
+      field(new TextComponent(row.createEl('td')), 'Anchor letter', 'n')
+        .setValue(kind.letter)
+        .onChange((value) => this.setKind(at, { letter: value.trim() }));
+
+      field(new TextComponent(row.createEl('td')), 'Name', 'Nota')
+        .setValue(kind.title)
+        .onChange((value) => this.setKind(at, { title: value.trim() }));
+
+      new ButtonComponent(row.createEl('td'))
+        .setButtonText('Remove')
+        .onClick(async () => {
           const kinds = this.plugin.noteKinds();
           // The last one stays. A list left empty is a list the command has
           // nothing to offer from, so it is read as no answer and the three
@@ -207,8 +207,7 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
           this.plugin.settings.noteKinds = kinds.filter((_, i) => i !== at);
           await this.plugin.saveSettings();
           this.display();
-        }),
-      );
+        });
     });
 
     containerEl.createEl('h3', { text: 'Sidebar' });
