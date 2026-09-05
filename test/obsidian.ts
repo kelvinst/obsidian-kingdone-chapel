@@ -623,8 +623,14 @@ export class Setting {
     return this;
   }
 
-  setDesc(desc: string): Setting {
-    this.descEl.textContent = desc;
+  /**
+   * The app takes a fragment as well as a string, which is how a description
+   * carries a link: text alone is written as text, and a fragment is put in
+   * as it was built.
+   */
+  setDesc(desc: string | DocumentFragment): Setting {
+    if (typeof desc === 'string') this.descEl.textContent = desc;
+    else this.descEl.append(desc);
     return this;
   }
 

@@ -134,9 +134,17 @@ lists them as a table: the callout each is written as, the letter its anchors ca
 name it is given in a note's title. Add your own, or write over these; the first in the list is
 the one offered first.
 
-`note` is Obsidian's own callout; `homiletic` (a megaphone, amber) and `reviewers` (glasses,
-green) are drawn by this plugin's stylesheet. A callout of your own is a `data-callout` rule in
-your theme or in a CSS snippet:
+A callout is drawn by whoever defined it, and a kind naming one nobody has is written in the
+plain grey of a callout Obsidian does not know — so a kind of your own has to name a callout
+that exists. Three sources, in order of least work:
+
+- **Obsidian's own** — `note`, `tip`, `warning`, `quote` and the rest of
+  [the supported types](https://help.obsidian.md/callouts#Supported+types). `note` is one of
+  these, which is why **Nota** needs no CSS at all.
+- **This plugin's** — `homiletic` (a megaphone, amber) and `reviewers` (glasses, green), drawn
+  by `styles.css` and shipped with the two kinds that name them.
+- **Your own** — [a custom callout](https://help.obsidian.md/callouts#Customize+callouts): a
+  `data-callout` rule in your theme or in a CSS snippet, naming a colour and an icon.
 
 ```css
 .callout[data-callout='marginalia'] {
@@ -144,6 +152,10 @@ your theme or in a CSS snippet:
   --callout-icon: lucide-pencil;
 }
 ```
+
+`--callout-color` has to be a real colour value: Obsidian mixes it for the background and reads
+it as `color` for the title, so the bare `R, G, B` triple older docs use is dropped — the icon
+lands and the colour silently does not.
 
 ### Chapter breadcrumbs
 
