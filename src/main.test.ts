@@ -1429,6 +1429,13 @@ describe('onload', () => {
     expect(world.plugin.settings.translationsFolder).toBe('Textos');
   });
 
+  it('draws its own links in both views', async () => {
+    await world.plugin.onload();
+
+    expect(world.plugin.postProcessors.length).toBe(2);
+    expect(world.plugin.editorExtensions.length).toBe(2);
+  });
+
   it('leaves the folder alone where the new name was saved too', async () => {
     world.plugin.data = { bibleFolder: 'Antigo', translationsFolder: 'Textos' };
     await world.plugin.onload();
