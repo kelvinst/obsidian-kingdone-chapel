@@ -343,7 +343,8 @@ describe('the kinds of note', () => {
     await vi.waitFor(() => expect(rows()).toHaveLength(4));
     expect(world.plugin.settings.noteKinds[3]).toEqual({
       callout: 'note',
-      letter: 'n',
+      // A letter of its own, so its notes are numbered apart from the rest.
+      letter: 'a',
       title: '',
     });
   });
@@ -428,5 +429,57 @@ describe('the kinds table', () => {
         (field) => field.title,
       ),
     ).toEqual(['Callout', 'Anchor letter', 'Name']);
+  });
+});
+
+describe('a kind with something missing', () => {
+  function rows(): HTMLElement[] {
+    return Array.from(
+      containerEl.querySelectorAll<HTMLElement>('.kcp-note-kind'),
+    );
+  }
+
+  function fields(at: number): HTMLInputElement[] {
+    return Array.from(rows()[at].querySelectorAll<HTMLInputElement>('input'));
+  }
+
+  function button(text: string) {
+    const found = Array.from(
+      containerEl.querySelectorAll<HTMLButtonElement>('button'),
+    ).find((el) => el.textContent === text);
+    if (!found) throw new Error(`no button reading ${text}`);
+    return found;
+  }
+
+  it('keeps the letter it had while the field is empty', async () => {
+    const letter = fields(0)[1];
+    letter.value = '';
+    change(letter, 'input');
+    // Nothing to wait for: the letter is only written when one is typed.
+    await Promise.resolve();
+    expect(world.plugin.settings.noteKinds[0].letter).toBe('n');
+
+    letter.value = 'c';
+    change(letter, 'input');
+    await vi.waitFor(() =>
+      expect(world.plugin.settings.noteKinds[0].letter).toBe('c'),
+    );
+  });
+
+  it('is added on a letter no other kind is numbered by', async () => {
+    button('Add').dispatchEvent(new Event('click'));
+    await vi.waitFor(() => expect(rows()).toHaveLength(4));
+    expect(world.plugin.settings.noteKinds[3].letter).toBe('a');
+  });
+
+  it('is added on no letter at all where every one of them is taken', async () => {
+    world.plugin.settings.noteKinds = 'abcdefghijklmnopqrstuvwxyz'
+      .split('')
+      .map((letter) => ({ callout: 'note', letter, title: letter }));
+    tab.display();
+
+    button('Add').dispatchEvent(new Event('click'));
+    await vi.waitFor(() => expect(rows()).toHaveLength(27));
+    expect(world.plugin.settings.noteKinds[26].letter).toBe('');
   });
 });
