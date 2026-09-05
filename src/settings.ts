@@ -167,7 +167,13 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
     const table = containerEl.createEl('table', { cls: 'kcp-note-kinds' });
     const head = table.createEl('thead').createEl('tr');
     for (const column of COLUMNS) {
-      head.createEl('th', { text: column });
+      const cell = head.createEl('th', { text: column.name });
+      // A column too narrow to say what it holds says it on hover instead,
+      // which is where a reader asks.
+      if (!column.hint) continue;
+      const hint = cell.createSpan({ text: '?', cls: 'kcp-note-hint' });
+      hint.title = column.hint;
+      hint.setAttribute('aria-label', column.hint);
     }
     // The column the Remove buttons stand in, which names nothing.
     head.createEl('th');
@@ -180,7 +186,12 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
         .setValue(kind.callout)
         .onChange((value) => this.setKind(at, { callout: value.trim() }));
 
-      field(new TextComponent(row.createEl('td')), 'Anchor letter', 'n')
+      field(
+        new TextComponent(row.createEl('td')),
+        ANCHOR.name,
+        'n',
+        ANCHOR.hint,
+      )
         .setValue(kind.letter)
         .onChange((value) => {
           // Letters, and nothing else. A kind anchoring its notes on a digit
@@ -336,8 +347,18 @@ function docs(href: string, text: string): HTMLAnchorElement {
 /** What a letter a kind anchors its notes with may be made of. */
 const LETTERS = /^[a-z]+$/i;
 
+/** The column a kind's letter is typed into, which is the one that needs saying. */
+const ANCHOR = {
+  name: 'Anchor',
+  hint: "A letter, written into the block id of every note of this kind: `n` anchors them `^shedd-psa-1-n2`. It is what keeps one kind's numbering apart from another's.",
+};
+
 /** What a row of the kinds table says, left to right. */
-const COLUMNS = ['Callout', 'Anchor letter', 'Name'];
+const COLUMNS: { name: string; hint?: string }[] = [
+  { name: 'Callout' },
+  ANCHOR,
+  { name: 'Name' },
+];
 
 /**
  * A letter no kind is anchoring its notes with, for the kind being added.
@@ -370,9 +391,14 @@ function freeLetter(kinds: NoteKind[]): string {
  * while it is empty, and the tooltip says it again once it is full, since a
  * row of four boxes reads as four boxes otherwise.
  */
-function field(text: TextComponent, name: string, example: string) {
-  text.inputEl.setAttribute('aria-label', name);
-  text.inputEl.title = name;
+function field(
+  text: TextComponent,
+  name: string,
+  example: string,
+  hint = name,
+) {
+  text.inputEl.setAttribute('aria-label', hint);
+  text.inputEl.title = hint;
   return text.setPlaceholder(example);
 }
 
