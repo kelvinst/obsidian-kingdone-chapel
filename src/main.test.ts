@@ -2047,6 +2047,11 @@ describe('resolveEmbeds', () => {
     expect(await world.plugin.resolveEmbeds(text, file)).toBe('Um comentário.');
   });
 
+  it('drops an embed of a block that names no verse', async () => {
+    const text = '![[ARA-01-GEN-001#^titulo]]\n\nUm comentário.';
+    expect(await world.plugin.resolveEmbeds(text, file)).toBe('Um comentário.');
+  });
+
   it('follows a version answering a version answering a translation', async () => {
     world.vault.write(
       chapterPath('SHEDD', 1, 'GEN', 1),

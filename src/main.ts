@@ -1283,7 +1283,12 @@ export default class KingdoneChapelPlugin extends Plugin {
       from.path,
     );
     if (!dest) return '';
-    const verse = await this.verseIn(dest, verseInId(id));
+    // An id that ends anywhere but on a number names something other than a
+    // verse, and asking for no verse at all would answer with the chapter's
+    // first one — a verse nobody pointed at.
+    const wanted = verseInId(id);
+    if (wanted === null) return '';
+    const verse = await this.verseIn(dest, wanted);
     if (!verse) return '';
     return this.resolveEmbeds(verse.text, dest, new Set(seen).add(key));
   }
