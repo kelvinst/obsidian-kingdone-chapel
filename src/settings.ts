@@ -1,7 +1,7 @@
 import { PluginSettingTab, Setting } from 'obsidian';
-import type { App } from 'obsidian';
+import type { App, TextComponent } from 'obsidian';
 
-import { LANGS } from './books';
+import { LANGS, nameLang } from './books';
 import type { Lang } from './books';
 import { DEFAULT_NOTE_KINDS } from './notes';
 import type { NoteKind } from './notes';
@@ -135,12 +135,12 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName('Kinds of note')
       .setDesc(
-        'What `Write a note on this verse` offers, and how each kind is written: ' +
-          'the callout it is written as, the letter its anchors carry — `n2`, ' +
-          '`h2`, `r2`, which is what keeps one kind numbered apart from another — ' +
-          'and what it is called in each language. The first is the one offered ' +
-          'first. A callout is a name your theme or your CSS snippet draws; the ' +
-          "ones here are this vault's own.",
+        'What "Write a note on this verse" offers, one row each, in the order ' +
+          'they are offered in. A row says four things: the callout the note is ' +
+          'written as, the letter its anchors carry — n2, h2, r2, which is what ' +
+          'keeps one kind numbered apart from another — and what the kind is ' +
+          'called in Portuguese and in English. A callout is a name your theme ' +
+          "or your CSS snippet draws; the ones here are this vault's own.",
       )
       .addButton((b) =>
         b.setButtonText('Add').onClick(async () => {
@@ -164,25 +164,29 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
       );
 
     this.plugin.noteKinds().forEach((kind, at) => {
+      // Named for the kind it is, so a row says which one it is before any of
+      // its fields are read, and describes its fields in the order they sit
+      // in: four boxes in a line say nothing about themselves.
       const setting = new Setting(containerEl)
         .setClass('kcp-note-kind')
+        .setName(
+          kind.titles[nameLang(this.plugin.settings.language)] || kind.callout,
+        )
+        .setDesc('Callout, anchor letter, Portuguese, English')
         .addText((text) =>
-          text
-            .setPlaceholder('callout')
+          field(text, 'Callout', 'note')
             .setValue(kind.callout)
             .onChange((value) => this.setKind(at, { callout: value.trim() })),
         )
         .addText((text) =>
-          text
-            .setPlaceholder('n')
+          field(text, 'Anchor letter', 'n')
             .setValue(kind.letter)
             .onChange((value) => this.setKind(at, { letter: value.trim() })),
         );
 
       for (const lang of LANGS) {
         setting.addText((text) =>
-          text
-            .setPlaceholder(lang)
+          field(text, LANG_NAMES[lang], LANG_NAMES[lang])
             .setValue(kind.titles[lang] || '')
             .onChange((value) => this.setTitle(at, lang, value.trim())),
         );
@@ -294,6 +298,20 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
     this.plugin.settings.noteKinds = kinds;
     await this.plugin.saveSettings();
   }
+}
+
+/** What each language is called, for the field a kind's name is typed into. */
+const LANG_NAMES: Record<Lang, string> = { pt: 'Portuguese', en: 'English' };
+
+/**
+ * A field of a kind, named twice over: the placeholder says what belongs in it
+ * while it is empty, and the tooltip says it again once it is full, since a
+ * row of four boxes reads as four boxes otherwise.
+ */
+function field(text: TextComponent, name: string, example: string) {
+  text.inputEl.setAttribute('aria-label', name);
+  text.inputEl.title = name;
+  return text.setPlaceholder(example);
 }
 
 /** A kind with no name yet, in every language the plugin writes. */

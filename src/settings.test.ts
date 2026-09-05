@@ -404,3 +404,40 @@ describe('the last kind of note', () => {
     expect(world.plugin.settings.noteKinds).toHaveLength(1);
   });
 });
+
+describe('a row of the kinds list', () => {
+  function rows(): HTMLElement[] {
+    return Array.from(
+      containerEl.querySelectorAll<HTMLElement>('.kcp-note-kind'),
+    );
+  }
+
+  it('is named for the kind it is, in the language names are written in', () => {
+    expect(
+      rows().map((row) => row.querySelector('.setting-item-name')?.textContent),
+    ).toEqual(['Nota', 'Nótula Homilética', 'Nota dos Revisores']);
+  });
+
+  it('says what its fields are, and each field says it again', () => {
+    const row = rows()[0];
+    expect(row.querySelector('.setting-item-description')?.textContent).toBe(
+      'Callout, anchor letter, Portuguese, English',
+    );
+    expect(
+      Array.from(row.querySelectorAll<HTMLInputElement>('input')).map(
+        (field) => field.title,
+      ),
+    ).toEqual(['Callout', 'Anchor letter', 'Portuguese', 'English']);
+  });
+
+  it('is named for its callout while it has no name of its own', async () => {
+    world.plugin.settings.noteKinds = [
+      { callout: 'marginalia', letter: 'm', titles: { pt: '', en: '' } },
+    ];
+    tab.display();
+
+    expect(rows()[0].querySelector('.setting-item-name')?.textContent).toBe(
+      'marginalia',
+    );
+  });
+});
