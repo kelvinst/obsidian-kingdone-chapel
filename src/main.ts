@@ -99,6 +99,12 @@ const RENAMED: Record<string, string> = {
   revisores: 'reviewers',
 };
 
+/** What a callout of that name was renamed to, or nothing where it is its own. */
+function renaming(callout: string): string | null {
+  const own = Object.prototype.hasOwnProperty.call(RENAMED, callout);
+  return own ? RENAMED[callout] : null;
+}
+
 /** A run of verse numbers as a notice says them: `verse 2`, `verses 2, 4`. */
 function said(verses: number[]): string {
   const one = verses.length === 1;
@@ -214,11 +220,13 @@ export default class KingdoneChapelPlugin extends Plugin {
     // the names this plugin shipped are rewritten; a callout of the reader's
     // own is theirs, whatever it is called.
     if (Array.isArray(this.settings.noteKinds)) {
-      this.settings.noteKinds = this.settings.noteKinds.map((kind) =>
-        kind && RENAMED[kind.callout]
-          ? { ...kind, callout: RENAMED[kind.callout] }
-          : kind,
-      );
+      this.settings.noteKinds = this.settings.noteKinds.map((kind) => {
+        // Asked of the table itself rather than of what it inherits: a callout
+        // named `toString` would otherwise be renamed to the function of that
+        // name, which the next save drops on its way through JSON.
+        const renamed = kind && renaming(kind.callout);
+        return renamed ? { ...kind, callout: renamed } : kind;
+      });
     }
     this.chapterCache = new Map();
 

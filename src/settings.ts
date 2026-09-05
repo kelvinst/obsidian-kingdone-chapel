@@ -191,12 +191,13 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
       field(new TextComponent(row.createEl('td')), 'Anchor letter', 'n')
         .setValue(kind.letter)
         .onChange((value) => {
-          // A kind with no letter anchors its notes `^shedd-psa-1-7`, which is
+          // Letters, and nothing else. A kind anchoring its notes on a digit
+          // — or on nothing at all — anchors them `^shedd-psa-1-11`, which is
           // what a verse is anchored, so the chapter would carry a note its
-          // own verses cannot be told apart from. A field emptied to type
-          // another letter into keeps the one it had until one is typed.
+          // own verses cannot be told apart from. A field being typed into
+          // keeps the letter it had until it holds one.
           const letter = value.trim();
-          if (letter) this.setKind(at, { letter });
+          if (LETTERS.test(letter)) this.setKind(at, { letter });
         });
 
       field(new TextComponent(row.createEl('td')), 'Name', 'Nota')
@@ -300,6 +301,9 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
   }
 }
 
+/** What a letter a kind anchors its notes with may be made of. */
+const LETTERS = /^[a-z]+$/i;
+
 /** What a row of the kinds table says, left to right. */
 const COLUMNS = ['Callout', 'Anchor letter', 'Name'];
 
@@ -309,13 +313,24 @@ const COLUMNS = ['Callout', 'Anchor letter', 'Name'];
  * Each letter is a numbering of its own — `n1` counts apart from `h1` — so a
  * new kind sharing a letter shares the count, and the anchors stop saying
  * which kind they belong to. A vault that has somehow used every letter is
- * given none, and says so by leaving the field empty to be typed into.
+ * given a pair of them, since a kind on no letter at all anchors its notes
+ * where the verses are.
  */
 function freeLetter(kinds: NoteKind[]): string {
   const taken = new Set(kinds.map((kind) => kind.letter));
-  return (
-    'abcdefghijklmnopqrstuvwxyz'.split('').find((l) => !taken.has(l)) || ''
-  );
+  const letters = 'abcdefghijklmnopqrstuvwxyz'.split('');
+  const free = letters.find((letter) => !taken.has(letter));
+  if (free) return free;
+
+  // Every single letter is spoken for, so the pairs are asked next: a kind
+  // added on no letter at all would anchor its notes the way a verse is
+  // anchored, which is the one answer this must not give.
+  for (const first of letters) {
+    for (const second of letters) {
+      if (!taken.has(first + second)) return first + second;
+    }
+  }
+  return '';
 }
 
 /**

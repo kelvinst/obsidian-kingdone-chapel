@@ -451,9 +451,16 @@ describe('a kind with something missing', () => {
     return found;
   }
 
-  it('keeps the letter it had while the field is empty', async () => {
+  it('keeps the letter it had while the field holds no letter', async () => {
     const letter = fields(0)[1];
     letter.value = '';
+    change(letter, 'input');
+    await Promise.resolve();
+    expect(world.plugin.settings.noteKinds[0].letter).toBe('n');
+
+    // A digit anchors a note where a verse is anchored, so it is no answer
+    // either.
+    letter.value = '1';
     change(letter, 'input');
     // Nothing to wait for: the letter is only written when one is typed.
     await Promise.resolve();
@@ -472,7 +479,25 @@ describe('a kind with something missing', () => {
     expect(world.plugin.settings.noteKinds[3].letter).toBe('a');
   });
 
-  it('is added on no letter at all where every one of them is taken', async () => {
+  it('is added on no letter at all where even the pairs are taken', async () => {
+    const letters = 'abcdefghijklmnopqrstuvwxyz'.split('');
+    const every = [
+      ...letters,
+      ...letters.flatMap((first) => letters.map((second) => first + second)),
+    ];
+    world.plugin.settings.noteKinds = every.map((letter) => ({
+      callout: 'note',
+      letter,
+      title: letter,
+    }));
+    tab.display();
+
+    button('Add').dispatchEvent(new Event('click'));
+    await vi.waitFor(() => expect(rows()).toHaveLength(every.length + 1));
+    expect(world.plugin.settings.noteKinds[every.length].letter).toBe('');
+  });
+
+  it('is added on a pair of letters where every single one is taken', async () => {
     world.plugin.settings.noteKinds = 'abcdefghijklmnopqrstuvwxyz'
       .split('')
       .map((letter) => ({ callout: 'note', letter, title: letter }));
@@ -480,6 +505,6 @@ describe('a kind with something missing', () => {
 
     button('Add').dispatchEvent(new Event('click'));
     await vi.waitFor(() => expect(rows()).toHaveLength(27));
-    expect(world.plugin.settings.noteKinds[26].letter).toBe('');
+    expect(world.plugin.settings.noteKinds[26].letter).toBe('aa');
   });
 });

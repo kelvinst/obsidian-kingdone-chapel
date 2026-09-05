@@ -2692,3 +2692,17 @@ describe('the kinds a vault saved before the callouts were renamed', () => {
     expect(await loaded('homiletica')).toBe('homiletica');
   });
 });
+
+describe('a kind named after something every object carries', () => {
+  it('is left as it is, rather than renamed to what a name inherits', async () => {
+    const world = harness({}, {});
+    world.plugin.data = {
+      noteKinds: [{ callout: 'toString', letter: 't', title: 'Assim' }],
+    };
+    await world.plugin.onload();
+
+    expect(world.plugin.settings.noteKinds).toEqual([
+      { callout: 'toString', letter: 't', title: 'Assim' },
+    ]);
+  });
+});
