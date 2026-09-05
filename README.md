@@ -130,9 +130,9 @@ every verse in it and quotes every one of them in its body.
 
 Three kinds ship with the plugin — **Nota** (`[!note]`, anchored `n1`), **Nótula Homilética**
 (`[!homiletica]`, `h1`) and **Nota dos Revisores** (`[!revisores]`, `r1`) — and the settings tab
-lists them: the callout each is written as, the letter its anchors carry, and what it is called
-in each language. Add your own, or write over these; the first in the list is the one offered
-first. The callouts are drawn by your theme or by a CSS snippet, and the ones here are this
+lists them as a table: the callout each is written as, the letter its anchors carry, and the
+name it is given in a note's title. Add your own, or write over these; the first in the list is
+the one offered first. The callouts are drawn by your theme or by a CSS snippet, and the ones here are this
 vault's own.
 
 ### Chapter breadcrumbs
