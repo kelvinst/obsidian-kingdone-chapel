@@ -46,17 +46,25 @@ describe('softLinkRenderer', () => {
     ]);
   });
 
+  it('resolves a same-note anchor, which names no other file', () => {
+    const el = rendered('<p>((#^shedd-psa-103-10|Sl 103.10))</p>');
+    expect(links(el)).toEqual(['internal-link|#^shedd-psa-103-10>Sl 103.10']);
+  });
+
   it('opens the note a click names, in this pane', () => {
     const app = stub();
     const el = rendered('<p>((Shedd-19-PSA-023|23))</p>', app);
-    el.querySelector('a')!.dispatchEvent(
-      new MouseEvent('click', { bubbles: true, cancelable: true }),
-    );
+    const evt = new MouseEvent('click', { bubbles: true, cancelable: true });
+    el.querySelector('a')!.dispatchEvent(evt);
     expect(app.workspace.openLinkText).toHaveBeenCalledWith(
       'Shedd-19-PSA-023',
       'Shedd-19-PSA-000.md',
       false,
     );
+    // `data-href` on `.internal-link` is what Obsidian's own delegated click
+    // handler reads; without `preventDefault()` it would open the same note a
+    // second time on top of the `openLinkText` call above.
+    expect(evt.defaultPrevented).toBe(true);
   });
 
   it('opens it in a new pane where the click asked for one', () => {
@@ -139,6 +147,18 @@ describe('softLinkRenderer', () => {
         '<p>((Shedd-19-PSA-023|23))</p></div></div>',
     );
     expect(links(el).length).toBe(1);
+  });
+
+  it('draws nothing for a display holding markup, pinned as current behaviour', () => {
+    // `((a|**1**))` is a token the grammar accepts, its display being prose —
+    // but markdown has already rendered `**1**` into a `<strong>` by the time
+    // this runs, so the text node reading the token is split into three:
+    // `((a|` and `))` either side of the element. Neither piece names a
+    // complete token, so nothing is drawn. Node-joining across an inline
+    // element is not chased here; this only pins what happens today.
+    const el = rendered('<p>((a|<strong>1</strong>))</p>');
+    expect(links(el)).toEqual([]);
+    expect(el.querySelector('strong')?.textContent).toBe('1');
   });
 
   it('leaves a note with no token untouched', () => {

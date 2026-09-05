@@ -9,7 +9,7 @@ import type { EditorState, Range } from '@codemirror/state';
 import { editorLivePreviewField } from 'obsidian';
 
 import { runsIn } from './syntax';
-import { CODE_BLOCK, touched, unquoted } from './source';
+import { CODE_BLOCK, NOT_PROSE_SOURCE, touched, unquoted } from './source';
 
 /**
  * The three marks while the note is being edited.
@@ -44,19 +44,16 @@ const LABEL = '\uFFFD';
 /**
  * What the source holds that the reader never sees as prose.
  *
- * Code and maths are one half of it, and links the other: a link carries its
- * target as well as its label, and a target is full of delimiters the note
- * never wrote. A block anchor is a caret — `[[NVI-43-JHN-001#^nvi-jhn-1-1|Jo
+ * `NOT_PROSE_SOURCE` in `source.ts` is code, maths and links, shared with
+ * `softlink-live.ts`'s own masking. Added here is a block anchor, which only
+ * this file's runs need masked: a caret — `[[NVI-43-JHN-001#^nvi-jhn-1-1|Jo
  * 1.1]]` — so a line naming two of them would otherwise read as one long
  * superscript, and so would a verse between two lines ending in block ids.
- *
- * Maths is held to Obsidian's own rule, that a dollar opening or closing it
- * touches what it delimits. Two dollars written as money would otherwise pair
- * off and blank out everything between them, `,,Custa $5,, e $6` losing the
- * exclamations that close the aside along with the rest.
  */
-const NOT_PROSE =
-  /`[^`\n]*`|\$(?![\s$])[^$\n]*[^\s$]\$|!?\[\[[^\]\n]*\]\]|\[[^\]\n]*\]\([^)\n]*\)|\^[\w-]+(?=[ \t]*$)/gm;
+const NOT_PROSE = new RegExp(
+  `${NOT_PROSE_SOURCE}|\\^[\\w-]+(?=[ \\t]*$)`,
+  'gm',
+);
 
 /**
  * A line that begins a block of its own: a list item, a heading, a quote, a

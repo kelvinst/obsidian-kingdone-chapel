@@ -12,7 +12,7 @@ import type { App } from 'obsidian';
 import { softLinksIn } from './softlink';
 import type { SoftLink } from './softlink';
 import { linkEl } from './softlink-read';
-import { CODE_BLOCK, touched, unquoted } from './source';
+import { CODE_BLOCK, NOT_PROSE_SOURCE, touched, unquoted } from './source';
 
 /**
  * The links a note draws while it is being written.
@@ -29,14 +29,23 @@ import { CODE_BLOCK, touched, unquoted } from './source';
  */
 
 /**
- * Blank out inline code, keeping every other character where it was.
+ * Blank out what a token has no business being read out of, keeping every
+ * other character where it was: inline code, maths, and the label of a
+ * rendered wikilink or markdown link — the same constructs `softlink-read.ts`
+ * excludes by tag name in its `verbatim`, read here out of the source instead
+ * since the editor has no rendered element to check. Left unmasked on
+ * purpose: a 4-space indented code block and frontmatter, telling either apart
+ * from a nested list item or the note's own prose needs list context this
+ * line-at-a-time reader does not have.
  *
  * The stand-in is as long as what it replaces, so a token's place in the line is
  * still its place after masking, and `` `((a|1))` `` is a token the note is
  * showing rather than one it is drawing.
  */
+const NOT_PROSE = new RegExp(NOT_PROSE_SOURCE, 'g');
+
 function mask(text: string): string {
-  return text.replace(/`[^`\n]*`/g, (found) => '￼'.repeat(found.length));
+  return text.replace(NOT_PROSE, (found) => '￼'.repeat(found.length));
 }
 
 /** The anchor standing in for a token, drawn where the token was written. */
@@ -98,9 +107,15 @@ export function build(
   const into: Range<Decoration>[] = [];
   let code = false;
   let codeDepth = 0;
+  // Past the foot of what is on screen, nothing can still affect a
+  // decoration — a token cannot reach past its own line, so unlike a mark's
+  // run there is no block straddling the bottom left to finish — only a fence
+  // opened above it matters, and that is read on the way down to it.
+  const bottom = visible.length ? visible[visible.length - 1].to : -1;
 
   for (let number = 1; number <= state.doc.lines; number++) {
     const line = state.doc.line(number);
+    if (line.from > bottom) break;
     const said = unquoted(line.text);
     const quoted = (
       line.text.slice(0, line.text.length - said.length).match(/>/g) ?? []

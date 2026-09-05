@@ -53,10 +53,19 @@ export interface SoftLink {
  * usually called. It may not be blank, an empty label leaving nothing on the
  * page to click.
  *
+ * The trimming of the display's surrounding spaces happens after the match, in
+ * `softLinksIn`, not here. A pattern that trims itself needs a lazy quantifier
+ * around the spaces to know where they end, and a lazy quantifier next to
+ * `[ \t]*` gives the engine a run it can split however many ways — every one of
+ * them tried before it gives up on an unterminated token, which made an
+ * unclosed `((a|` followed by a long run of spaces take seconds to fail on.
+ * Matching the whole run greedily and trimming the string afterward keeps the
+ * same result in linear time.
+ *
  * Nothing is written as `.`, which would match the newline between two lines and
  * let a token reach out of the one it opened in.
  */
-const LINK = /\(\(([^\s()[\]|\n]+)(?:\|[ \t]*([^()[\]|\n]*?)[ \t]*)?\)\)/g;
+const LINK = /\(\(([^\s()[\]|\n]+)(?:\|([^()[\]|\n]*))?\)\)/g;
 
 /**
  * Every link in `text`, in the order they were written, counted from `offset`.
@@ -70,11 +79,13 @@ export function softLinksIn(text: string, offset = 0): SoftLink[] {
   let match = LINK.exec(text);
   while (match) {
     const path = match[1];
-    const display = match[2];
-    // A token written `((a|))` says it wants a label and gives none. Reading it
-    // as an unaliased link would put the file name on the page instead, which
-    // is not what was asked for either; it is left as the note wrote it.
-    if (display === undefined || display !== '') {
+    const display = match[2]?.trim();
+    // A token written `((a|))` says it wants a label and gives none — and so
+    // does one written `((a|  ))`, the spaces trimmed away leaving nothing.
+    // Reading it as an unaliased link would put the file name on the page
+    // instead, which is not what was asked for either; it is left as the note
+    // wrote it.
+    if (display !== '') {
       const from = offset + match.index;
       found.push({
         from,
