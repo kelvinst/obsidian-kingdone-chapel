@@ -116,7 +116,7 @@ describe('the note being written', () => {
 
   it('names a kind by its callout where the language has no name for it', () => {
     world.plugin.settings.noteKinds = [
-      { callout: 'marginalia', letter: 'm', titles: { pt: '', en: '' } },
+      { callout: 'marginalia', letter: 'm', title: '' },
     ];
     const modal = opened();
     expect(

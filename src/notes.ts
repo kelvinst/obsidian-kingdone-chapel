@@ -14,7 +14,6 @@
  * over the chapter's text: the command reads the verse, asks which kind of
  * note and which number, and applies what these hand back.
  */
-import type { Lang } from './books';
 import { outsideFences } from './utils';
 
 /** A range of the chapter to be replaced, in the editor's own terms. */
@@ -36,8 +35,15 @@ export interface NoteKind {
   callout: string;
   /** Letter its anchors carry, which is what tells one kind's numbers apart. */
   letter: string;
-  /** What it is called, by language: `Nota`, `Note`. */
-  titles: Record<Lang, string>;
+  /**
+   * What it is called, in the title of every note written as it: `Nota`.
+   *
+   * One name rather than one per language. A kind is a vault's own — the
+   * callout is drawn by its own stylesheet, and the notes are written in
+   * whatever the commentary is written in — so the name is written once, the
+   * way it is to be read, rather than translated by a setting.
+   */
+  title: string;
 }
 
 /**
@@ -50,17 +56,9 @@ export interface NoteKind {
  * notes has no way of writing them otherwise.
  */
 export const DEFAULT_NOTE_KINDS: NoteKind[] = [
-  { callout: 'note', letter: 'n', titles: { pt: 'Nota', en: 'Note' } },
-  {
-    callout: 'homiletica',
-    letter: 'h',
-    titles: { pt: 'Nótula Homilética', en: 'Homiletic Note' },
-  },
-  {
-    callout: 'revisores',
-    letter: 'r',
-    titles: { pt: 'Nota dos Revisores', en: "Reviewers' Note" },
-  },
+  { callout: 'note', letter: 'n', title: 'Nota' },
+  { callout: 'homiletica', letter: 'h', title: 'Nótula Homilética' },
+  { callout: 'revisores', letter: 'r', title: 'Nota dos Revisores' },
 ];
 
 /** The block ids a chapter's verses carry, up to the verse number itself. */

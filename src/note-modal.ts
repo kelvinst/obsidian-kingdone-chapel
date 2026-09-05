@@ -1,7 +1,6 @@
 import { Modal, Notice, Setting } from 'obsidian';
 import type { App } from 'obsidian';
 
-import { nameLang } from './books';
 import { nextNoteNumber } from './notes';
 import type { NoteKind } from './notes';
 import type { NoteTarget } from './main';
@@ -41,9 +40,9 @@ export class WriteNoteModal extends Modal {
     return nextNoteNumber(editor.getValue(), this.target.prefix, kind.letter);
   }
 
-  /** What a kind is called, in the language the plugin writes. */
+  /** What a kind is called, or its callout where it is called nothing yet. */
   title(kind: NoteKind): string {
-    return kind.titles[nameLang(this.plugin.settings.language)] || kind.callout;
+    return kind.title || kind.callout;
   }
 
   onOpen() {
