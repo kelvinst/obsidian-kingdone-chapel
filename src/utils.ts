@@ -98,6 +98,8 @@ export interface VerseLine {
 
 /** The block id closing a verse line: `^nvi-gen-1-1`, ending in chapter and verse. */
 const BLOCK_ID = /\s*\^([A-Za-z0-9-]+)\s*$/;
+/** A Markdown heading, which names a section rather than writing a verse. */
+const VERSE_HEADING = /^#{1,6}\s/;
 /** How a verse line opens: an ordered list item now, a bolded number in older chapters. */
 const VERSE_MARKER = /^\s*(?:\*\*(\d+)\*\*|(\d+)\.)\s*/;
 /** The verse a block id names, in the number it ends on. */
@@ -166,7 +168,9 @@ export function parseVerses(content: string): VerseLine[] {
       above = [];
       continue;
     }
-    if (line.trim() === '') above = [];
+    // A blank line ends what stands above, and so does a heading: a verse is
+    // written under one, never out of it.
+    if (line.trim() === '' || VERSE_HEADING.test(line)) above = [];
     else above.push(line);
   }
 

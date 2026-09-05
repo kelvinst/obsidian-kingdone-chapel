@@ -415,6 +415,12 @@ describe('parseVerses', () => {
     ).toEqual([{ verse: 1, text: verse }]);
   });
 
+  it('stops at a heading, so it is not read into the verse under it', () => {
+    expect(
+      parseVerses('## Os justos\nFeliz o homem. ^shedd-psa-1-1\n'),
+    ).toEqual([{ verse: 1, text: 'Feliz o homem.' }]);
+  });
+
   it('leaves a verse that writes itself out alone', () => {
     expect(
       parseVerses('## Uma seção\n1. Falou o SENHOR. ^ara-lev-1-1\n'),
