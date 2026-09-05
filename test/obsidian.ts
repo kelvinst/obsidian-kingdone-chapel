@@ -200,6 +200,16 @@ export function getLinkpath(linktext: string): string {
   return linktext.split('#')[0];
 }
 
+/**
+ * Whether a click asked for a new pane. The app reads the platform's own
+ * modifier; a test says which one it pressed and this believes it.
+ */
+export class Keymap {
+  static isModEvent(evt?: MouseEvent | KeyboardEvent | null): boolean | 'tab' {
+    return !!evt && (evt.ctrlKey || evt.metaKey);
+  }
+}
+
 export class MarkdownRenderer {
   /** Every render since the last reset, so a test can see what was drawn. */
   static rendered: { markdown: string; path: string }[] = [];
@@ -348,7 +358,7 @@ export class Plugin extends Component {
   settingTabs: PluginSettingTab[] = [];
   suggests: unknown[] = [];
   /** What `onload` gave the renderer, for a test to run over an element. */
-  postProcessors: ((el: HTMLElement) => unknown)[] = [];
+  postProcessors: ((el: HTMLElement, ctx: never) => unknown)[] = [];
   /** What `onload` gave the editor, so a test can see one was. */
   editorExtensions: unknown[] = [];
   ribbons: { icon: string; title: string; callback: () => void }[] = [];
@@ -392,10 +402,12 @@ export class Plugin extends Component {
     this.suggests.push(suggest);
   }
 
-  registerMarkdownPostProcessor(
-    processor: (el: HTMLElement) => unknown,
-  ): (el: HTMLElement) => unknown {
-    this.postProcessors.push(processor);
+  registerMarkdownPostProcessor<T>(
+    processor: (el: HTMLElement, ctx: T) => unknown,
+  ): (el: HTMLElement, ctx: T) => unknown {
+    this.postProcessors.push(
+      processor as (el: HTMLElement, ctx: never) => unknown,
+    );
     return processor;
   }
 
