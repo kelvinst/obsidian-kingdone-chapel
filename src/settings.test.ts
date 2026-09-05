@@ -508,3 +508,43 @@ describe('a kind with something missing', () => {
     expect(world.plugin.settings.noteKinds[26].letter).toBe('aa');
   });
 });
+
+describe('what the kinds say about their callouts', () => {
+  function desc(): HTMLElement {
+    const found = Array.from(
+      containerEl.querySelectorAll<HTMLElement>('.setting-item'),
+    ).find(
+      (el) =>
+        el.querySelector('.setting-item-name')?.textContent === 'Kinds of note',
+    );
+    const el = found?.querySelector<HTMLElement>('.setting-item-description');
+    if (!el) throw new Error('the kinds are described nowhere');
+    return el;
+  }
+
+  it('says which callouts are whose', () => {
+    const said = desc().textContent || '';
+    expect(said).toContain("`note` is one of Obsidian's own callouts");
+    expect(said).toContain(
+      '`homiletic` and `reviewers` are drawn by this plugin',
+    );
+  });
+
+  it('links out to the callouts a reader may name, and to writing one', () => {
+    expect(
+      Array.from(desc().querySelectorAll('a')).map((link) => [
+        link.textContent,
+        link.getAttribute('href'),
+      ]),
+    ).toEqual([
+      [
+        "Obsidian's own callouts",
+        'https://help.obsidian.md/callouts#Supported+types',
+      ],
+      [
+        'a callout of your own',
+        'https://help.obsidian.md/callouts#Customize+callouts',
+      ],
+    ]);
+  });
+});
