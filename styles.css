@@ -432,7 +432,7 @@
 .kcp-note-hint {
   margin-left: 0.3em;
   color: var(--text-faint);
-  cursor: help;
+  cursor: pointer;
 }
 
 /* The button column is as wide as the button, and is the one that ends the
