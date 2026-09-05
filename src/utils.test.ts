@@ -517,6 +517,10 @@ describe('verseWords', () => {
     expect(verseWords('Feliz ,,nota ^1^ mais,, homem')).toBe('Feliz homem');
   });
 
+  it('drops an embed of what is no verse, bang and all', () => {
+    expect(verseWords('![[ARA-41-MRK-014]] mais')).toBe('mais');
+  });
+
   it('reads a link as the label it was given', () => {
     expect(
       verseWords('Veja [[Shedd-19-PSA-026#^shedd-psa-26-4|Sl 26.4]].'),
