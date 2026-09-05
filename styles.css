@@ -386,3 +386,85 @@
 .cm-line.kcp-small-line .kcp-small {
   font-size: inherit;
 }
+
+/* --- settings: the kinds of note --- */
+
+/* The kinds are a table, and are drawn as one: a row of settings lays its own
+   info column out as wide as whatever it holds, so columns written that way
+   line up with nothing. */
+.kcp-note-kinds {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.kcp-note-kinds th {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-normal);
+  text-align: left;
+  padding: 0 var(--size-4-2) var(--size-2-2) 0;
+}
+
+.kcp-note-kinds td {
+  padding: var(--size-2-2) var(--size-4-2) var(--size-2-2) 0;
+  vertical-align: middle;
+}
+
+.kcp-note-kinds input[type='text'] {
+  width: 100%;
+  min-width: 0;
+}
+
+/* The letter is one character, the callout a word, the name a few: the name
+   takes what is left rather than every column sharing the width evenly. */
+.kcp-note-kinds th:nth-child(1),
+.kcp-note-kinds td:nth-child(1) {
+  width: 10em;
+}
+
+.kcp-note-kinds th:nth-child(2),
+.kcp-note-kinds td:nth-child(2) {
+  width: 5em;
+}
+
+/* The mark that carries what a column is too narrow to say. Quieter than the
+   name it stands beside, and shaped like something to be asked. */
+.kcp-note-hint {
+  margin-left: 0.3em;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+/* The button column is as wide as the button, and is the one that ends the
+   row, so nothing follows it. */
+.kcp-note-kinds th:last-child,
+.kcp-note-kinds td:last-child {
+  width: 1%;
+  padding-right: 0;
+  white-space: nowrap;
+}
+
+/* --- callouts the kinds of note are written as --- */
+
+/* Two of the three kinds a note may be written as. `note` is Obsidian's own —
+   already the blue pencil, and the most frequent of the three, so the default
+   is the right weight for it — and these two need a colour and an icon.
+
+   `--callout-color` has to be a real colour value. Obsidian feeds it to
+   `color-mix(in oklch, var(--callout-color) 10%, transparent)` for the
+   background and reads it as `color` for the title, so the bare `R, G, B`
+   triple the old docs use is invalid here and is dropped: the icon still
+   lands, the colour silently does not.
+
+   Both hues are mid-ramp, so they hold their contrast in the light theme and
+   in the dark one without a per-theme override. */
+
+.callout[data-callout='homiletic'] {
+  --callout-color: #ba7517;
+  --callout-icon: lucide-megaphone;
+}
+
+.callout[data-callout='reviewers'] {
+  --callout-color: #1d9e75;
+  --callout-icon: lucide-glasses;
+}

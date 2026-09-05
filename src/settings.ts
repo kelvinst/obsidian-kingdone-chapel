@@ -1,7 +1,15 @@
-import { PluginSettingTab, Setting } from 'obsidian';
+import {
+  ButtonComponent,
+  PluginSettingTab,
+  Setting,
+  TextComponent,
+  setTooltip,
+} from 'obsidian';
 import type { App } from 'obsidian';
 
 import type { Lang } from './books';
+import { DEFAULT_NOTE_KINDS } from './notes';
+import type { NoteKind } from './notes';
 import type { Source } from './sources';
 import type KingdoneChapelPlugin from './main';
 
@@ -127,6 +135,96 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
           });
       });
 
+    containerEl.createEl('h3', { text: 'Notes' });
+
+    new Setting(containerEl)
+      .setName('Kinds of note')
+      .setDesc(kindsDesc())
+      .addButton((b) =>
+        b.setButtonText('Add').onClick(async () => {
+          const kinds = this.plugin.noteKinds();
+          this.plugin.settings.noteKinds = [
+            ...kinds,
+            { callout: 'note', letter: freeLetter(kinds), title: '' },
+          ];
+          await this.plugin.saveSettings();
+          this.display();
+        }),
+      )
+      .addButton((b) =>
+        b.setButtonText('Reset').onClick(async () => {
+          this.plugin.settings.noteKinds = DEFAULT_NOTE_KINDS.map((kind) => ({
+            ...kind,
+          }));
+          await this.plugin.saveSettings();
+          this.display();
+        }),
+      );
+
+    // A table, because the rows are one: the settings list lays every row out
+    // for itself — an info column as wide as whatever it holds — so columns
+    // written as settings line up with nothing. A table's own columns are the
+    // one width down the whole of it.
+    const table = containerEl.createEl('table', { cls: 'kcp-note-kinds' });
+    const head = table.createEl('thead').createEl('tr');
+    for (const column of COLUMNS) {
+      const cell = head.createEl('th', { text: column.name });
+      // A column too narrow to say what it holds says it on hover instead,
+      // which is where a reader asks.
+      if (!column.hint) continue;
+      // The app's own tooltip and no other: a `title` beside it would draw a
+      // second one, the same words twice over in the window's own hand. Shown
+      // the moment it is hovered, since it is there to be asked.
+      const hint = cell.createSpan({ text: '?', cls: 'kcp-note-hint' });
+      setTooltip(hint, column.hint, { delay: 0 });
+    }
+    // The column the Remove buttons stand in, which names nothing.
+    head.createEl('th');
+
+    const body = table.createEl('tbody');
+    this.plugin.noteKinds().forEach((kind, at) => {
+      const row = body.createEl('tr', { cls: 'kcp-note-kind' });
+
+      field(new TextComponent(row.createEl('td')), 'Callout', 'note')
+        .setValue(kind.callout)
+        .onChange((value) => this.setKind(at, { callout: value.trim() }));
+
+      field(
+        new TextComponent(row.createEl('td')),
+        ANCHOR.name,
+        'n',
+        ANCHOR.hint,
+      )
+        .setValue(kind.letter)
+        .onChange((value) => {
+          // Letters, and nothing else. A kind anchoring its notes on a digit
+          // — or on nothing at all — anchors them `^shedd-psa-1-11`, which is
+          // what a verse is anchored, so the chapter would carry a note its
+          // own verses cannot be told apart from. A field being typed into
+          // keeps the letter it had until it holds one.
+          const letter = value.trim();
+          if (LETTERS.test(letter)) this.setKind(at, { letter });
+        });
+
+      field(new TextComponent(row.createEl('td')), 'Name', 'Nota')
+        .setValue(kind.title)
+        .onChange((value) => this.setKind(at, { title: value.trim() }));
+
+      new ButtonComponent(row.createEl('td'))
+        .setButtonText('Remove')
+        .onClick(async () => {
+          const kinds = this.plugin.noteKinds();
+          // The last one stays. A list left empty is a list the command has
+          // nothing to offer from, so it is read as no answer and the three
+          // written here answer instead — which would put back the very rows
+          // that were just taken away, and add to them the next time.
+          if (kinds.length === 1) return;
+          this.plugin.settings.noteKinds = kinds.filter((_, i) => i !== at);
+          await this.plugin.saveSettings();
+          this.display();
+        });
+    });
+
     containerEl.createEl('h3', { text: 'Sidebar' });
 
     new Setting(containerEl)
@@ -192,6 +290,118 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
       }
     }
   }
+
+  /**
+   * One kind rewritten, with the rest left as they are.
+   *
+   * The rows are read back from the settings on every keystroke rather than
+   * held in the tab, so a row edited while another was added lands on what is
+   * saved rather than on what the tab was drawn from.
+   */
+  async setKind(at: number, over: Partial<NoteKind>) {
+    const kinds = this.plugin
+      .noteKinds()
+      .map((kind, i) => (i === at ? { ...kind, ...over } : kind));
+    this.plugin.settings.noteKinds = kinds;
+    await this.plugin.saveSettings();
+  }
+}
+
+/** Obsidian's own page on the callouts it ships, and on writing one. */
+const CALLOUT_DOCS = 'https://help.obsidian.md/callouts#Supported+types';
+const CUSTOM_CALLOUT_DOCS =
+  'https://help.obsidian.md/callouts#Customize+callouts';
+
+/**
+ * What the kinds are, and what a kind of the reader's own has to name.
+ *
+ * A callout is drawn by whoever defined it: `note` is Obsidian's, the two
+ * beside it are this plugin's, and one this vault has never heard of is
+ * written in the plain grey of a callout nothing draws — which is a hard thing
+ * to work out from the note it leaves behind. So the two places a callout can
+ * come from are said here, and linked.
+ */
+function kindsDesc(): DocumentFragment {
+  const desc = document.createDocumentFragment();
+  desc.append(
+    'What "Write a note on this verse" offers, one row each, in the order ' +
+      'they are offered in. A row says three things: the callout the note is ' +
+      'written as, the letter its anchors carry — n2, h2, r2, which is what ' +
+      'keeps one kind numbered apart from another — and the name it is given ' +
+      'in the title of every note written as it. ',
+    '`note` is one of ',
+    docs(CALLOUT_DOCS, "Obsidian's own callouts"),
+    '; `homiletic` and `reviewers` are drawn by this plugin. A kind of your ' +
+      'own has to name a callout something draws: one of Obsidian’s, or ',
+    docs(CUSTOM_CALLOUT_DOCS, 'a callout of your own'),
+    ', written into your theme or a CSS snippet.',
+  );
+  return desc;
+}
+
+/** A link out to the app's own documentation, opened where links open. */
+function docs(href: string, text: string): HTMLAnchorElement {
+  const link = document.createElement('a');
+  link.href = href;
+  link.textContent = text;
+  return link;
+}
+
+/** What a letter a kind anchors its notes with may be made of. */
+const LETTERS = /^[a-z]+$/i;
+
+/** The column a kind's letter is typed into, which is the one that needs saying. */
+const ANCHOR = {
+  name: 'Anchor',
+  hint: "A letter, written into the block id of every note of this kind: `n` anchors them `^shedd-psa-1-n2`. It is what keeps one kind's numbering apart from another's.",
+};
+
+/** What a row of the kinds table says, left to right. */
+const COLUMNS: { name: string; hint?: string }[] = [
+  { name: 'Callout' },
+  ANCHOR,
+  { name: 'Name' },
+];
+
+/**
+ * A letter no kind is anchoring its notes with, for the kind being added.
+ *
+ * Each letter is a numbering of its own — `n1` counts apart from `h1` — so a
+ * new kind sharing a letter shares the count, and the anchors stop saying
+ * which kind they belong to. A vault that has somehow used every letter is
+ * given a pair of them, since a kind on no letter at all anchors its notes
+ * where the verses are.
+ */
+function freeLetter(kinds: NoteKind[]): string {
+  const taken = new Set(kinds.map((kind) => kind.letter));
+  const letters = 'abcdefghijklmnopqrstuvwxyz'.split('');
+  const free = letters.find((letter) => !taken.has(letter));
+  if (free) return free;
+
+  // Every single letter is spoken for, so the pairs are asked next: a kind
+  // added on no letter at all would anchor its notes the way a verse is
+  // anchored, which is the one answer this must not give.
+  for (const first of letters) {
+    for (const second of letters) {
+      if (!taken.has(first + second)) return first + second;
+    }
+  }
+  return '';
+}
+
+/**
+ * A field of a kind, named twice over: the placeholder says what belongs in it
+ * while it is empty, and the tooltip says it again once it is full, since a
+ * row of four boxes reads as four boxes otherwise.
+ */
+function field(
+  text: TextComponent,
+  name: string,
+  example: string,
+  hint = name,
+) {
+  setTooltip(text.inputEl, hint, { delay: 0 });
+  return text.setPlaceholder(example);
 }
 
 /**

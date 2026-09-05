@@ -293,7 +293,7 @@ function beforeFence(outside: boolean[], line: number): number {
  * that closes it is the end of the block and is out again, so that a quote may
  * be written after a block without being written into it.
  */
-function outsideFences(lines: string[]): boolean[] {
+export function outsideFences(lines: string[]): boolean[] {
   let fenced = false;
   return lines.map((line) => {
     if (!FENCE.test(line)) return !fenced;

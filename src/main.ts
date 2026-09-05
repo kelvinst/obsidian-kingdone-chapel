@@ -6,7 +6,7 @@ import {
   WorkspaceLeaf,
   getLinkpath,
 } from 'obsidian';
-import type { PaneType, TAbstractFile } from 'obsidian';
+import type { Editor, PaneType, TAbstractFile } from 'obsidian';
 
 import { DEFAULT_SETTINGS, VIEW_TYPE } from './types';
 import type {
@@ -20,13 +20,30 @@ import type {
 import {
   chapterFileName,
   chapterKey,
+  hasBlockId,
   parseBookName,
   parseChapterName,
   parseVerseLine,
   parseVerses,
   verseInId,
 } from './utils';
-import { bookName, bookNameAt, nameLang, translationsName } from './books';
+import {
+  bookName,
+  bookNameAt,
+  nameLang,
+  noteHeadings,
+  quoteHeadings,
+  translationsName,
+} from './books';
+import { passageLabel } from './reference';
+import {
+  DEFAULT_NOTE_KINDS,
+  chapterPrefix,
+  noteAnchor,
+  noteWrites,
+} from './notes';
+import type { NoteKind } from './notes';
+import { WriteNoteModal } from './note-modal';
 import { VersionSuggestModal } from './modal';
 import { CreateVersionModal } from './create-modal';
 import { ReferenceSuggest } from './suggest';
@@ -45,6 +62,54 @@ import {
   sourceOf,
 } from './sources';
 import type { Source } from './sources';
+
+/**
+ * As much of the Vim extension as switching into insert mode needs: the key
+ * handler, over the CodeMirror 5 adapter the extension keeps for the view.
+ */
+interface VimAdapter {
+  Vim?: { handleKey: (adapter: unknown, key: string, from: string) => void };
+}
+
+/**
+ * The adapter itself: the class it is of carries the same handler, and its
+ * state says which mode the editor is in.
+ */
+interface Adapter {
+  constructor?: VimAdapter;
+  state?: { vim?: { insertMode?: boolean } };
+  /** The element the editor is typed into, where this is the view itself. */
+  contentDOM?: HTMLElement;
+}
+
+/** A chapter a note is being written into, as the command reads it. */
+export interface NoteTarget {
+  view: MarkdownView;
+  /** What the chapter's verse ids open with: `shedd-psa-1`. */
+  prefix: string;
+  /** The book as it is named in the note's title. */
+  book: string;
+  chapter: number;
+  verses: number[];
+}
+
+/** The callouts this plugin ships, under the names it shipped them under first. */
+const RENAMED: Record<string, string> = {
+  homiletica: 'homiletic',
+  revisores: 'reviewers',
+};
+
+/** What a callout of that name was renamed to, or nothing where it is its own. */
+function renaming(callout: string): string | null {
+  const own = Object.prototype.hasOwnProperty.call(RENAMED, callout);
+  return own ? RENAMED[callout] : null;
+}
+
+/** A run of verse numbers as a notice says them: `verse 2`, `verses 2, 4`. */
+function said(verses: number[]): string {
+  const one = verses.length === 1;
+  return `${one ? 'verse' : 'verses'} ${verses.join(', ')}`;
+}
 
 /** The version `word` names, matched without case, or null where none does. */
 function named(versions: string[], word: string): string | null {
@@ -113,6 +178,8 @@ export default class KingdoneChapelPlugin extends Plugin {
   breadcrumbs: Breadcrumbs;
   /** A breadcrumb refresh waiting out a run of vault changes, if one is. */
   queuedRefresh: number | null = null;
+  /** The mode switch waiting for a modal to hand the focus back, if one is. */
+  queuedTyping: number | null = null;
   /** "version/book:chapter" -> the files fighting over it. Filled by index(). */
   chapterConflicts: Map<string, TFile[]> = new Map();
   /** What is wrong with the versions the vault holds, as far as it is known. */
@@ -146,6 +213,21 @@ export default class KingdoneChapelPlugin extends Plugin {
     // Saved again with everything else otherwise, so the name it replaced
     // outlives it and is read back by the migration above.
     delete (this.settings as unknown as Record<string, unknown>).bibleFolder;
+    // The two callouts this plugin draws were named in Portuguese while they
+    // were one vault's own. A vault that saved the kinds before they were
+    // renamed goes on writing notes under the old names, which the stylesheet
+    // no longer draws — and nothing about a callout says why it is grey. Only
+    // the names this plugin shipped are rewritten; a callout of the reader's
+    // own is theirs, whatever it is called.
+    if (Array.isArray(this.settings.noteKinds)) {
+      this.settings.noteKinds = this.settings.noteKinds.map((kind) => {
+        // Asked of the table itself rather than of what it inherits: a callout
+        // named `toString` would otherwise be renamed to the function of that
+        // name, which the next save drops on its way through JSON.
+        const renamed = kind && renaming(kind.callout);
+        return renamed ? { ...kind, callout: renamed } : kind;
+      });
+    }
     this.chapterCache = new Map();
 
     this.addSettingTab(new KingdoneChapelSettingTab(this.app, this));
@@ -171,6 +253,18 @@ export default class KingdoneChapelPlugin extends Plugin {
           return;
         }
         new CreateVersionModal(this.app, this, sources).open();
+      },
+    });
+
+    this.addCommand({
+      id: 'write-verse-note',
+      name: 'Write a note on this verse',
+      checkCallback: (checking) => {
+        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+        const target = view ? this.noteTarget(view) : null;
+        if (!target) return false;
+        if (!checking) new WriteNoteModal(this.app, this, target).open();
+        return true;
       },
     });
 
@@ -272,6 +366,7 @@ export default class KingdoneChapelPlugin extends Plugin {
     });
     this.registerEvent(settled);
     this.register(() => this.cancelQueuedRefresh());
+    this.register(() => this.cancelQueuedTyping());
 
     // A pane picks up the bar when it opens a chapter, and loses it when it
     // moves on. Reading and editing look the same to it, but switching between
@@ -377,6 +472,11 @@ export default class KingdoneChapelPlugin extends Plugin {
   cancelQueuedRefresh() {
     if (this.queuedRefresh !== null) window.clearTimeout(this.queuedRefresh);
     this.queuedRefresh = null;
+  }
+
+  cancelQueuedTyping() {
+    if (this.queuedTyping !== null) window.clearTimeout(this.queuedTyping);
+    this.queuedTyping = null;
   }
 
   /**
@@ -721,8 +821,15 @@ export default class KingdoneChapelPlugin extends Plugin {
     } catch (e) {
       return null;
     }
+    return this.verseAtLine(view, line);
+  }
 
-    // Which block the cursor is in answers both layouts. A version writing no
+  /** The verse `line` belongs to: the block it sits in, else the one above it. */
+  verseAtLine(view: MarkdownView, line: number): number | null {
+    const editor = view.editor;
+    if (!editor) return null;
+
+    // Which block the line is in answers both layouts. A version writing no
     // block ids at all — verses numbered and nothing more — is left to the
     // walk below, which is what it has.
     if (view.file) {
@@ -735,6 +842,221 @@ export default class KingdoneChapelPlugin extends Plugin {
       if (parsed) return parsed.verse;
     }
     return null;
+  }
+
+  /**
+   * The verses a note would be written over: every one the selection touches,
+   * or the one the cursor is in where nothing is selected.
+   *
+   * A note may be about a run of verses — `Nota 1 - Salmos 1.1-3` is one note
+   * marked on three — and the selection is how that run is said, since it is
+   * how the verses are read in the first place. Everything between the two
+   * ends comes with them, whether or not it was dragged over whole.
+   */
+  noteVerses(view: MarkdownView): number[] | null {
+    let from: number;
+    let to: number;
+    // A pane with no editor left in it answers here rather than above: reading
+    // the cursor is what needs one, and a pane torn down mid-command throws
+    // the same way whether the editor went with it or only its document did.
+    try {
+      const editor = view.editor;
+      from = editor.getCursor('from').line;
+      to = editor.somethingSelected() ? editor.getCursor('to').line : from;
+    } catch (e) {
+      return null;
+    }
+
+    const first = this.verseAtLine(view, from);
+    const last = this.verseAtLine(view, to);
+    // A selection dragged from a heading down into the verses names no verse
+    // at the end it opened on, and the verses it covers are what it is about:
+    // only a selection touching none of them is about nothing.
+    if (first === null && last === null) return null;
+
+    const start = first === null ? (last as number) : first;
+    const end = last === null || last < start ? start : last;
+    const verses: number[] = [];
+    for (let verse = start; verse <= end; verse++) verses.push(verse);
+    return verses;
+  }
+
+  /** The kinds of note this vault writes, never empty: the defaults answer for none. */
+  noteKinds(): NoteKind[] {
+    const kinds = this.settings.noteKinds;
+    return kinds && kinds.length ? kinds : DEFAULT_NOTE_KINDS;
+  }
+
+  /**
+   * The chapter a note would be written into, and the verses it would be about,
+   * or null where the pane is not a version's chapter being edited.
+   *
+   * A note is written by hand into the file it belongs to, so it takes an
+   * editor: reading mode has the verse but nowhere to put the writing.
+   */
+  noteTarget(view: MarkdownView): NoteTarget | null {
+    const file = view.file;
+    const editor = view.editor;
+    if (!file || !editor || view.getMode() === 'preview') return null;
+
+    const source = this.sourceFor(file);
+    if (!source) return null;
+    const parsed = parseChapterName(file.basename, source.code);
+    if (!parsed) return null;
+
+    const verses = this.noteVerses(view);
+    if (!verses) return null;
+
+    return {
+      view,
+      prefix: chapterPrefix(source.code, parsed.book, parsed.chapter),
+      book: bookName(parsed.book, nameLang(this.settings.language)),
+      chapter: parsed.chapter,
+      verses,
+    };
+  }
+
+  /**
+   * Write one note: the callout under the notes heading, and a marker in the
+   * aside of every verse it is about.
+   *
+   * Both halves go in as one edit apiece, last in the chapter first, so that
+   * each write still lands where it was measured. The cursor is left on the
+   * note's own empty line, which is what the reader came here to type into.
+   */
+  writeNote(target: NoteTarget, kind: NoteKind, number: number) {
+    const editor = target.view.editor;
+    if (!editor) return;
+
+    const anchor = noteAnchor(target.prefix, kind.letter, number);
+    const text = editor.getValue();
+    if (hasBlockId(text, anchor)) {
+      new Notice(
+        `This chapter already carries a note ${kind.letter}${number}.`,
+      );
+      return;
+    }
+
+    const headings = noteHeadings(this.settings.language);
+    const written = noteWrites(text, {
+      callout: kind.callout,
+      title: `${kind.title || kind.callout} ${number} - ${passageLabel(
+        target.book,
+        target.chapter,
+        target.verses,
+      )}`,
+      verses: target.verses.map((verse) => `${target.prefix}-${verse}`),
+      anchor,
+      label: `${kind.letter}${number}`,
+      // The marker in a verse's aside is the heading said again, in the one
+      // word the section is named by.
+      markers: headings,
+      headings,
+      quotes: quoteHeadings(this.settings.language),
+    });
+
+    // A version that merges verses writes one id for the run, so a note asked
+    // for the verses either side of a merge is about fewer verses than it was
+    // asked for. It is written about the ones the chapter has, and says which
+    // it left out; asked for none of them, it is not written at all.
+    if (!written.verses.length) {
+      new Notice(`This chapter writes no verse of ${said(target.verses)}.`);
+      return;
+    }
+    if (written.verses.length < target.verses.length) {
+      const missing = target.verses.filter(
+        (verse) => !written.verses.includes(`${target.prefix}-${verse}`),
+      );
+      new Notice(`Written without ${said(missing)}: this chapter has none.`);
+    }
+
+    for (const write of written.writes) {
+      editor.replaceRange(write.text, write.from, write.to);
+    }
+    editor.setCursor(written.comment);
+    this.startTyping(editor);
+
+    // And again once the modal has finished closing. It hands the focus back
+    // to the editor after this returns, and a Vim editor taking the focus back
+    // is a Vim editor in normal mode again — so the mode is set once for the
+    // command run without a modal in front of it, and once for the one with.
+    //
+    // A pane keeps its editor when it is given another file, so the second
+    // half is for the chapter the first half wrote in and no other: a reader
+    // opening something else in that tab before the tick is out would have its
+    // cursor moved, its focus taken and its file put into insert mode.
+    //
+    // One at a time, and dropped with the plugin the way the queued refresh
+    // is: a reload while a note is being written tears the pane down under it.
+    const into = target.view.file;
+    this.cancelQueuedTyping();
+    this.queuedTyping = window.setTimeout(() => {
+      this.queuedTyping = null;
+      if (target.view.file !== into) return;
+      editor.focus();
+      editor.setCursor(written.comment);
+      this.startTyping(editor);
+    }, 0);
+  }
+
+  /**
+   * Put a Vim editor into insert mode, so that the note can be typed the moment
+   * it is written.
+   *
+   * The command leaves the cursor on an empty line for the comment, which is an
+   * invitation to type; a Vim reader landing there in normal mode has the
+   * invitation and none of the typing, and the first word of the note is read
+   * as commands instead. So the mode follows the cursor.
+   *
+   * Vim is Obsidian's own setting rather than this plugin's, and the editor it
+   * hands over says nothing about it. What does say is the CodeMirror 5 adapter
+   * the Vim extension keeps beside the view: the extension is what puts it
+   * there, so an editor carrying one is an editor in Vim mode, and the setting
+   * itself is never asked for — it can be read under a name the app is free to
+   * change, and the adapter is the thing that has to be there anyway.
+   *
+   * The key handler is reached two ways, because the app has published it both:
+   * `CodeMirrorAdapter` on the window, and the adapter's own class. Either
+   * answers; neither being there leaves the editor alone rather than crashing
+   * on it.
+   *
+   * An editor already typing is left as it is, since the key is a letter there
+   * rather than a mode, and the note would open with one.
+   *
+   * `a` rather than `i`: normal mode holds the cursor on a character, so the
+   * cursor set on the note's line is pulled back off the space that ends it,
+   * and appending after that space is what lands where the note is typed.
+   *
+   * The handler is asked first and the key itself sent second, because the
+   * handler is the quiet way and does not always take — the extension listens
+   * for the key on the editor's own element, which is what a reader pressing
+   * `a` would reach.
+   */
+  startTyping(editor: Editor) {
+    const held = editor as unknown as { cm?: Adapter & { cm?: Adapter } };
+    // `cm` is the view the editor draws in, and the adapter sits beside it
+    // under the same name; an app handing over the adapter itself is answered
+    // by what it carries rather than by where it was found.
+    const view = held.cm;
+    const adapter = view?.cm || (view?.state?.vim ? view : null);
+    if (!adapter?.state?.vim || adapter.state.vim.insertMode) return;
+
+    const published = (window as unknown as { CodeMirrorAdapter?: VimAdapter })
+      .CodeMirrorAdapter;
+    const vim = published?.Vim || adapter.constructor?.Vim;
+    if (vim) vim.handleKey(adapter, 'a', 'mapping');
+    if (adapter.state.vim.insertMode) return;
+
+    const typing = view?.contentDOM;
+    if (!typing) return;
+    typing.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'a',
+        code: 'KeyA',
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
   }
 
   /**

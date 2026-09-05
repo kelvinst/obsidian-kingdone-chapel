@@ -6,6 +6,7 @@ import type { Harness } from '../test/harness';
 import { DEFAULT_SETTINGS } from './types';
 import type { KingdoneChapelSettings } from './types';
 import { KingdoneChapelSettingTab } from './settings';
+import { DEFAULT_NOTE_KINDS } from './notes';
 
 /** The block of one setting, found by the name written above it. */
 function setting(container: HTMLElement, name: string): HTMLElement {
@@ -202,7 +203,7 @@ describe('the headings', () => {
   it('breaks the references and the sidebar out of the rest', () => {
     expect(
       Array.from(containerEl.querySelectorAll('h3')).map((h) => h.textContent),
-    ).toEqual(['References', 'Sidebar']);
+    ).toEqual(['References', 'Notes', 'Sidebar']);
   });
 });
 
@@ -282,6 +283,290 @@ describe('the duplicate files', () => {
     ).map((li) => li.textContent);
     expect(items).toEqual([
       'Bibles/NVI/NVI-01-GEN-001.md  |  Bibles/NVI/copy/NVI-01-GEN-001.md',
+    ]);
+  });
+});
+
+describe('the kinds of note', () => {
+  /** The rows the tab draws, one per kind. */
+  function rows(): HTMLElement[] {
+    return Array.from(
+      containerEl.querySelectorAll<HTMLElement>('.kcp-note-kind'),
+    );
+  }
+
+  /** The fields of one row: callout, letter, and a title per language. */
+  function fields(at: number): HTMLInputElement[] {
+    return Array.from(rows()[at].querySelectorAll<HTMLInputElement>('input'));
+  }
+
+  /** A button of the tab, or of one row, found by what is written on it. */
+  function button(text: string, within: HTMLElement = containerEl) {
+    const found = Array.from(
+      within.querySelectorAll<HTMLButtonElement>('button'),
+    ).find((el) => el.textContent === text);
+    if (!found) throw new Error(`no button reading ${text}`);
+    return found;
+  }
+
+  it('draws the three it ships with, as they are written', () => {
+    expect(rows()).toHaveLength(3);
+    expect(fields(0).map((f) => f.value)).toEqual(['note', 'n', 'Nota']);
+    expect(fields(1).map((f) => f.value)).toEqual([
+      'homiletic',
+      'h',
+      'Nótula Homilética',
+    ]);
+  });
+
+  it('saves a callout, a letter and a name as they are typed', async () => {
+    const [callout, letter, name] = fields(0);
+    callout.value = 'comentario';
+    change(callout, 'input');
+    letter.value = 'c';
+    change(letter, 'input');
+    name.value = 'Comentário';
+    change(name, 'input');
+
+    await vi.waitFor(() =>
+      expect(world.plugin.settings.noteKinds[0]).toEqual({
+        callout: 'comentario',
+        letter: 'c',
+        title: 'Comentário',
+      }),
+    );
+    expect(world.plugin.settings.noteKinds).toHaveLength(3);
+  });
+
+  it('adds a kind with nothing written in it yet', async () => {
+    button('Add').dispatchEvent(new Event('click'));
+    await vi.waitFor(() => expect(rows()).toHaveLength(4));
+    expect(world.plugin.settings.noteKinds[3]).toEqual({
+      callout: 'note',
+      // A letter of its own, so its notes are numbered apart from the rest.
+      letter: 'a',
+      title: '',
+    });
+  });
+
+  it('drops the kind whose row is removed', async () => {
+    button('Remove', rows()[1]).dispatchEvent(new Event('click'));
+    await vi.waitFor(() => expect(rows()).toHaveLength(2));
+    expect(world.plugin.settings.noteKinds.map((kind) => kind.callout)).toEqual(
+      ['note', 'reviewers'],
+    );
+  });
+
+  it('puts the three back where a vault has written over them', async () => {
+    world.plugin.settings.noteKinds = [];
+    tab.display();
+    expect(rows()).toHaveLength(3); // the ones it falls back on, undrawn
+
+    button('Reset').dispatchEvent(new Event('click'));
+    await vi.waitFor(() =>
+      expect(world.plugin.settings.noteKinds).toHaveLength(3),
+    );
+    expect(world.plugin.data).toMatchObject({
+      noteKinds: DEFAULT_NOTE_KINDS,
+    });
+  });
+});
+
+describe('the last kind of note', () => {
+  function rows(): HTMLElement[] {
+    return Array.from(
+      containerEl.querySelectorAll<HTMLElement>('.kcp-note-kind'),
+    );
+  }
+
+  function remove(at: number) {
+    const found = Array.from(
+      rows()[at].querySelectorAll<HTMLButtonElement>('button'),
+    ).find((el) => el.textContent === 'Remove');
+    found?.dispatchEvent(new Event('click'));
+  }
+
+  it('stays, since an empty list is read as no answer at all', async () => {
+    remove(2);
+    await vi.waitFor(() => expect(rows()).toHaveLength(2));
+    remove(1);
+    await vi.waitFor(() => expect(rows()).toHaveLength(1));
+
+    remove(0);
+    expect(rows()).toHaveLength(1);
+    expect(world.plugin.settings.noteKinds).toHaveLength(1);
+  });
+});
+
+describe('the kinds table', () => {
+  function rows(): HTMLElement[] {
+    return Array.from(
+      containerEl.querySelectorAll<HTMLElement>('.kcp-note-kind'),
+    );
+  }
+
+  it('is drawn as a table, so its columns are the one width down it', () => {
+    const table = containerEl.querySelector<HTMLElement>('.kcp-note-kinds');
+    expect(table?.tagName).toBe('TABLE');
+    expect(table?.querySelectorAll('tbody tr')).toHaveLength(3);
+    expect(rows()[0].tagName).toBe('TR');
+  });
+
+  it('names its columns once, in a head of its own', () => {
+    expect(
+      Array.from(containerEl.querySelectorAll('.kcp-note-kinds thead th')).map(
+        (column) => column.textContent,
+      ),
+      // The last of them stands over the buttons, and names nothing.
+    ).toEqual(['Callout', 'Anchor?', 'Name', '']);
+  });
+
+  it('gives every field a cell of its own, named for what it holds', () => {
+    const row = rows()[0];
+    expect(row.querySelectorAll('td')).toHaveLength(4);
+    const named = Array.from(
+      row.querySelectorAll<HTMLInputElement>('input'),
+    ).map((field) => field.getAttribute('aria-label'));
+    expect(named[0]).toBe('Callout');
+    expect(named[2]).toBe('Name');
+    // The anchor is named at greater length, since the column cannot hold it.
+    expect(named[1]).toContain('written into the block id');
+  });
+
+  it('says what the anchor is, where the column has no room to', () => {
+    const hint = containerEl.querySelector<HTMLElement>('.kcp-note-hint');
+    const said = hint?.getAttribute('aria-label') || '';
+    expect(said).toContain('written into the block id');
+    // The app draws the tooltip from the label: a `title` beside it would be
+    // the same words twice over, in two hands.
+    expect(hint?.title).toBe('');
+    // The field says the same, for the row it is read in.
+    const anchor = Array.from(
+      containerEl.querySelectorAll<HTMLInputElement>('.kcp-note-kind input'),
+    )[1];
+    expect(anchor.getAttribute('aria-label')).toBe(said);
+    expect(anchor.title).toBe('');
+  });
+
+  it('is shown the moment it is hovered, rather than after a wait', () => {
+    const hint = containerEl.querySelector<HTMLElement>('.kcp-note-hint');
+    expect(hint?.getAttribute('data-tooltip-delay')).toBe('0');
+  });
+});
+
+describe('a kind with something missing', () => {
+  function rows(): HTMLElement[] {
+    return Array.from(
+      containerEl.querySelectorAll<HTMLElement>('.kcp-note-kind'),
+    );
+  }
+
+  function fields(at: number): HTMLInputElement[] {
+    return Array.from(rows()[at].querySelectorAll<HTMLInputElement>('input'));
+  }
+
+  function button(text: string) {
+    const found = Array.from(
+      containerEl.querySelectorAll<HTMLButtonElement>('button'),
+    ).find((el) => el.textContent === text);
+    if (!found) throw new Error(`no button reading ${text}`);
+    return found;
+  }
+
+  it('keeps the letter it had while the field holds no letter', async () => {
+    const letter = fields(0)[1];
+    letter.value = '';
+    change(letter, 'input');
+    await Promise.resolve();
+    expect(world.plugin.settings.noteKinds[0].letter).toBe('n');
+
+    // A digit anchors a note where a verse is anchored, so it is no answer
+    // either.
+    letter.value = '1';
+    change(letter, 'input');
+    // Nothing to wait for: the letter is only written when one is typed.
+    await Promise.resolve();
+    expect(world.plugin.settings.noteKinds[0].letter).toBe('n');
+
+    letter.value = 'c';
+    change(letter, 'input');
+    await vi.waitFor(() =>
+      expect(world.plugin.settings.noteKinds[0].letter).toBe('c'),
+    );
+  });
+
+  it('is added on a letter no other kind is numbered by', async () => {
+    button('Add').dispatchEvent(new Event('click'));
+    await vi.waitFor(() => expect(rows()).toHaveLength(4));
+    expect(world.plugin.settings.noteKinds[3].letter).toBe('a');
+  });
+
+  it('is added on no letter at all where even the pairs are taken', async () => {
+    const letters = 'abcdefghijklmnopqrstuvwxyz'.split('');
+    const every = [
+      ...letters,
+      ...letters.flatMap((first) => letters.map((second) => first + second)),
+    ];
+    world.plugin.settings.noteKinds = every.map((letter) => ({
+      callout: 'note',
+      letter,
+      title: letter,
+    }));
+    tab.display();
+
+    button('Add').dispatchEvent(new Event('click'));
+    await vi.waitFor(() => expect(rows()).toHaveLength(every.length + 1));
+    expect(world.plugin.settings.noteKinds[every.length].letter).toBe('');
+  });
+
+  it('is added on a pair of letters where every single one is taken', async () => {
+    world.plugin.settings.noteKinds = 'abcdefghijklmnopqrstuvwxyz'
+      .split('')
+      .map((letter) => ({ callout: 'note', letter, title: letter }));
+    tab.display();
+
+    button('Add').dispatchEvent(new Event('click'));
+    await vi.waitFor(() => expect(rows()).toHaveLength(27));
+    expect(world.plugin.settings.noteKinds[26].letter).toBe('aa');
+  });
+});
+
+describe('what the kinds say about their callouts', () => {
+  function desc(): HTMLElement {
+    const found = Array.from(
+      containerEl.querySelectorAll<HTMLElement>('.setting-item'),
+    ).find(
+      (el) =>
+        el.querySelector('.setting-item-name')?.textContent === 'Kinds of note',
+    );
+    const el = found?.querySelector<HTMLElement>('.setting-item-description');
+    if (!el) throw new Error('the kinds are described nowhere');
+    return el;
+  }
+
+  it('says which callouts are whose', () => {
+    const said = desc().textContent || '';
+    expect(said).toContain("`note` is one of Obsidian's own callouts");
+    expect(said).toContain(
+      '`homiletic` and `reviewers` are drawn by this plugin',
+    );
+  });
+
+  it('links out to the callouts a reader may name, and to writing one', () => {
+    expect(
+      Array.from(desc().querySelectorAll('a')).map((link) => [
+        link.textContent,
+        link.getAttribute('href'),
+      ]),
+    ).toEqual([
+      [
+        "Obsidian's own callouts",
+        'https://help.obsidian.md/callouts#Supported+types',
+      ],
+      [
+        'a callout of your own',
+        'https://help.obsidian.md/callouts#Customize+callouts',
+      ],
     ]);
   });
 });

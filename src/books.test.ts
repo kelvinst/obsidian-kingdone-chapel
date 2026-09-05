@@ -12,6 +12,7 @@ import {
   langsFor,
   matchBooks,
   nameLang,
+  noteHeadings,
   plain,
   sectionName,
   quoteHeadings,
@@ -286,5 +287,16 @@ describe('translationsName', () => {
 
   it('reads in Portuguese when no language is named', () => {
     expect(translationsName()).toBe('Traduções');
+  });
+});
+
+describe('noteHeadings', () => {
+  it('writes the heading of the language chosen, and reads the other', () => {
+    expect(noteHeadings('en')).toEqual(['Notes', 'Notas']);
+    expect(noteHeadings('pt')).toEqual(['Notas', 'Notes']);
+  });
+
+  it('writes the first language where none was chosen', () => {
+    expect(noteHeadings('')[0]).toBe('Notas');
   });
 });

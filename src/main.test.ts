@@ -16,6 +16,7 @@ import { VIEW_TYPE } from './types';
 import type { Location } from './types';
 import { VersionSuggestModal } from './modal';
 import { CreateVersionModal } from './create-modal';
+import { WriteNoteModal } from './note-modal';
 import { KingdoneChapelView } from './view';
 
 const GEN_1 = [
@@ -1544,6 +1545,7 @@ describe('onload', () => {
     expect(world.plugin.commands.map((c) => c.id)).toEqual([
       'open-verse-in-another-version',
       'create-version',
+      'write-verse-note',
       'open-sidebar',
       'open-in-ara',
       'open-in-nvi',
@@ -2087,5 +2089,620 @@ describe('resolveEmbeds', () => {
     );
     const text = '![[SHEDD-01-GEN-001#^shedd-gen-1-1]]';
     expect(await world.plugin.resolveEmbeds(text, file)).toBe('');
+  });
+});
+
+describe('writing a note on a verse', () => {
+  const KIND = {
+    callout: 'note',
+    letter: 'n',
+    title: 'Nota',
+  };
+
+  /** A chapter of a version, written the way the generator writes one. */
+  const CHAPTER =
+    '# Gênesis 1 - NVI\n\n## [[ARA-01-GEN-001|ARA]]\n\n' +
+    '![[ARA-01-GEN-001#^ara-gen-1-1|flat]]\n^nvi-gen-1-1\n\n' +
+    '![[ARA-01-GEN-001#^ara-gen-1-2|flat]]\n^nvi-gen-1-2\n\n' +
+    '![[ARA-01-GEN-001#^ara-gen-1-3|flat]]\n^nvi-gen-1-3\n';
+
+  function editing(text = CHAPTER, path = chapterPath('NVI', 1, 'GEN', 1)) {
+    const view = pane(world.app, {
+      file: world.vault.getAbstractFileByPath(path) as TFile,
+      editor: new FakeEditor(text),
+    });
+    return { view, editor: editorOf(view) };
+  }
+
+  it('is about the verse the cursor is in', () => {
+    const { view, editor } = editing();
+    editor.at(5);
+    expect(world.plugin.noteTarget(view)).toMatchObject({
+      prefix: 'nvi-gen-1',
+      book: 'Gênesis',
+      chapter: 1,
+      verses: [1],
+    });
+  });
+
+  it('is about every verse a selection touches', () => {
+    const { view, editor } = editing();
+    editor.anchor = { line: 5, ch: 0 };
+    editor.cursor = { line: 11, ch: 0 };
+    editor.selected = true;
+    expect(world.plugin.noteTarget(view)?.verses).toEqual([1, 2, 3]);
+  });
+
+  it('is nothing in a note that is not a chapter of a version', () => {
+    const { view, editor } = editing(CHAPTER, 'Estudos/Romanos.md');
+    editor.at(5);
+    expect(world.plugin.noteTarget(view)).toBeNull();
+  });
+
+  it('is nothing in a chapter being read rather than written', () => {
+    const view = pane(world.app, {
+      file: world.vault.getAbstractFileByPath(
+        chapterPath('NVI', 1, 'GEN', 1),
+      ) as TFile,
+      editor: new FakeEditor(CHAPTER),
+      mode: 'preview',
+    });
+    expect(world.plugin.noteTarget(view)).toBeNull();
+  });
+
+  it('marks the verse and writes the note under a heading of its own', () => {
+    const { view, editor } = editing();
+    editor.at(5);
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+
+    expect(editor.text).toContain(
+      '![[ARA-01-GEN-001#^ara-gen-1-1|flat]]\n' +
+        ',,**Notas**: [[#^nvi-gen-1-n1|n1]].,,\n' +
+        '^nvi-gen-1-1',
+    );
+    expect(editor.text).toContain('## Notas');
+    expect(editor.text).toContain('> [!note]+ Nota 1 - Gênesis 1.1');
+    expect(editor.text).toContain('> > ![[#^nvi-gen-1-1]]');
+    expect(editor.text).toContain('^nvi-gen-1-n1');
+  });
+
+  it('leaves the cursor on the line the note is typed into', () => {
+    const { view, editor } = editing();
+    editor.at(5);
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+
+    expect(editor.getLine(editor.cursor.line)).toBe('> ');
+    expect(editor.getLine(editor.cursor.line + 1)).toBe('^nvi-gen-1-n1');
+  });
+
+  it('adds a second note to the list the verse already carries', () => {
+    const { view, editor } = editing();
+    editor.at(5);
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+    // The verse now runs embed, marker, id: the id is the line the cursor is
+    // put back on, since a pane with no cache behind it reads the lines alone.
+    editor.at(6);
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 2);
+
+    expect(editor.text).toContain(
+      ',,**Notas**: [[#^nvi-gen-1-n1|n1]]; [[#^nvi-gen-1-n2|n2]].,,',
+    );
+    expect(editor.text.match(/## Notas/g)).toHaveLength(1);
+    expect(editor.text).toContain('> [!note]+ Nota 2 - Gênesis 1.1');
+  });
+
+  it('marks every verse of a note written over a range', () => {
+    const { view, editor } = editing();
+    editor.anchor = { line: 5, ch: 0 };
+    editor.cursor = { line: 11, ch: 0 };
+    editor.selected = true;
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+
+    expect(editor.text.match(/\[\[#\^nvi-gen-1-n1\|n1\]\]/g)).toHaveLength(3);
+    expect(editor.text).toContain('> [!note]+ Nota 1 - Gênesis 1.1-3');
+    expect(editor.text).toContain(
+      '> > ![[#^nvi-gen-1-1]] ![[#^nvi-gen-1-2]] ![[#^nvi-gen-1-3]]',
+    );
+  });
+
+  it('refuses a number the chapter has already given a note', () => {
+    const { view, editor } = editing();
+    editor.at(5);
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+    const written = editor.text;
+
+    editor.at(8);
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+    expect(editor.text).toBe(written);
+    expect(notices[notices.length - 1].message).toContain('already carries');
+  });
+
+  it('offers the note only where one can be written', async () => {
+    await world.plugin.onload();
+    const command = world.plugin.commands.find(
+      (c) => c.id === 'write-verse-note',
+    );
+    expect(command?.checkCallback?.(true)).toBe(false);
+
+    const { view, editor } = editing();
+    editor.at(5);
+    world.workspace.activeView = view;
+    expect(command?.checkCallback?.(true)).toBe(true);
+  });
+});
+
+describe('a note that cannot be written as asked', () => {
+  const KINDS = [
+    { callout: 'note', letter: 'n', title: 'Nota' },
+    { callout: 'marginalia', letter: 'm', title: '' },
+  ];
+
+  const CHAPTER =
+    '# Gênesis 1 - NVI\n\n![[ARA-01-GEN-001#^ara-gen-1-1|flat]]\n^nvi-gen-1-1\n';
+
+  function editing() {
+    const view = pane(world.app, {
+      file: world.vault.getAbstractFileByPath(
+        chapterPath('NVI', 1, 'GEN', 1),
+      ) as TFile,
+      editor: new FakeEditor(CHAPTER),
+    });
+    return { view, editor: editorOf(view) };
+  }
+
+  it('is about nothing where the cursor cannot be read at all', () => {
+    const { view, editor } = editing();
+    editor.broken = true;
+    expect(world.plugin.noteTarget(view)).toBeNull();
+  });
+
+  it('is written nowhere once the pane has lost its editor', () => {
+    const { view, editor } = editing();
+    editor.at(3);
+    const target = world.plugin.noteTarget(view)!;
+    (view as { editor: unknown }).editor = null;
+    world.plugin.writeNote(target, KINDS[0], 1);
+    expect(editor.text).toBe(CHAPTER);
+  });
+
+  it('is titled by its callout where the language names the kind nothing', () => {
+    const { view, editor } = editing();
+    editor.at(3);
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KINDS[1], 1);
+    expect(editor.text).toContain(
+      '> [!marginalia]+ marginalia 1 - Gênesis 1.1',
+    );
+  });
+
+  it('falls back on the kinds it ships with where the vault lists none', () => {
+    world.plugin.settings.noteKinds = [];
+    expect(world.plugin.noteKinds().map((kind) => kind.callout)).toEqual([
+      'note',
+      'homiletic',
+      'reviewers',
+    ]);
+  });
+});
+
+describe('the note command', () => {
+  const CHAPTER =
+    '# Gênesis 1 - NVI\n\n![[ARA-01-GEN-001#^ara-gen-1-1|flat]]\n^nvi-gen-1-1\n';
+
+  function editing(path = chapterPath('NVI', 1, 'GEN', 1)) {
+    const view = pane(world.app, {
+      file: world.vault.getAbstractFileByPath(path) as TFile,
+      editor: new FakeEditor(CHAPTER),
+    });
+    return { view, editor: editorOf(view) };
+  }
+
+  it('opens the modal on the chapter the cursor is in', async () => {
+    await world.plugin.onload();
+    const opened = vi.spyOn(WriteNoteModal.prototype, 'open');
+    const { view, editor } = editing();
+    editor.at(3);
+    world.workspace.activeView = view;
+
+    world.plugin.commands
+      .find((c) => c.id === 'write-verse-note')
+      ?.checkCallback?.(false);
+    expect(opened).toHaveBeenCalled();
+    opened.mockRestore();
+  });
+
+  it('is offered by no note of a version that is not a chapter', () => {
+    const { view, editor } = editing('Bibles/NVI/Leituras.md');
+    editor.at(3);
+    expect(world.plugin.noteTarget(view)).toBeNull();
+  });
+
+  it('is offered by no pane that has lost its editor', () => {
+    const view = pane(world.app, {
+      file: world.vault.getAbstractFileByPath(
+        chapterPath('NVI', 1, 'GEN', 1),
+      ) as TFile,
+    });
+    expect(world.plugin.noteTarget(view)).toBeNull();
+    expect(world.plugin.verseAtLine(view, 0)).toBeNull();
+  });
+
+  it('is about the verse a selection starts on where it ends above one', () => {
+    const { view, editor } = editing();
+    editor.anchor = { line: 3, ch: 0 };
+    editor.cursor = { line: 0, ch: 0 };
+    editor.selected = true;
+    expect(world.plugin.noteTarget(view)?.verses).toEqual([1]);
+  });
+
+  it('is about nothing above the first verse of the chapter', () => {
+    const { view, editor } = editing();
+    editor.at(0);
+    expect(world.plugin.noteTarget(view)).toBeNull();
+  });
+});
+
+describe('a note written in a Vim editor', () => {
+  const CHAPTER =
+    '# Gênesis 1 - NVI\n\n![[ARA-01-GEN-001#^ara-gen-1-1|flat]]\n^nvi-gen-1-1\n';
+  const KIND = {
+    callout: 'note',
+    letter: 'n',
+    title: 'Nota',
+  };
+
+  /**
+   * The Vim extension as the app publishes it, and the keys it was handed. It
+   * answers the key by typing, the way the real one does, unless `deaf`.
+   */
+  function vim(deaf = false): { keys: string[] } {
+    const keys: string[] = [];
+    (window as unknown as { CodeMirrorAdapter?: unknown }).CodeMirrorAdapter = {
+      Vim: {
+        handleKey: (
+          cm: { state: { vim: { insertMode: boolean } } },
+          key: string,
+        ) => {
+          keys.push(key);
+          if (!deaf) cm.state.vim.insertMode = true;
+        },
+      },
+    };
+    return { keys };
+  }
+
+  /** An editor in Vim mode, as one that has never been typed into reads. */
+  function adapterOf(insertMode = false) {
+    return { state: { vim: { insertMode } } };
+  }
+
+  /** A pane over the chapter, with the cursor in verse 1. */
+  function editing(adapter: object | null = adapterOf(), dom?: HTMLElement) {
+    const editor = new FakeEditor(CHAPTER);
+    if (adapter) editor.cm = { cm: adapter, contentDOM: dom };
+    const view = pane(world.app, {
+      file: world.vault.getAbstractFileByPath(
+        chapterPath('NVI', 1, 'GEN', 1),
+      ) as TFile,
+      editor,
+    });
+    editor.at(3);
+    return { view, editor };
+  }
+
+  afterEach(() => {
+    delete (window as unknown as { CodeMirrorAdapter?: unknown })
+      .CodeMirrorAdapter;
+  });
+
+  it('is typed straight away, the mode switched before the cursor moves', () => {
+    const asked = vim();
+    const { view, editor } = editing();
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+
+    expect(asked.keys).toEqual(['a']);
+    expect(editor.getLine(editor.cursor.line)).toBe('> ');
+  });
+
+  it('is set again once the modal has handed the focus back', () => {
+    vi.useFakeTimers();
+    const asked = vim();
+    const { view, editor } = editing();
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+    // The editor is in normal mode again, the way a pane taking the focus
+    // back from a modal is.
+    vi.runAllTimers();
+    vi.useRealTimers();
+
+    // Once as the note is written, and not again: the editor is still typing.
+    expect(asked.keys).toEqual(['a']);
+    expect(editor.focused).toBe(1);
+    expect(editor.getLine(editor.cursor.line)).toBe('> ');
+  });
+
+  it('leaves an editor already typing where it is', () => {
+    vi.useFakeTimers();
+    const asked = vim();
+    const { view } = editing(adapterOf(true));
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+    vi.runAllTimers();
+    vi.useRealTimers();
+
+    expect(asked.keys).toEqual([]);
+  });
+
+  it('takes the adapter itself where that is what it was handed', () => {
+    const asked = vim();
+    const editor = new FakeEditor(CHAPTER);
+    editor.cm = adapterOf();
+    const view = pane(world.app, {
+      file: world.vault.getAbstractFileByPath(
+        chapterPath('NVI', 1, 'GEN', 1),
+      ) as TFile,
+      editor,
+    });
+    editor.at(3);
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+
+    expect(asked.keys).toEqual(['a']);
+  });
+
+  it('leaves an editor keeping no adapter — no Vim — alone', () => {
+    const asked = vim();
+    const { view } = editing(null);
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+
+    expect(asked.keys).toEqual([]);
+  });
+
+  it('asks the adapter for the Vim the app publishes nowhere', () => {
+    const keys: string[] = [];
+    class Adapter {
+      state = { vim: { insertMode: false } };
+      static Vim = {
+        handleKey: (cm: Adapter, key: string) => {
+          keys.push(key);
+          cm.state.vim.insertMode = true;
+        },
+      };
+    }
+    const { view } = editing(new Adapter());
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+
+    expect(keys).toEqual(['a']);
+  });
+
+  it('presses the key itself where the handler did not take', () => {
+    const asked = vim(true);
+    const typed: string[] = [];
+    const dom = document.createElement('div');
+    dom.addEventListener('keydown', (evt) => typed.push(evt.key));
+    const { view } = editing(adapterOf(), dom);
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+
+    expect(asked.keys).toEqual(['a']);
+    expect(typed).toEqual(['a']);
+  });
+
+  it('has no key to press where the editor draws in nothing it can reach', () => {
+    const asked = vim(true);
+    const { view, editor } = editing();
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+
+    expect(asked.keys).toEqual(['a']);
+    expect(editor.getLine(editor.cursor.line)).toBe('> ');
+  });
+
+  it('leaves an editor whose Vim is nowhere to be asked for alone', () => {
+    const { view, editor } = editing();
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+
+    expect(editor.getLine(editor.cursor.line)).toBe('> ');
+  });
+});
+
+describe('a note over a chapter that merged its verses', () => {
+  const KIND = {
+    callout: 'note',
+    letter: 'n',
+    title: 'Nota',
+  };
+  /** A chapter writing verses 1 and 3, the way a version that merges 1-2 does. */
+  const MERGED =
+    '# Gênesis 1 - NVI\n\n![[a|flat]]\n^nvi-gen-1-1\n\n![[b|flat]]\n^nvi-gen-1-3\n';
+
+  function editing(text: string) {
+    const view = pane(world.app, {
+      file: world.vault.getAbstractFileByPath(
+        chapterPath('NVI', 1, 'GEN', 1),
+      ) as TFile,
+      editor: new FakeEditor(text),
+    });
+    return { view, editor: editorOf(view) };
+  }
+
+  /** The target the command would have built, over verses 1 to 3. */
+  function over(view: ReturnType<typeof editing>['view'], verses: number[]) {
+    return { ...world.plugin.noteTarget(view)!, verses };
+  }
+
+  it('quotes what the chapter has and says what it left out', () => {
+    const { view, editor } = editing(MERGED);
+    editor.at(3);
+    world.plugin.writeNote(over(view, [1, 2, 3]), KIND, 1);
+
+    expect(editor.text).toContain('> > ![[#^nvi-gen-1-1]] ![[#^nvi-gen-1-3]]');
+    expect(editor.text).not.toContain('![[#^nvi-gen-1-2]]');
+    expect(notices[notices.length - 1].message).toBe(
+      'Written without verse 2: this chapter has none.',
+    );
+  });
+
+  it('is not written where the chapter carries none of the verses', () => {
+    const { view, editor } = editing(MERGED);
+    editor.at(3);
+    world.plugin.writeNote(over(view, [8, 9]), KIND, 1);
+
+    expect(editor.text).toBe(MERGED);
+    expect(notices[notices.length - 1].message).toBe(
+      'This chapter writes no verse of verses 8, 9.',
+    );
+  });
+});
+
+describe('the mode set once the modal is out of the way', () => {
+  const KIND = {
+    callout: 'note',
+    letter: 'n',
+    title: 'Nota',
+  };
+  const CHAPTER =
+    '# Gênesis 1 - NVI\n\n![[ARA-01-GEN-001#^ara-gen-1-1|flat]]\n^nvi-gen-1-1\n';
+
+  /** The Vim extension as the app publishes it, deaf to the key it is handed. */
+  function vim(): { keys: string[] } {
+    const keys: string[] = [];
+    (window as unknown as { CodeMirrorAdapter?: unknown }).CodeMirrorAdapter = {
+      Vim: { handleKey: (_cm: unknown, key: string) => keys.push(key) },
+    };
+    return { keys };
+  }
+
+  function editing() {
+    const editor = new FakeEditor(CHAPTER);
+    editor.cm = { cm: { state: { vim: { insertMode: false } } } };
+    const view = pane(world.app, {
+      file: world.vault.getAbstractFileByPath(
+        chapterPath('NVI', 1, 'GEN', 1),
+      ) as TFile,
+      editor,
+    });
+    editor.at(3);
+    return { view, editor };
+  }
+
+  afterEach(() => {
+    delete (window as unknown as { CodeMirrorAdapter?: unknown })
+      .CodeMirrorAdapter;
+  });
+
+  it('is left to the chapter the note was written in', () => {
+    vi.useFakeTimers();
+    const asked = vim();
+    const { view, editor } = editing();
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+    asked.keys.length = 0;
+    editor.focused = 0;
+    // The pane keeps its editor and is given another chapter.
+    (view as { file: TFile | null }).file = world.vault.getAbstractFileByPath(
+      chapterPath('NVI', 1, 'GEN', 2),
+    ) as TFile;
+    vi.runAllTimers();
+    vi.useRealTimers();
+
+    expect(asked.keys).toEqual([]);
+    expect(editor.focused).toBe(0);
+  });
+
+  it('is dropped with the plugin, rather than run after it', async () => {
+    // Loaded, since it is the load that registers what unloading undoes.
+    await world.plugin.onload();
+    vi.useFakeTimers();
+    const asked = vim();
+    const { view, editor } = editing();
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+    asked.keys.length = 0;
+    editor.focused = 0;
+    world.plugin.unload();
+    vi.runAllTimers();
+    vi.useRealTimers();
+
+    expect(asked.keys).toEqual([]);
+    expect(editor.focused).toBe(0);
+  });
+});
+
+describe('a selection that opens above the verses', () => {
+  const CHAPTER =
+    '# Gênesis 1 - NVI\n\n![[a|flat]]\n^nvi-gen-1-1\n\n![[b|flat]]\n^nvi-gen-1-2\n';
+
+  it('is about the verses it covers, not about nothing', () => {
+    const editor = new FakeEditor(CHAPTER);
+    const view = pane(world.app, {
+      file: world.vault.getAbstractFileByPath(
+        chapterPath('NVI', 1, 'GEN', 1),
+      ) as TFile,
+      editor,
+    });
+    // Dragged from the heading down into verse 2.
+    editor.anchor = { line: 0, ch: 0 };
+    editor.cursor = { line: 6, ch: 0 };
+    editor.selected = true;
+
+    expect(world.plugin.noteTarget(view)?.verses).toEqual([2]);
+  });
+
+  it('is about nothing where it touches no verse at all', () => {
+    const editor = new FakeEditor(CHAPTER);
+    const view = pane(world.app, {
+      file: world.vault.getAbstractFileByPath(
+        chapterPath('NVI', 1, 'GEN', 1),
+      ) as TFile,
+      editor,
+    });
+    editor.anchor = { line: 0, ch: 0 };
+    editor.cursor = { line: 1, ch: 0 };
+    editor.selected = true;
+
+    expect(world.plugin.noteTarget(view)).toBeNull();
+  });
+});
+
+describe('the kinds a vault saved before the callouts were renamed', () => {
+  /** A plugin loaded over settings saved by an earlier version. */
+  async function loaded(noteKinds: unknown) {
+    const world = harness({}, {});
+    world.plugin.data = { noteKinds };
+    await world.plugin.onload();
+    return world.plugin.settings.noteKinds;
+  }
+
+  it('is carried onto the names the stylesheet draws', async () => {
+    expect(
+      await loaded([
+        { callout: 'note', letter: 'n', title: 'Nota' },
+        { callout: 'homiletica', letter: 'h', title: 'Nótula Homilética' },
+        { callout: 'revisores', letter: 'r', title: 'Nota dos Revisores' },
+      ]),
+    ).toEqual([
+      { callout: 'note', letter: 'n', title: 'Nota' },
+      { callout: 'homiletic', letter: 'h', title: 'Nótula Homilética' },
+      { callout: 'reviewers', letter: 'r', title: 'Nota dos Revisores' },
+    ]);
+  });
+
+  it('leaves a callout of the readers own alone, whatever it is called', async () => {
+    expect(
+      await loaded([
+        { callout: 'marginalia', letter: 'm', title: 'Marginália' },
+      ]),
+    ).toEqual([{ callout: 'marginalia', letter: 'm', title: 'Marginália' }]);
+  });
+
+  it('reads a list that is no list as none', async () => {
+    expect(await loaded('homiletica')).toBe('homiletica');
+  });
+});
+
+describe('a kind named after something every object carries', () => {
+  it('is left as it is, rather than renamed to what a name inherits', async () => {
+    const world = harness({}, {});
+    world.plugin.data = {
+      noteKinds: [{ callout: 'toString', letter: 't', title: 'Assim' }],
+    };
+    await world.plugin.onload();
+
+    expect(world.plugin.settings.noteKinds).toEqual([
+      { callout: 'toString', letter: 't', title: 'Assim' },
+    ]);
   });
 });

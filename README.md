@@ -21,6 +21,8 @@ in your vault, keeping chapter _and_ verse alignment.
 - **Version picker** (`Open this verse in another version`) with a preview of each version's
   text before you jump.
 - **One command per version**, so each translation can get its own hotkey.
+- **Notes on a verse** (`Write a note on this verse`) written into a version's chapter: the
+  callout at the foot of the chapter and the marker in the verse, both in one step.
 - Jumps land on the verse's block anchor (`#^...`), not just the top of the chapter.
 - Handles versions that merge verses — if MENS puts verses 1–2 under `**1**`, asking for verse 2
   finds it and labels the card `v.1`.
@@ -84,6 +86,76 @@ name: Bíblia Shedd
 has, so `@Shedd Sl 1.1` links to it from the moment it exists. `translation` records what it
 was written from — the plugin does not read it back, it is there so the folder says where its
 embeds point.
+
+### Writing a note on a verse
+
+A version is written one note at a time, and every note is the same four steps done by hand:
+find the number the chapter has going spare, write the callout, write its anchor, then go back
+up and mark the verse it is about. **Write a note on this verse** does all four.
+
+Put the cursor in a verse of a version's chapter — or select a run of them, for a note about a
+passage — and the command asks which kind of note it is and what it is numbered, offering one
+past the highest of that kind the chapter already carries. A commentary copied in with its own
+numbering can write over that.
+
+It then writes two things. A marker in the verse's own aside, beside the refs where there are
+any:
+
+```markdown
+![[ARA-19-PSA-001#^ara-psa-1-1|flat]]
+,,**Refs**: [[Shedd-19-PSA-026#^shedd-psa-26-4|Sl 26.4]]. **Notas**: [[#^shedd-psa-1-n1|n1]]; [[#^shedd-psa-1-n2|n2]].,,
+^shedd-psa-1-1
+```
+
+And the note itself, under `## Notas` at the foot of the chapter — after the verses, before
+`## Citações`, and written where the section is not there yet:
+
+```markdown
+<!-- prettier-ignore -->
+> [!note]+ Nota 2 - Salmos 1.1
+>
+> > [!quote]-
+> >
+> > ![[#^shedd-psa-1-1]]
+>
+> A descrição negativa daquilo que não faz.
+^shedd-psa-1-n2
+```
+
+The cursor is left on the empty line, so the comment is typed straight away — in Vim mode the
+editor is put into insert mode with it, so the note is typed rather than read as commands.
+Enter writes the note from the modal, wherever the focus was left. A second note on
+the same verse joins the marker list rather than replacing it, and a note over a range marks
+every verse in it and quotes every one of them in its body.
+
+Three kinds ship with the plugin — **Nota** (`[!note]`, anchored `n1`), **Nótula Homilética**
+(`[!homiletic]`, `h1`) and **Nota dos Revisores** (`[!reviewers]`, `r1`) — and the settings tab
+lists them as a table: the callout each is written as, the letter its anchors carry, and the
+name it is given in a note's title. Add your own, or write over these; the first in the list is
+the one offered first.
+
+A callout is drawn by whoever defined it, and a kind naming one nobody has is written in the
+plain grey of a callout Obsidian does not know — so a kind of your own has to name a callout
+that exists. Three sources, in order of least work:
+
+- **Obsidian's own** — `note`, `tip`, `warning`, `quote` and the rest of
+  [the supported types](https://help.obsidian.md/callouts#Supported+types). `note` is one of
+  these, which is why **Nota** needs no CSS at all.
+- **This plugin's** — `homiletic` (a megaphone, amber) and `reviewers` (glasses, green), drawn
+  by `styles.css` and shipped with the two kinds that name them.
+- **Your own** — [a custom callout](https://help.obsidian.md/callouts#Customize+callouts): a
+  `data-callout` rule in your theme or in a CSS snippet, naming a colour and an icon.
+
+```css
+.callout[data-callout='marginalia'] {
+  --callout-color: #7a5cad;
+  --callout-icon: lucide-pencil;
+}
+```
+
+`--callout-color` has to be a real colour value: Obsidian mixes it for the background and reads
+it as `color` for the title, so the bare `R, G, B` triple older docs use is dropped — the icon
+lands and the colour silently does not.
 
 ### Chapter breadcrumbs
 

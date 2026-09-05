@@ -198,6 +198,22 @@ export function setIcon(el: HTMLElement, icon: string) {
   el.setAttribute('data-icon', icon);
 }
 
+/**
+ * The app's own tooltip, which it draws from the label rather than from
+ * `title`. The stand-in records what would be shown, and how long a reader
+ * would have to hover for it.
+ */
+export function setTooltip(
+  el: HTMLElement,
+  tooltip: string,
+  options: { delay?: number } = {},
+) {
+  el.setAttribute('aria-label', tooltip);
+  if (options.delay !== undefined) {
+    el.setAttribute('data-tooltip-delay', String(options.delay));
+  }
+}
+
 export function normalizePath(path: string): string {
   return path.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
 }
@@ -623,8 +639,14 @@ export class Setting {
     return this;
   }
 
-  setDesc(desc: string): Setting {
-    this.descEl.textContent = desc;
+  /**
+   * The app takes a fragment as well as a string, which is how a description
+   * carries a link: text alone is written as text, and a fragment is put in
+   * as it was built.
+   */
+  setDesc(desc: string | DocumentFragment): Setting {
+    if (typeof desc === 'string') this.descEl.textContent = desc;
+    else this.descEl.append(desc);
     return this;
   }
 
