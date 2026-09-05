@@ -166,6 +166,8 @@ export default class KingdoneChapelPlugin extends Plugin {
   breadcrumbs: Breadcrumbs;
   /** A breadcrumb refresh waiting out a run of vault changes, if one is. */
   queuedRefresh: number | null = null;
+  /** The mode switch waiting for a modal to hand the focus back, if one is. */
+  queuedTyping: number | null = null;
   /** "version/book:chapter" -> the files fighting over it. Filled by index(). */
   chapterConflicts: Map<string, TFile[]> = new Map();
   /** What is wrong with the versions the vault holds, as far as it is known. */
@@ -337,6 +339,7 @@ export default class KingdoneChapelPlugin extends Plugin {
     });
     this.registerEvent(settled);
     this.register(() => this.cancelQueuedRefresh());
+    this.register(() => this.cancelQueuedTyping());
 
     // A pane picks up the bar when it opens a chapter, and loses it when it
     // moves on. Reading and editing look the same to it, but switching between
@@ -442,6 +445,11 @@ export default class KingdoneChapelPlugin extends Plugin {
   cancelQueuedRefresh() {
     if (this.queuedRefresh !== null) window.clearTimeout(this.queuedRefresh);
     this.queuedRefresh = null;
+  }
+
+  cancelQueuedTyping() {
+    if (this.queuedTyping !== null) window.clearTimeout(this.queuedTyping);
+    this.queuedTyping = null;
   }
 
   /**
@@ -834,11 +842,15 @@ export default class KingdoneChapelPlugin extends Plugin {
 
     const first = this.verseAtLine(view, from);
     const last = this.verseAtLine(view, to);
-    if (first === null) return null;
+    // A selection dragged from a heading down into the verses names no verse
+    // at the end it opened on, and the verses it covers are what it is about:
+    // only a selection touching none of them is about nothing.
+    if (first === null && last === null) return null;
 
-    const end = last === null || last < first ? first : last;
+    const start = first === null ? (last as number) : first;
+    const end = last === null || last < start ? start : last;
     const verses: number[] = [];
-    for (let verse = first; verse <= end; verse++) verses.push(verse);
+    for (let verse = start; verse <= end; verse++) verses.push(verse);
     return verses;
   }
 
@@ -947,16 +959,18 @@ export default class KingdoneChapelPlugin extends Plugin {
     // half is for the chapter the first half wrote in and no other: a reader
     // opening something else in that tab before the tick is out would have its
     // cursor moved, its focus taken and its file put into insert mode.
+    //
+    // One at a time, and dropped with the plugin the way the queued refresh
+    // is: a reload while a note is being written tears the pane down under it.
     const into = target.view.file;
-    const typing = window.setTimeout(() => {
+    this.cancelQueuedTyping();
+    this.queuedTyping = window.setTimeout(() => {
+      this.queuedTyping = null;
       if (target.view.file !== into) return;
       editor.focus();
       editor.setCursor(written.comment);
       this.startTyping(editor);
     }, 0);
-    // Dropped with the plugin, the way the queued refresh is: a reload while a
-    // note is being written tears the pane down under it.
-    this.register(() => window.clearTimeout(typing));
   }
 
   /**

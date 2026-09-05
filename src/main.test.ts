@@ -2603,7 +2603,9 @@ describe('the mode set once the modal is out of the way', () => {
     expect(editor.focused).toBe(0);
   });
 
-  it('is dropped with the plugin, rather than run after it', () => {
+  it('is dropped with the plugin, rather than run after it', async () => {
+    // Loaded, since it is the load that registers what unloading undoes.
+    await world.plugin.onload();
     vi.useFakeTimers();
     const asked = vim();
     const { view, editor } = editing();
@@ -2616,5 +2618,41 @@ describe('the mode set once the modal is out of the way', () => {
 
     expect(asked.keys).toEqual([]);
     expect(editor.focused).toBe(0);
+  });
+});
+
+describe('a selection that opens above the verses', () => {
+  const CHAPTER =
+    '# Gênesis 1 - NVI\n\n![[a|flat]]\n^nvi-gen-1-1\n\n![[b|flat]]\n^nvi-gen-1-2\n';
+
+  it('is about the verses it covers, not about nothing', () => {
+    const editor = new FakeEditor(CHAPTER);
+    const view = pane(world.app, {
+      file: world.vault.getAbstractFileByPath(
+        chapterPath('NVI', 1, 'GEN', 1),
+      ) as TFile,
+      editor,
+    });
+    // Dragged from the heading down into verse 2.
+    editor.anchor = { line: 0, ch: 0 };
+    editor.cursor = { line: 6, ch: 0 };
+    editor.selected = true;
+
+    expect(world.plugin.noteTarget(view)?.verses).toEqual([2]);
+  });
+
+  it('is about nothing where it touches no verse at all', () => {
+    const editor = new FakeEditor(CHAPTER);
+    const view = pane(world.app, {
+      file: world.vault.getAbstractFileByPath(
+        chapterPath('NVI', 1, 'GEN', 1),
+      ) as TFile,
+      editor,
+    });
+    editor.anchor = { line: 0, ch: 0 };
+    editor.cursor = { line: 1, ch: 0 };
+    editor.selected = true;
+
+    expect(world.plugin.noteTarget(view)).toBeNull();
   });
 });
