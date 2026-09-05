@@ -942,11 +942,21 @@ export default class KingdoneChapelPlugin extends Plugin {
     // to the editor after this returns, and a Vim editor taking the focus back
     // is a Vim editor in normal mode again — so the mode is set once for the
     // command run without a modal in front of it, and once for the one with.
-    window.setTimeout(() => {
+    //
+    // A pane keeps its editor when it is given another file, so the second
+    // half is for the chapter the first half wrote in and no other: a reader
+    // opening something else in that tab before the tick is out would have its
+    // cursor moved, its focus taken and its file put into insert mode.
+    const into = target.view.file;
+    const typing = window.setTimeout(() => {
+      if (target.view.file !== into) return;
       editor.focus();
       editor.setCursor(written.comment);
       this.startTyping(editor);
     }, 0);
+    // Dropped with the plugin, the way the queued refresh is: a reload while a
+    // note is being written tears the pane down under it.
+    this.register(() => window.clearTimeout(typing));
   }
 
   /**

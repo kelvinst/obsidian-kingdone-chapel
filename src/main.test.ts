@@ -2548,3 +2548,73 @@ describe('a note over a chapter that merged its verses', () => {
     );
   });
 });
+
+describe('the mode set once the modal is out of the way', () => {
+  const KIND = {
+    callout: 'note',
+    letter: 'n',
+    titles: { pt: 'Nota', en: 'Note' },
+  };
+  const CHAPTER =
+    '# Gênesis 1 - NVI\n\n![[ARA-01-GEN-001#^ara-gen-1-1|flat]]\n^nvi-gen-1-1\n';
+
+  /** The Vim extension as the app publishes it, deaf to the key it is handed. */
+  function vim(): { keys: string[] } {
+    const keys: string[] = [];
+    (window as unknown as { CodeMirrorAdapter?: unknown }).CodeMirrorAdapter = {
+      Vim: { handleKey: (_cm: unknown, key: string) => keys.push(key) },
+    };
+    return { keys };
+  }
+
+  function editing() {
+    const editor = new FakeEditor(CHAPTER);
+    editor.cm = { cm: { state: { vim: { insertMode: false } } } };
+    const view = pane(world.app, {
+      file: world.vault.getAbstractFileByPath(
+        chapterPath('NVI', 1, 'GEN', 1),
+      ) as TFile,
+      editor,
+    });
+    editor.at(3);
+    return { view, editor };
+  }
+
+  afterEach(() => {
+    delete (window as unknown as { CodeMirrorAdapter?: unknown })
+      .CodeMirrorAdapter;
+  });
+
+  it('is left to the chapter the note was written in', () => {
+    vi.useFakeTimers();
+    const asked = vim();
+    const { view, editor } = editing();
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+    asked.keys.length = 0;
+    editor.focused = 0;
+    // The pane keeps its editor and is given another chapter.
+    (view as { file: TFile | null }).file = world.vault.getAbstractFileByPath(
+      chapterPath('NVI', 1, 'GEN', 2),
+    ) as TFile;
+    vi.runAllTimers();
+    vi.useRealTimers();
+
+    expect(asked.keys).toEqual([]);
+    expect(editor.focused).toBe(0);
+  });
+
+  it('is dropped with the plugin, rather than run after it', () => {
+    vi.useFakeTimers();
+    const asked = vim();
+    const { view, editor } = editing();
+    world.plugin.writeNote(world.plugin.noteTarget(view)!, KIND, 1);
+    asked.keys.length = 0;
+    editor.focused = 0;
+    world.plugin.unload();
+    vi.runAllTimers();
+    vi.useRealTimers();
+
+    expect(asked.keys).toEqual([]);
+    expect(editor.focused).toBe(0);
+  });
+});
