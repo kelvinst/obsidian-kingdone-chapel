@@ -426,7 +426,7 @@ describe('the kinds table', () => {
     expect(row.querySelectorAll('td')).toHaveLength(4);
     const named = Array.from(
       row.querySelectorAll<HTMLInputElement>('input'),
-    ).map((field) => field.title);
+    ).map((field) => field.getAttribute('aria-label'));
     expect(named[0]).toBe('Callout');
     expect(named[2]).toBe('Name');
     // The anchor is named at greater length, since the column cannot hold it.
@@ -435,13 +435,22 @@ describe('the kinds table', () => {
 
   it('says what the anchor is, where the column has no room to', () => {
     const hint = containerEl.querySelector<HTMLElement>('.kcp-note-hint');
-    expect(hint?.title).toContain('written into the block id');
-    expect(hint?.getAttribute('aria-label')).toBe(hint?.title);
+    const said = hint?.getAttribute('aria-label') || '';
+    expect(said).toContain('written into the block id');
+    // The app draws the tooltip from the label: a `title` beside it would be
+    // the same words twice over, in two hands.
+    expect(hint?.title).toBe('');
     // The field says the same, for the row it is read in.
     const anchor = Array.from(
       containerEl.querySelectorAll<HTMLInputElement>('.kcp-note-kind input'),
     )[1];
-    expect(anchor.title).toBe(hint?.title);
+    expect(anchor.getAttribute('aria-label')).toBe(said);
+    expect(anchor.title).toBe('');
+  });
+
+  it('is shown the moment it is hovered, rather than after a wait', () => {
+    const hint = containerEl.querySelector<HTMLElement>('.kcp-note-hint');
+    expect(hint?.getAttribute('data-tooltip-delay')).toBe('0');
   });
 });
 

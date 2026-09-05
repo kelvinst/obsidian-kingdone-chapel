@@ -3,6 +3,7 @@ import {
   PluginSettingTab,
   Setting,
   TextComponent,
+  setTooltip,
 } from 'obsidian';
 import type { App } from 'obsidian';
 
@@ -171,9 +172,11 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
       // A column too narrow to say what it holds says it on hover instead,
       // which is where a reader asks.
       if (!column.hint) continue;
+      // The app's own tooltip and no other: a `title` beside it would draw a
+      // second one, the same words twice over in the window's own hand. Shown
+      // the moment it is hovered, since it is there to be asked.
       const hint = cell.createSpan({ text: '?', cls: 'kcp-note-hint' });
-      hint.title = column.hint;
-      hint.setAttribute('aria-label', column.hint);
+      setTooltip(hint, column.hint, { delay: 0 });
     }
     // The column the Remove buttons stand in, which names nothing.
     head.createEl('th');
@@ -397,8 +400,7 @@ function field(
   example: string,
   hint = name,
 ) {
-  text.inputEl.setAttribute('aria-label', hint);
-  text.inputEl.title = hint;
+  setTooltip(text.inputEl, hint, { delay: 0 });
   return text.setPlaceholder(example);
 }
 
