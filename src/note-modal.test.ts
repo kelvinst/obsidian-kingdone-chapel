@@ -95,7 +95,7 @@ describe('the note being written', () => {
     drop.value = '1';
     change(drop, 'change');
 
-    expect(modal.kind.callout).toBe('homiletica');
+    expect(modal.kind.callout).toBe('homiletic');
     expect(modal.number).toBe(1);
     expect(control<HTMLInputElement>(modal, 'Number', 'input').value).toBe('1');
   });

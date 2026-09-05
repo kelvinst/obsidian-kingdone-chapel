@@ -313,7 +313,7 @@ describe('the kinds of note', () => {
     expect(rows()).toHaveLength(3);
     expect(fields(0).map((f) => f.value)).toEqual(['note', 'n', 'Nota']);
     expect(fields(1).map((f) => f.value)).toEqual([
-      'homiletica',
+      'homiletic',
       'h',
       'Nótula Homilética',
     ]);
@@ -352,7 +352,7 @@ describe('the kinds of note', () => {
     button('Remove', rows()[1]).dispatchEvent(new Event('click'));
     await vi.waitFor(() => expect(rows()).toHaveLength(2));
     expect(world.plugin.settings.noteKinds.map((kind) => kind.callout)).toEqual(
-      ['note', 'revisores'],
+      ['note', 'reviewers'],
     );
   });
 

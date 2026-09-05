@@ -31,7 +31,7 @@ export interface Write {
 
 /** One kind of note: what it is called, what it is written as, how it is named. */
 export interface NoteKind {
-  /** Obsidian callout the note is written as: `note`, `homiletica`. */
+  /** Obsidian callout the note is written as: `note`, `homiletic`. */
   callout: string;
   /** Letter its anchors carry, which is what tells one kind's numbers apart. */
   letter: string;
@@ -50,15 +50,15 @@ export interface NoteKind {
  * The kinds a note may be written as, as they stand in a vault that has said
  * nothing: the three the Shedd commentary is written with.
  *
- * They are settings rather than a fixed list because the callouts are a
- * vault's own — `homiletica` and `revisores` are named in this vault's
- * stylesheet and nowhere else — and a commentary keeping some other set of
- * notes has no way of writing them otherwise.
+ * They are settings rather than a fixed list because a commentary keeping some
+ * other set of notes has no way of writing them otherwise. `note` is
+ * Obsidian's own; `homiletic` and `reviewers` are drawn by this plugin's
+ * stylesheet, and a vault naming its callouts something else says so here.
  */
 export const DEFAULT_NOTE_KINDS: NoteKind[] = [
   { callout: 'note', letter: 'n', title: 'Nota' },
-  { callout: 'homiletica', letter: 'h', title: 'Nótula Homilética' },
-  { callout: 'revisores', letter: 'r', title: 'Nota dos Revisores' },
+  { callout: 'homiletic', letter: 'h', title: 'Nótula Homilética' },
+  { callout: 'reviewers', letter: 'r', title: 'Nota dos Revisores' },
 ];
 
 /** The block ids a chapter's verses carry, up to the verse number itself. */

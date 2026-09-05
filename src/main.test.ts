@@ -2278,8 +2278,8 @@ describe('a note that cannot be written as asked', () => {
     world.plugin.settings.noteKinds = [];
     expect(world.plugin.noteKinds().map((kind) => kind.callout)).toEqual([
       'note',
-      'homiletica',
-      'revisores',
+      'homiletic',
+      'reviewers',
     ]);
   });
 });
