@@ -397,52 +397,36 @@ describe('the last kind of note', () => {
   });
 });
 
-describe('a row of the kinds list', () => {
+describe('the kinds table', () => {
   function rows(): HTMLElement[] {
     return Array.from(
       containerEl.querySelectorAll<HTMLElement>('.kcp-note-kind'),
     );
   }
 
-  it('is named for the kind it is', () => {
-    expect(
-      rows().map((row) => row.querySelector('.setting-item-name')?.textContent),
-    ).toEqual(['Nota', 'Nótula Homilética', 'Nota dos Revisores']);
+  it('is drawn as a table, so its columns are the one width down it', () => {
+    const table = containerEl.querySelector<HTMLElement>('.kcp-note-kinds');
+    expect(table?.tagName).toBe('TABLE');
+    expect(table?.querySelectorAll('tbody tr')).toHaveLength(3);
+    expect(rows()[0].tagName).toBe('TR');
   });
 
-  it('has its columns named once, in the row above them all', () => {
-    const head = containerEl.querySelector<HTMLElement>('.kcp-note-head');
-    expect(head?.querySelector('.setting-item-name')?.textContent).toBe('Kind');
+  it('names its columns once, in a head of its own', () => {
     expect(
-      Array.from(head?.querySelectorAll('.kcp-note-column') || []).map(
+      Array.from(containerEl.querySelectorAll('.kcp-note-kinds thead th')).map(
         (column) => column.textContent,
       ),
       // The last of them stands over the buttons, and names nothing.
     ).toEqual(['Callout', 'Anchor letter', 'Name', '']);
   });
 
-  it('says nothing beside each row that the columns say above it', () => {
+  it('gives every field a cell of its own, named for what it holds', () => {
+    const row = rows()[0];
+    expect(row.querySelectorAll('td')).toHaveLength(4);
     expect(
-      rows()[0].querySelector('.setting-item-description')?.textContent,
-    ).toBe('');
-  });
-
-  it('names each field again, for the row it is read in', () => {
-    expect(
-      Array.from(rows()[0].querySelectorAll<HTMLInputElement>('input')).map(
+      Array.from(row.querySelectorAll<HTMLInputElement>('input')).map(
         (field) => field.title,
       ),
     ).toEqual(['Callout', 'Anchor letter', 'Name']);
-  });
-
-  it('is named for its callout while it has no name of its own', async () => {
-    world.plugin.settings.noteKinds = [
-      { callout: 'marginalia', letter: 'm', title: '' },
-    ];
-    tab.display();
-
-    expect(rows()[0].querySelector('.setting-item-name')?.textContent).toBe(
-      'marginalia',
-    );
   });
 });
