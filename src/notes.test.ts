@@ -171,7 +171,7 @@ describe('noteBlock', () => {
   it('embeds every verse of a range on the one line', () => {
     expect(
       noteBlock(
-        'homiletica',
+        'homiletic',
         'Nótula Homilética 1 - Salmos 1.1-3',
         ['shedd-psa-1-1', 'shedd-psa-1-2', 'shedd-psa-1-3'],
         'shedd-psa-1-h1',
