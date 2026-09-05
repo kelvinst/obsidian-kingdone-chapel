@@ -283,6 +283,19 @@ describe('a card', () => {
     expect(notices.at(-1)?.message).toBe('Copied Almeida Revista e Atualizada');
   });
 
+  it('says so rather than going quiet when the copy itself fails', async () => {
+    const copy = vi
+      .spyOn(navigator.clipboard, 'writeText')
+      .mockRejectedValue(new Error('not focused'));
+    card().dispatchEvent(new MouseEvent('click', { altKey: true }));
+    await vi.waitFor(() =>
+      expect(notices.at(-1)?.message).toBe(
+        'Could not copy Almeida Revista e Atualizada.',
+      ),
+    );
+    expect(copy).toHaveBeenCalled();
+  });
+
   it('says nothing was copied where the card has nothing to copy', async () => {
     world.vault.write(chapterPath('ARA', 1, 'GEN', 1), 'Sem versículos.');
     world.plugin.chapterCache.clear();

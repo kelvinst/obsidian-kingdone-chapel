@@ -148,7 +148,7 @@ export class KingdoneChapelView extends ItemView {
 
     card.onclick = (evt) => {
       if (evt.altKey) {
-        this.copy(item);
+        void this.copy(item);
         return;
       }
       this.plugin.jumpTo(
@@ -164,18 +164,24 @@ export class KingdoneChapelView extends ItemView {
    * source that produced them, since a version built on a translation writes
    * its verses as embeds and an embed pasted anywhere is not a verse.
    *
-   * A card with nothing behind it says so instead of claiming a copy.
+   * A card with nothing behind it says so instead of claiming a copy, and so
+   * does a copy that fails — reading a file that has since gone away, or a
+   * clipboard the window is not focused enough to write to.
    */
   async copy(item: VersionItem) {
-    const text = item.text
-      ? await this.plugin.resolveEmbeds(item.text, item.file)
-      : '';
-    if (!text) {
-      new Notice(`${item.label} has nothing to copy here.`);
-      return;
+    try {
+      const text = item.text
+        ? await this.plugin.resolveEmbeds(item.text, item.file)
+        : '';
+      if (!text) {
+        new Notice(`${item.label} has nothing to copy here.`);
+        return;
+      }
+      await navigator.clipboard.writeText(text);
+      new Notice(`Copied ${item.label}`);
+    } catch (e) {
+      new Notice(`Could not copy ${item.label}.`);
     }
-    await navigator.clipboard.writeText(text);
-    new Notice(`Copied ${item.label}`);
   }
 
   async onClose() {
