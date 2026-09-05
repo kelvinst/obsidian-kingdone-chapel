@@ -149,9 +149,10 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
       )
       .addButton((b) =>
         b.setButtonText('Add').onClick(async () => {
+          const kinds = this.plugin.noteKinds();
           this.plugin.settings.noteKinds = [
-            ...this.plugin.noteKinds(),
-            { callout: 'note', letter: 'n', title: '' },
+            ...kinds,
+            { callout: 'note', letter: freeLetter(kinds), title: '' },
           ];
           await this.plugin.saveSettings();
           this.display();
@@ -189,7 +190,14 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
 
       field(new TextComponent(row.createEl('td')), 'Anchor letter', 'n')
         .setValue(kind.letter)
-        .onChange((value) => this.setKind(at, { letter: value.trim() }));
+        .onChange((value) => {
+          // A kind with no letter anchors its notes `^shedd-psa-1-7`, which is
+          // what a verse is anchored, so the chapter would carry a note its
+          // own verses cannot be told apart from. A field emptied to type
+          // another letter into keeps the one it had until one is typed.
+          const letter = value.trim();
+          if (letter) this.setKind(at, { letter });
+        });
 
       field(new TextComponent(row.createEl('td')), 'Name', 'Nota')
         .setValue(kind.title)
@@ -294,6 +302,21 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
 
 /** What a row of the kinds table says, left to right. */
 const COLUMNS = ['Callout', 'Anchor letter', 'Name'];
+
+/**
+ * A letter no kind is anchoring its notes with, for the kind being added.
+ *
+ * Each letter is a numbering of its own — `n1` counts apart from `h1` — so a
+ * new kind sharing a letter shares the count, and the anchors stop saying
+ * which kind they belong to. A vault that has somehow used every letter is
+ * given none, and says so by leaving the field empty to be typed into.
+ */
+function freeLetter(kinds: NoteKind[]): string {
+  const taken = new Set(kinds.map((kind) => kind.letter));
+  return (
+    'abcdefghijklmnopqrstuvwxyz'.split('').find((l) => !taken.has(l)) || ''
+  );
+}
 
 /**
  * A field of a kind, named twice over: the placeholder says what belongs in it

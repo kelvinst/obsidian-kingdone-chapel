@@ -2656,3 +2656,39 @@ describe('a selection that opens above the verses', () => {
     expect(world.plugin.noteTarget(view)).toBeNull();
   });
 });
+
+describe('the kinds a vault saved before the callouts were renamed', () => {
+  /** A plugin loaded over settings saved by an earlier version. */
+  async function loaded(noteKinds: unknown) {
+    const world = harness({}, {});
+    world.plugin.data = { noteKinds };
+    await world.plugin.onload();
+    return world.plugin.settings.noteKinds;
+  }
+
+  it('is carried onto the names the stylesheet draws', async () => {
+    expect(
+      await loaded([
+        { callout: 'note', letter: 'n', title: 'Nota' },
+        { callout: 'homiletica', letter: 'h', title: 'Nótula Homilética' },
+        { callout: 'revisores', letter: 'r', title: 'Nota dos Revisores' },
+      ]),
+    ).toEqual([
+      { callout: 'note', letter: 'n', title: 'Nota' },
+      { callout: 'homiletic', letter: 'h', title: 'Nótula Homilética' },
+      { callout: 'reviewers', letter: 'r', title: 'Nota dos Revisores' },
+    ]);
+  });
+
+  it('leaves a callout of the readers own alone, whatever it is called', async () => {
+    expect(
+      await loaded([
+        { callout: 'marginalia', letter: 'm', title: 'Marginália' },
+      ]),
+    ).toEqual([{ callout: 'marginalia', letter: 'm', title: 'Marginália' }]);
+  });
+
+  it('reads a list that is no list as none', async () => {
+    expect(await loaded('homiletica')).toBe('homiletica');
+  });
+});

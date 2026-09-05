@@ -93,6 +93,12 @@ export interface NoteTarget {
   verses: number[];
 }
 
+/** The callouts this plugin ships, under the names it shipped them under first. */
+const RENAMED: Record<string, string> = {
+  homiletica: 'homiletic',
+  revisores: 'reviewers',
+};
+
 /** A run of verse numbers as a notice says them: `verse 2`, `verses 2, 4`. */
 function said(verses: number[]): string {
   const one = verses.length === 1;
@@ -201,6 +207,19 @@ export default class KingdoneChapelPlugin extends Plugin {
     // Saved again with everything else otherwise, so the name it replaced
     // outlives it and is read back by the migration above.
     delete (this.settings as unknown as Record<string, unknown>).bibleFolder;
+    // The two callouts this plugin draws were named in Portuguese while they
+    // were one vault's own. A vault that saved the kinds before they were
+    // renamed goes on writing notes under the old names, which the stylesheet
+    // no longer draws — and nothing about a callout says why it is grey. Only
+    // the names this plugin shipped are rewritten; a callout of the reader's
+    // own is theirs, whatever it is called.
+    if (Array.isArray(this.settings.noteKinds)) {
+      this.settings.noteKinds = this.settings.noteKinds.map((kind) =>
+        kind && RENAMED[kind.callout]
+          ? { ...kind, callout: RENAMED[kind.callout] }
+          : kind,
+      );
+    }
     this.chapterCache = new Map();
 
     this.addSettingTab(new KingdoneChapelSettingTab(this.app, this));
