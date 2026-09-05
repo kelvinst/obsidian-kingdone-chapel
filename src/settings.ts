@@ -138,15 +138,7 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Kinds of note')
-      .setDesc(
-        'What "Write a note on this verse" offers, one row each, in the order ' +
-          'they are offered in. A row says three things: the callout the note is ' +
-          'written as, the letter its anchors carry — n2, h2, r2, which is what ' +
-          'keeps one kind numbered apart from another — and the name it is ' +
-          'given in the title of every note written as it. A callout is a ' +
-          'name your theme or your CSS snippet draws; the ones here are this ' +
-          "vault's own.",
-      )
+      .setDesc(kindsDesc())
       .addButton((b) =>
         b.setButtonText('Add').onClick(async () => {
           const kinds = this.plugin.noteKinds();
@@ -299,6 +291,46 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
     this.plugin.settings.noteKinds = kinds;
     await this.plugin.saveSettings();
   }
+}
+
+/** Obsidian's own page on the callouts it ships, and on writing one. */
+const CALLOUT_DOCS = 'https://help.obsidian.md/callouts#Supported+types';
+const CUSTOM_CALLOUT_DOCS =
+  'https://help.obsidian.md/callouts#Customize+callouts';
+
+/**
+ * What the kinds are, and what a kind of the reader's own has to name.
+ *
+ * A callout is drawn by whoever defined it: `note` is Obsidian's, the two
+ * beside it are this plugin's, and one this vault has never heard of is
+ * written in the plain grey of a callout nothing draws — which is a hard thing
+ * to work out from the note it leaves behind. So the two places a callout can
+ * come from are said here, and linked.
+ */
+function kindsDesc(): DocumentFragment {
+  const desc = document.createDocumentFragment();
+  desc.append(
+    'What "Write a note on this verse" offers, one row each, in the order ' +
+      'they are offered in. A row says three things: the callout the note is ' +
+      'written as, the letter its anchors carry — n2, h2, r2, which is what ' +
+      'keeps one kind numbered apart from another — and the name it is given ' +
+      'in the title of every note written as it. ',
+    '`note` is one of ',
+    docs(CALLOUT_DOCS, "Obsidian's own callouts"),
+    '; `homiletic` and `reviewers` are drawn by this plugin. A kind of your ' +
+      'own has to name a callout something draws: one of Obsidian’s, or ',
+    docs(CUSTOM_CALLOUT_DOCS, 'a callout of your own'),
+    ', written into your theme or a CSS snippet.',
+  );
+  return desc;
+}
+
+/** A link out to the app's own documentation, opened where links open. */
+function docs(href: string, text: string): HTMLAnchorElement {
+  const link = document.createElement('a');
+  link.href = href;
+  link.textContent = text;
+  return link;
 }
 
 /** What a letter a kind anchors its notes with may be made of. */
