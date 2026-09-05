@@ -369,8 +369,8 @@ export function verseEmbeds(text: string): VerseEmbed[] {
   }));
 }
 
-/** A wiki link, and the label it was given where it has one. */
-const LINK = /\[\[([^[\]|]+)(?:\|([^[\]]*))?\]\]/g;
+/** A wiki link, the bang that would make it an embed, and any label it has. */
+const LINK = /(!?)\[\[([^[\]|]+)(?:\|([^[\]]*))?\]\]/g;
 
 /**
  * The words a verse says, for somewhere with room for one line of it.
@@ -383,8 +383,10 @@ const LINK = /\[\[([^[\]|]+)(?:\|([^[\]]*))?\]\]/g;
  *
  * So an aside goes, delimiters and content both, while every other mark keeps
  * what it holds. A link that survives reads as the label it was given, or as
- * what it names where it was given none. Whatever the verse is written over is
- * one line by the end of it.
+ * what it names where it was given none. An embed goes with it: one naming a
+ * verse has been answered by the words already, and one naming anything else —
+ * a whole chapter, a picture — has no words to read out. Whatever the verse is
+ * written over is one line by the end of it.
  */
 export function verseWords(text: string): string {
   let out = '';
@@ -399,7 +401,7 @@ export function verseWords(text: string): string {
   }
   out += text.slice(at);
   return out
-    .replace(LINK, (_, target, label) => label ?? target)
+    .replace(LINK, (_, bang, target, label) => (bang ? '' : (label ?? target)))
     .replace(/\s+/g, ' ')
     .trim();
 }
