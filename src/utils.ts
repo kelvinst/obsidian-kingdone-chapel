@@ -135,8 +135,10 @@ export function verseInId(id: string): number | null {
  * verse with nothing in it, so what stands above it, back to the blank line,
  * is the verse.
  *
- * A line that names a verse and writes it at once is taken as it is: whatever
- * came before belongs to a heading or to the verse before, not to this one.
+ * A line that writes its own number is a verse written on one line and is
+ * taken as it is: whatever came before belongs to a heading or to the verse
+ * before, not to this one. A line closing on an id without writing a number is
+ * the end of what stands above it, whether or not it writes anything itself.
  */
 export function parseVerses(content: string): VerseLine[] {
   const out: VerseLine[] = [];
@@ -145,10 +147,19 @@ export function parseVerses(content: string): VerseLine[] {
   for (const line of content.split('\n')) {
     const parsed = parseVerseLine(line);
     if (parsed) {
+      // A line writing its own number is a verse written on one line, and what
+      // stands above it belongs to a heading or to the verse before. A line
+      // that carries only the id is the end of what stands above it, however
+      // much of the verse it writes itself: a version answering a translation
+      // writes the embed on one line and whatever it has to say beside it on
+      // the next, closing on the id.
       out.push(
-        parsed.text
+        VERSE_MARKER.test(line)
           ? parsed
-          : { verse: parsed.verse, text: above.join('\n').trim() },
+          : {
+              verse: parsed.verse,
+              text: [...above, parsed.text].join('\n').trim(),
+            },
       );
       above = [];
       continue;
