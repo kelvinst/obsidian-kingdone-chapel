@@ -29,7 +29,12 @@ import {
   referenceLabels,
   shortReference,
 } from './reference';
-import { hasBlockId, parseChapterName, quotePlacement } from './utils';
+import {
+  hasBlockId,
+  parseChapterName,
+  quotePlacement,
+  verseWords,
+} from './utils';
 import type { BookMatch } from './books';
 import type { BooklessRef, ParsedContextRef, ParsedRef } from './reference';
 import type { ChapterTarget, Location } from './types';
@@ -1009,7 +1014,9 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
       file,
       verses.length ? verses[0] : null,
     );
-    return match ? match.text : '';
+    // A row is one line, which has room for the verse and not for the refs and
+    // the notes a version hangs off it.
+    return match ? verseWords(match.text) : '';
   }
 
   renderSuggestion(item: Row, el: HTMLElement) {

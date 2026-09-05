@@ -710,6 +710,14 @@ describe('previewOf', () => {
     );
   });
 
+  it('shows the words of a verse that hangs an aside off itself', async () => {
+    world.vault.write(
+      chapterPath('NVI', 1, 'GEN', 1),
+      'No princípio ,,**Refs**:\n[[NVI-43-JHN-001#^nvi-jhn-1-1|Jo 1.1]].,, ^nvi-gen-1-1',
+    );
+    expect(await suggest.previewOf(file, 1, [])).toBe('No princípio');
+  });
+
   it('shows nothing for a file holding no verses', async () => {
     world.vault.write(chapterPath('NVI', 1, 'GEN', 1), 'Sem versículos');
     expect(await suggest.previewOf(file, 1, [])).toBe('');

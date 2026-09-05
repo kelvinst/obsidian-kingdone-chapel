@@ -95,6 +95,16 @@ describe('renderSuggestion', () => {
     );
   });
 
+  it('previews the words of a verse that hangs an aside off itself', () => {
+    const el = document.createElement('div');
+    const item = modal.getSuggestions('nvi')[0];
+    modal.renderSuggestion(
+      { ...item, text: 'Porque Deus ,,**Refs**: [[Jo 3.16]].,,' },
+      el,
+    );
+    expect(el.querySelector('.kcp-preview')?.textContent).toBe('Porque Deus');
+  });
+
   it('leaves the preview off a version with no text for the verse', () => {
     const el = document.createElement('div');
     modal.renderSuggestion(modal.getSuggestions('acf')[0], el);

@@ -11,6 +11,7 @@ import {
   parseVerseLine,
   parseVerses,
   verseInId,
+  verseWords,
 } from './utils';
 
 describe('parseChapterName', () => {
@@ -484,5 +485,49 @@ describe('verseEmbeds', () => {
 
   it('is nothing for a link that is not an embed', () => {
     expect(verseEmbeds('[[ARA-41-MRK-014#^ara-mrk-14-1]]')).toEqual([]);
+  });
+});
+
+describe('verseWords', () => {
+  it('leaves a verse that writes only words alone', () => {
+    expect(verseWords('No princípio, criou Deus.')).toBe(
+      'No princípio, criou Deus.',
+    );
+  });
+
+  it('drops an aside, delimiters and all', () => {
+    expect(
+      verseWords('Feliz o homem ,,**Refs**: Sl 26.4.,, que não anda'),
+    ).toBe('Feliz o homem que não anda');
+  });
+
+  it('drops an aside written over more than one line', () => {
+    expect(
+      verseWords('Feliz o homem ,,**Refs**:\n[[Shedd-19-PSA-026|Sl 26.4]].,,'),
+    ).toBe('Feliz o homem');
+  });
+
+  it('drops what an aside holds, marks and all', () => {
+    expect(verseWords('Feliz ,,nota ^1^ mais,, homem')).toBe('Feliz homem');
+  });
+
+  it('reads a link as the label it was given', () => {
+    expect(
+      verseWords('Veja [[Shedd-19-PSA-026#^shedd-psa-26-4|Sl 26.4]].'),
+    ).toBe('Veja Sl 26.4.');
+  });
+
+  it('reads a link with no label as what it names', () => {
+    expect(verseWords('Veja [[Salmo 26]].')).toBe('Veja Salmo 26.');
+  });
+
+  it('keeps the words a mark other than an aside holds', () => {
+    expect(verseWords('Filho ^1^ de Deus ~2~')).toBe('Filho 1 de Deus 2');
+  });
+
+  it('reads a verse written over lines as one line', () => {
+    expect(verseWords('Principio do evangelho\nde Jesus Cristo.')).toBe(
+      'Principio do evangelho de Jesus Cristo.',
+    );
   });
 });
