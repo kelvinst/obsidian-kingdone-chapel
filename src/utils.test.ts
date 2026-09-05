@@ -4,12 +4,14 @@ import {
   chapterFileName,
   chapterKey,
   hasBlockId,
+  verseEmbeds,
   quotePlacement,
   parseBookName,
   parseChapterName,
   parseVerseLine,
   parseVerses,
   verseInId,
+  verseWords,
 } from './utils';
 
 describe('parseChapterName', () => {
@@ -402,6 +404,23 @@ describe('parseVerses', () => {
     ]);
   });
 
+  it('carries the lines above an id closing a line that writes on', () => {
+    // How Shedd writes a verse it has refs or notes for: the embed, then an
+    // aside over as many lines as it takes, the id closing the last of them.
+    const verse =
+      '![[ARA-19-PSA-001#^ara-psa-1-1|flat]] ,,**Refs**:\n' +
+      '[[Shedd-19-PSA-026#^shedd-psa-26-4|Sl 26.4]].,,';
+    expect(
+      parseVerses('## Os justos\n\n' + verse + ' ^shedd-psa-1-1\n'),
+    ).toEqual([{ verse: 1, text: verse }]);
+  });
+
+  it('stops at a heading, so it is not read into the verse under it', () => {
+    expect(
+      parseVerses('## Os justos\nFeliz o homem. ^shedd-psa-1-1\n'),
+    ).toEqual([{ verse: 1, text: 'Feliz o homem.' }]);
+  });
+
   it('leaves a verse that writes itself out alone', () => {
     expect(
       parseVerses('## Uma seção\n1. Falou o SENHOR. ^ara-lev-1-1\n'),
@@ -418,5 +437,125 @@ describe('verseInId', () => {
   it('answers with nothing for an id naming something else', () => {
     expect(verseInId('a500c4')).toBeNull();
     expect(verseInId('ara-lev-1-')).toBeNull();
+  });
+});
+
+describe('verseEmbeds', () => {
+  it('reads the file and block a verse embeds', () => {
+    expect(verseEmbeds('![[ARA-41-MRK-014#^ara-mrk-14-1]]')).toMatchObject([
+      { path: 'ARA-41-MRK-014', block: 'ara-mrk-14-1' },
+    ]);
+  });
+
+  it('leaves the label out of it', () => {
+    expect(verseEmbeds('![[ARA-41-MRK-014#^ara-mrk-14-1|flat]]')).toMatchObject(
+      [{ block: 'ara-mrk-14-1' }],
+    );
+  });
+
+  it('reads one written with a folder before it', () => {
+    expect(
+      verseEmbeds('![[Bibles/ARA/ARA-41-MRK-014#^ara-mrk-14-1]]'),
+    ).toMatchObject([{ path: 'Bibles/ARA/ARA-41-MRK-014' }]);
+  });
+
+  it('says where in the verse each embed sits', () => {
+    const text = '![[ARA-41-MRK-014#^ara-mrk-14-1|flat]] — nota';
+    const [embed] = verseEmbeds(text);
+    expect(text.slice(embed.at, embed.at + embed.length)).toBe(
+      '![[ARA-41-MRK-014#^ara-mrk-14-1|flat]]',
+    );
+  });
+
+  it('reads an embed the verse writes beside words of its own', () => {
+    expect(
+      verseEmbeds('Antes: ![[ARA-41-MRK-014#^ara-mrk-14-1]] — nota'),
+    ).toMatchObject([{ block: 'ara-mrk-14-1' }]);
+  });
+
+  it('reads every embed a verse holds', () => {
+    expect(
+      verseEmbeds(
+        '![[ARA-41-MRK-014#^ara-mrk-14-1]]\n![[ARA-41-MRK-014#^ara-mrk-14-2]]',
+      ).map((e) => e.block),
+    ).toEqual(['ara-mrk-14-1', 'ara-mrk-14-2']);
+  });
+
+  it('is nothing for a verse that writes its own words', () => {
+    expect(verseEmbeds('No princípio, criou Deus.')).toEqual([]);
+  });
+
+  it('is nothing for an embed of a whole file', () => {
+    expect(verseEmbeds('![[ARA-41-MRK-014]]')).toEqual([]);
+  });
+
+  it('is nothing for a link that is not an embed', () => {
+    expect(verseEmbeds('[[ARA-41-MRK-014#^ara-mrk-14-1]]')).toEqual([]);
+  });
+});
+
+describe('verseWords', () => {
+  it('leaves a verse that writes only words alone', () => {
+    expect(verseWords('No princípio, criou Deus.')).toBe(
+      'No princípio, criou Deus.',
+    );
+  });
+
+  it('drops an aside, delimiters and all', () => {
+    expect(
+      verseWords('Feliz o homem ,,**Refs**: Sl 26.4.,, que não anda'),
+    ).toBe('Feliz o homem que não anda');
+  });
+
+  it('drops an aside written over more than one line', () => {
+    expect(
+      verseWords('Feliz o homem ,,**Refs**:\n[[Shedd-19-PSA-026|Sl 26.4]].,,'),
+    ).toBe('Feliz o homem');
+  });
+
+  it('drops what an aside holds, marks and all', () => {
+    expect(verseWords('Feliz ,,nota ^1^ mais,, homem')).toBe('Feliz homem');
+  });
+
+  it('drops an embed of what is no verse, bang and all', () => {
+    expect(verseWords('![[ARA-41-MRK-014]] mais')).toBe('mais');
+  });
+
+  it('reads a soft link as what the note draws for it', () => {
+    expect(
+      verseWords('Feliz o homem ((Shedd-19-PSA-026#^shedd-psa-26-4|Sl 26.4))'),
+    ).toBe('Feliz o homem Sl 26.4');
+  });
+
+  it('reads a soft link with no label as what it names', () => {
+    expect(verseWords('Veja ((Shedd-19-PSA-026)).')).toBe(
+      'Veja Shedd-19-PSA-026.',
+    );
+  });
+
+  it('leaves a parenthetical that is no soft link as it was written', () => {
+    expect(verseWords('Feliz o homem ((veja o salmo) e o resto)')).toBe(
+      'Feliz o homem ((veja o salmo) e o resto)',
+    );
+  });
+
+  it('reads a link as the label it was given', () => {
+    expect(
+      verseWords('Veja [[Shedd-19-PSA-026#^shedd-psa-26-4|Sl 26.4]].'),
+    ).toBe('Veja Sl 26.4.');
+  });
+
+  it('reads a link with no label as what it names', () => {
+    expect(verseWords('Veja [[Salmo 26]].')).toBe('Veja Salmo 26.');
+  });
+
+  it('keeps the words a mark other than an aside holds', () => {
+    expect(verseWords('Filho ^1^ de Deus ~2~')).toBe('Filho 1 de Deus 2');
+  });
+
+  it('reads a verse written over lines as one line', () => {
+    expect(verseWords('Principio do evangelho\nde Jesus Cristo.')).toBe(
+      'Principio do evangelho de Jesus Cristo.',
+    );
   });
 });

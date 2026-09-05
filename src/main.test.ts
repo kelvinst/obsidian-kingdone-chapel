@@ -576,6 +576,97 @@ describe('verseIn', () => {
     world.vault.write(file.path, 'Sem versículos.');
     expect(await world.plugin.verseIn(file, 1)).toBeNull();
   });
+
+  // A generated version holds no words of its own: every verse is an embed of
+  // the translation it answers, with the version's own id under it. What the
+  // reader wants is the verse, not the markup naming it.
+  describe('a version written as embeds of another', () => {
+    const SHEDD = 'Bibles/SHEDD/SHEDD-01-GEN-001.md';
+    let shedd: TFile;
+
+    beforeEach(() => {
+      shedd = world.vault.write(
+        SHEDD,
+        '![[ARA-01-GEN-001#^ara-gen-1-1|flat]]\n^shedd-gen-1-1',
+      );
+    });
+
+    it('reads the words behind the embed', async () => {
+      expect(await world.plugin.verseIn(shedd, 1)).toEqual({
+        verse: 1,
+        text: 'No princípio, criou Deus.',
+      });
+    });
+
+    it('follows an embed of a version that embeds in its turn', async () => {
+      const mens = world.vault.write(
+        'Bibles/MENS/MENS-01-GEN-001.md',
+        '![[SHEDD-01-GEN-001#^shedd-gen-1-1]]\n^mens-gen-1-1',
+      );
+      expect(await world.plugin.verseIn(mens, 1)).toMatchObject({
+        text: 'No princípio, criou Deus.',
+      });
+    });
+
+    it('reads the words in where the verse writes beside the embed', async () => {
+      world.vault.write(
+        SHEDD,
+        '![[ARA-01-GEN-001#^ara-gen-1-1|flat]] — nota\n^shedd-gen-1-1',
+      );
+      expect(await world.plugin.verseIn(shedd, 1)).toEqual({
+        verse: 1,
+        text: 'No princípio, criou Deus. — nota',
+      });
+    });
+
+    it('drops an embed it cannot follow, keeping the words beside it', async () => {
+      world.vault.write(
+        SHEDD,
+        '![[ARA-01-GEN-009#^ara-gen-9-1]] — nota\n^shedd-gen-1-1',
+      );
+      expect(await world.plugin.verseIn(shedd, 1)).toEqual({
+        verse: 1,
+        text: '— nota',
+      });
+    });
+
+    it('gives up on a pair of versions embedding each other', async () => {
+      world.vault.write(
+        SHEDD,
+        '![[MENS-01-GEN-001#^mens-gen-1-1]]\n^shedd-gen-1-1',
+      );
+      world.vault.write(
+        'Bibles/MENS/MENS-01-GEN-001.md',
+        '![[SHEDD-01-GEN-001#^shedd-gen-1-1]]\n^mens-gen-1-1',
+      );
+      expect(await world.plugin.verseIn(shedd, 1)).toEqual({
+        verse: 1,
+        text: '',
+      });
+    });
+
+    it('reads nothing where the embed names no file the vault holds', async () => {
+      world.vault.write(
+        SHEDD,
+        '![[ARA-01-GEN-009#^ara-gen-9-1]]\n^shedd-gen-1-1',
+      );
+      expect(await world.plugin.verseIn(shedd, 1)).toEqual({
+        verse: 1,
+        text: '',
+      });
+    });
+
+    it('reads nothing where the file it names holds no such verse', async () => {
+      world.vault.write(
+        SHEDD,
+        '![[ARA-01-GEN-001#^ara-gen-1-9]]\n^shedd-gen-1-1',
+      );
+      expect(await world.plugin.verseIn(shedd, 1)).toEqual({
+        verse: 1,
+        text: '',
+      });
+    });
+  });
 });
 
 describe('versionsFor', () => {
@@ -603,6 +694,20 @@ describe('versionsFor', () => {
   it('leaves out a version that does not carry the chapter', async () => {
     const loc = locationFor(world, chapterPath('NVI', 1, 'GEN', 2));
     expect(await world.plugin.versionsFor(loc, false)).toEqual([]);
+  });
+
+  it('carries the words a generated version embeds, not the embed', async () => {
+    world.vault.write(
+      'Bibles/SHEDD/SHEDD-01-GEN-001.md',
+      '![[ARA-01-GEN-001#^ara-gen-1-1|flat]]\n^shedd-gen-1-1',
+    );
+    const loc = locationFor(world, chapterPath('NVI', 1, 'GEN', 1), {
+      verse: 1,
+    });
+    const items = await world.plugin.versionsFor(loc, false);
+    expect(items.find((i) => i.version === 'SHEDD')).toMatchObject({
+      text: 'No princípio, criou Deus.',
+    });
   });
 
   it('leaves the text empty where the version has no such verse', async () => {

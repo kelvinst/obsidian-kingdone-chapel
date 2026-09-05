@@ -1,3 +1,6 @@
+import { runsIn } from './syntax';
+import { softLinksIn } from './softlink';
+
 /** A chapter file name, split into its parts. */
 export interface ChapterName {
   version: string;
@@ -96,6 +99,8 @@ export interface VerseLine {
 
 /** The block id closing a verse line: `^nvi-gen-1-1`, ending in chapter and verse. */
 const BLOCK_ID = /\s*\^([A-Za-z0-9-]+)\s*$/;
+/** A Markdown heading, which names a section rather than writing a verse. */
+const VERSE_HEADING = /^#{1,6}\s/;
 /** How a verse line opens: an ordered list item now, a bolded number in older chapters. */
 const VERSE_MARKER = /^\s*(?:\*\*(\d+)\*\*|(\d+)\.)\s*/;
 /** The verse a block id names, in the number it ends on. */
@@ -135,8 +140,10 @@ export function verseInId(id: string): number | null {
  * verse with nothing in it, so what stands above it, back to the blank line,
  * is the verse.
  *
- * A line that names a verse and writes it at once is taken as it is: whatever
- * came before belongs to a heading or to the verse before, not to this one.
+ * A line that writes its own number is a verse written on one line and is
+ * taken as it is: whatever came before belongs to a heading or to the verse
+ * before, not to this one. A line closing on an id without writing a number is
+ * the end of what stands above it, whether or not it writes anything itself.
  */
 export function parseVerses(content: string): VerseLine[] {
   const out: VerseLine[] = [];
@@ -145,15 +152,26 @@ export function parseVerses(content: string): VerseLine[] {
   for (const line of content.split('\n')) {
     const parsed = parseVerseLine(line);
     if (parsed) {
+      // A line writing its own number is a verse written on one line, and what
+      // stands above it belongs to a heading or to the verse before. A line
+      // that carries only the id is the end of what stands above it, however
+      // much of the verse it writes itself: a version answering a translation
+      // writes the embed on one line and whatever it has to say beside it on
+      // the next, closing on the id.
       out.push(
-        parsed.text
+        VERSE_MARKER.test(line)
           ? parsed
-          : { verse: parsed.verse, text: above.join('\n').trim() },
+          : {
+              verse: parsed.verse,
+              text: [...above, parsed.text].join('\n').trim(),
+            },
       );
       above = [];
       continue;
     }
-    if (line.trim() === '') above = [];
+    // A blank line ends what stands above, and so does a heading: a verse is
+    // written under one, never out of it.
+    if (line.trim() === '' || VERSE_HEADING.test(line)) above = [];
     else above.push(line);
   }
 
@@ -318,4 +336,85 @@ function tailAt(lines: string[], line: number): string {
 function gapAt(lines: string[], line: number): string {
   if (lines[line].trim()) return '\n\n';
   return line > 0 && lines[line - 1].trim() ? '\n' : '';
+}
+
+/** An embed of one verse of another version, and where in the text it sits. */
+export interface VerseEmbed {
+  path: string;
+  block: string;
+  at: number;
+  length: number;
+}
+
+/**
+ * Every verse another version is embedded from, in the order the text writes
+ * them.
+ *
+ * A generated version holds no words of its own: a verse is an embed of the
+ * translation it answers, carrying a label and standing over the version's own
+ * block id — and whatever else the version has to say may be written beside
+ * it. Read as it stands the verse is markup, which is honest but unreadable,
+ * so name what each embed points at and where it sits, and let the caller put
+ * the words in its place.
+ *
+ * Only an embed naming a block names a verse: one embedding a whole file names
+ * a chapter, and a plain link is not an embed at all.
+ */
+export function verseEmbeds(text: string): VerseEmbed[] {
+  const pattern = /!\[\[([^[\]|#]+)#\^([^[\]|#]+)(?:\|[^[\]]*)?\]\]/g;
+  return Array.from(text.matchAll(pattern), (found) => ({
+    path: found[1],
+    block: found[2],
+    at: found.index,
+    length: found[0].length,
+  }));
+}
+
+/** A wiki link, the bang that would make it an embed, and any label it has. */
+const LINK = /(!?)\[\[([^[\]|]+)(?:\|([^[\]]*))?\]\]/g;
+
+/**
+ * The words a verse says, for somewhere with room for one line of it.
+ *
+ * A verse is written for the page it sits on: Shedd hangs its refs and its
+ * notes off one in an aside, and writes them as links. Rendered, that is the
+ * verse and its apparatus; written into a preview as plain text, it is markup
+ * standing where the words should be, and the reader picking a reference is
+ * being shown what says nothing about which row is the right one.
+ *
+ * So an aside goes, delimiters and content both, while every other mark keeps
+ * what it holds. A link that survives reads as the label it was given, or as
+ * what it names where it was given none — a soft link the note draws itself
+ * reads as what it draws, for the same reason. An embed goes with it: one naming a
+ * verse has been answered by the words already, and one naming anything else —
+ * a whole chapter, a picture — has no words to read out. Whatever the verse is
+ * written over is one line by the end of it.
+ */
+export function verseWords(text: string): string {
+  let out = '';
+  let at = 0;
+  for (const run of runsIn(text)) {
+    // A run inside one already read belongs to it, not to the text.
+    if (run.from < at) continue;
+    out += text.slice(at, run.from);
+    if (run.mark.cls !== 'kcp-small')
+      out += verseWords(text.slice(run.contentFrom, run.contentTo));
+    at = run.to;
+  }
+  out += text.slice(at);
+
+  // A soft link is read where it sits rather than by a pattern of its own:
+  // `softLinksIn` already answers which tokens are links and what each draws.
+  let drawn = '';
+  let from = 0;
+  for (const link of softLinksIn(out)) {
+    drawn += out.slice(from, link.from) + link.text;
+    from = link.to;
+  }
+  drawn += out.slice(from);
+
+  return drawn
+    .replace(LINK, (_, bang, target, label) => (bang ? '' : (label ?? target)))
+    .replace(/\s+/g, ' ')
+    .trim();
 }
