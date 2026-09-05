@@ -190,9 +190,13 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
 
       setting.addButton((b) =>
         b.setButtonText('Remove').onClick(async () => {
-          this.plugin.settings.noteKinds = this.plugin
-            .noteKinds()
-            .filter((_, i) => i !== at);
+          const kinds = this.plugin.noteKinds();
+          // The last one stays. A list left empty is a list the command has
+          // nothing to offer from, so it is read as no answer and the three
+          // written here answer instead — which would put back the very rows
+          // that were just taken away, and add to them the next time.
+          if (kinds.length === 1) return;
+          this.plugin.settings.noteKinds = kinds.filter((_, i) => i !== at);
           await this.plugin.saveSettings();
           this.display();
         }),
