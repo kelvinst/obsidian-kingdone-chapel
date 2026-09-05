@@ -6,12 +6,13 @@ import type {
   ViewUpdate,
 } from '@codemirror/view';
 import type { EditorState, Extension, Range } from '@codemirror/state';
-import { editorInfoField } from 'obsidian';
+import { editorInfoField, editorLivePreviewField } from 'obsidian';
 import type { App } from 'obsidian';
 
 import { softLinksIn } from './softlink';
 import type { SoftLink } from './softlink';
 import { linkEl } from './softlink-read';
+import { CODE_BLOCK, touched, unquoted } from './source';
 
 /**
  * The links a note draws while it is being written.
@@ -27,14 +28,6 @@ import { linkEl } from './softlink-read';
  * built one way, so the two views can never drift into behaving differently.
  */
 
-/** A line opening or closing a code block, where a token is only text. */
-const CODE_BLOCK = /^\s*(?:```|~~~)/;
-
-/** What a line says once its quote markers are taken off. */
-function unquoted(text: string): string {
-  return text.replace(/^(\s*>)+\s?/, '');
-}
-
 /**
  * Blank out inline code, keeping every other character where it was.
  *
@@ -44,11 +37,6 @@ function unquoted(text: string): string {
  */
 function mask(text: string): string {
   return text.replace(/`[^`\n]*`/g, (found) => '￼'.repeat(found.length));
-}
-
-/** Whether anything is selected, or the cursor sits, within `from`-`to`. */
-function touched(state: EditorState, from: number, to: number): boolean {
-  return state.selection.ranges.some((r) => r.from <= to && r.to >= from);
 }
 
 /** The anchor standing in for a token, drawn where the token was written. */
@@ -91,6 +79,11 @@ export class SoftLinkWidget extends WidgetType {
  * mark this walks lines rather than blocks, and needs no notion of where a
  * paragraph ends. A quote's markers are taken off before the line is read, so a
  * token written three callouts deep in a book note is read like any other.
+ *
+ * Source mode is the note as it is written: Obsidian draws `[[a link]]` there
+ * as the brackets themselves, and a link of the plugin's own has no business
+ * drawing an anchor over source the note never asked to have rewritten.
+ * Absent, as in a state built by hand, take it for live preview.
  */
 export function build(
   state: EditorState,
@@ -98,6 +91,10 @@ export function build(
   app: App,
   sourcePath: string,
 ): DecorationSet {
+  if (!(state.field(editorLivePreviewField, false) ?? true)) {
+    return Decoration.set([]);
+  }
+
   const into: Range<Decoration>[] = [];
   let code = false;
   let codeDepth = 0;
@@ -162,8 +159,17 @@ export class LiveSoftLinks implements PluginValue {
 
   update(update: ViewUpdate) {
     // The selection among them: a token comes back when the cursor arrives and
-    // is drawn again when it leaves.
-    if (update.docChanged || update.selectionSet || update.viewportChanged) {
+    // is drawn again when it leaves. And the view the editor is drawing, which
+    // decides whether a token is drawn as a link at all — switching to source
+    // mode moves neither the note nor the cursor, and the links would
+    // otherwise stay as live preview left them.
+    if (
+      update.docChanged ||
+      update.selectionSet ||
+      update.viewportChanged ||
+      update.state.field(editorLivePreviewField, false) !==
+        update.startState.field(editorLivePreviewField, false)
+    ) {
       this.decorations = build(
         update.view.state,
         update.view.visibleRanges,

@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
-import { editorInfoField } from 'obsidian';
+import { editorInfoField, editorLivePreviewField } from 'obsidian';
 
 import {
   LiveSoftLinks,
@@ -95,8 +95,20 @@ describe('build', () => {
     expect(read(below('Escreva `((a|1))` assim.'))).toEqual([]);
   });
 
-  it('draws a token written inside a callout', () => {
-    expect(read(below('> [!note]', '> ((a|1))'))).toEqual(['link:1']);
+  it('leaves a token inside a fence written inside a callout alone', () => {
+    expect(read(below('> [!note]', '> ```', '> ((a|1))', '> ```'))).toEqual([]);
+  });
+
+  it('draws a token written three callouts deep', () => {
+    expect(read(below('>>> ((a|1))'))).toEqual(['link:1']);
+  });
+
+  it('does not close a fence on a line quoted to a different depth', () => {
+    // The inner fence line is a fence closing nothing — its quote depth does
+    // not match the depth the block opened at — so the block stays open
+    // through it and the token inside stays hidden. The correctly-quoted
+    // fence after it is what actually closes the block.
+    expect(read(below('> ```', '>> ```', '> ((a|1))', '> ```'))).toEqual([]);
   });
 
   it('reads nothing below what is on screen', () => {
@@ -109,6 +121,61 @@ describe('build', () => {
       count++;
     });
     expect(count).toBe(0);
+  });
+
+  it('still counts a fence opened above what is visible', () => {
+    const doc = ['```', '((a|1))', '```'].join('\n');
+    const state = EditorState.create({ doc, selection: { anchor: 0 } });
+    // The fence opens on line 1, which is out of range — only line 2 (where
+    // the token sits) and below is visible — but the block it opens still
+    // holds, so the token stays hidden rather than being read as plain text.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const set = build(
+      state,
+      [{ from: 4, to: doc.length }],
+      stub() as any,
+      'a.md',
+    );
+    let count = 0;
+    set.between(0, doc.length, () => {
+      count++;
+    });
+    expect(count).toBe(0);
+  });
+});
+
+describe('source mode', () => {
+  /** The decorations of a note the editor is drawing one way or the other. */
+  function read(doc: string, live: boolean): string[] {
+    const state = EditorState.create({
+      doc,
+      selection: { anchor: 0 },
+      extensions: [editorLivePreviewField.init(() => live)],
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const set = build(
+      state,
+      [{ from: 0, to: doc.length }],
+      stub() as any,
+      'a.md',
+    );
+    const out: string[] = [];
+    set.between(0, doc.length, (from, to, value) => {
+      const widget = value.spec.widget as
+        { link?: { text: string } } | undefined;
+      out.push(
+        widget ? `link:${widget.link!.text}` : `raw:${doc.slice(from, to)}`,
+      );
+    });
+    return out;
+  }
+
+  it('draws the link in live preview', () => {
+    expect(read(below('((a|1))'), true)).toEqual(['link:1']);
+  });
+
+  it('leaves the token on the page in source mode', () => {
+    expect(read(below('((a|1))'), false)).toEqual([]);
   });
 });
 
@@ -208,9 +275,41 @@ describe('LiveSoftLinks', () => {
       docChanged: false,
       selectionSet: false,
       viewportChanged: false,
+      startState: still.state,
+      state: still.state,
       view: still,
     } as never);
     expect(links.decorations).toBe(before);
+  });
+
+  /** An editor drawing one view of a note or the other. */
+  function drawing(doc: string, live: boolean): EditorView {
+    const state = EditorState.create({
+      doc,
+      extensions: [editorLivePreviewField.init(() => live)],
+    });
+    return {
+      state,
+      visibleRanges: [{ from: 0, to: doc.length }],
+    } as unknown as EditorView;
+  }
+
+  it('reads the editor again when it is switched to source mode', () => {
+    const doc = below('((a|1))');
+    const preview = drawing(doc, true);
+    const links = new LiveSoftLinks(preview, stub() as never);
+    expect(links.decorations.size).toBe(1);
+
+    const source = drawing(doc, false);
+    links.update({
+      docChanged: false,
+      selectionSet: false,
+      viewportChanged: false,
+      startState: preview.state,
+      state: source.state,
+      view: source,
+    } as never);
+    expect(links.decorations.size).toBe(0);
   });
 });
 
