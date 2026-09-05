@@ -608,6 +608,28 @@ describe('verseIn', () => {
       });
     });
 
+    it('reads the words in where the verse writes beside the embed', async () => {
+      world.vault.write(
+        SHEDD,
+        '![[ARA-01-GEN-001#^ara-gen-1-1|flat]] — nota\n^shedd-gen-1-1',
+      );
+      expect(await world.plugin.verseIn(shedd, 1)).toEqual({
+        verse: 1,
+        text: 'No princípio, criou Deus. — nota',
+      });
+    });
+
+    it('drops an embed it cannot follow, keeping the words beside it', async () => {
+      world.vault.write(
+        SHEDD,
+        '![[ARA-01-GEN-009#^ara-gen-9-1]] — nota\n^shedd-gen-1-1',
+      );
+      expect(await world.plugin.verseIn(shedd, 1)).toEqual({
+        verse: 1,
+        text: '— nota',
+      });
+    });
+
     it('gives up on a pair of versions embedding each other', async () => {
       world.vault.write(
         SHEDD,

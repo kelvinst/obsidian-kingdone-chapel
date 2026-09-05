@@ -4,6 +4,7 @@ import {
   chapterFileName,
   chapterKey,
   hasBlockId,
+  verseEmbeds,
   quotePlacement,
   parseBookName,
   parseChapterName,
@@ -418,5 +419,59 @@ describe('verseInId', () => {
   it('answers with nothing for an id naming something else', () => {
     expect(verseInId('a500c4')).toBeNull();
     expect(verseInId('ara-lev-1-')).toBeNull();
+  });
+});
+
+describe('verseEmbeds', () => {
+  it('reads the file and block a verse embeds', () => {
+    expect(verseEmbeds('![[ARA-41-MRK-014#^ara-mrk-14-1]]')).toMatchObject([
+      { path: 'ARA-41-MRK-014', block: 'ara-mrk-14-1' },
+    ]);
+  });
+
+  it('leaves the label out of it', () => {
+    expect(verseEmbeds('![[ARA-41-MRK-014#^ara-mrk-14-1|flat]]')).toMatchObject(
+      [{ block: 'ara-mrk-14-1' }],
+    );
+  });
+
+  it('reads one written with a folder before it', () => {
+    expect(
+      verseEmbeds('![[Bibles/ARA/ARA-41-MRK-014#^ara-mrk-14-1]]'),
+    ).toMatchObject([{ path: 'Bibles/ARA/ARA-41-MRK-014' }]);
+  });
+
+  it('says where in the verse each embed sits', () => {
+    const text = '![[ARA-41-MRK-014#^ara-mrk-14-1|flat]] — nota';
+    const [embed] = verseEmbeds(text);
+    expect(text.slice(embed.at, embed.at + embed.length)).toBe(
+      '![[ARA-41-MRK-014#^ara-mrk-14-1|flat]]',
+    );
+  });
+
+  it('reads an embed the verse writes beside words of its own', () => {
+    expect(
+      verseEmbeds('Antes: ![[ARA-41-MRK-014#^ara-mrk-14-1]] — nota'),
+    ).toMatchObject([{ block: 'ara-mrk-14-1' }]);
+  });
+
+  it('reads every embed a verse holds', () => {
+    expect(
+      verseEmbeds(
+        '![[ARA-41-MRK-014#^ara-mrk-14-1]]\n![[ARA-41-MRK-014#^ara-mrk-14-2]]',
+      ).map((e) => e.block),
+    ).toEqual(['ara-mrk-14-1', 'ara-mrk-14-2']);
+  });
+
+  it('is nothing for a verse that writes its own words', () => {
+    expect(verseEmbeds('No princípio, criou Deus.')).toEqual([]);
+  });
+
+  it('is nothing for an embed of a whole file', () => {
+    expect(verseEmbeds('![[ARA-41-MRK-014]]')).toEqual([]);
+  });
+
+  it('is nothing for a link that is not an embed', () => {
+    expect(verseEmbeds('[[ARA-41-MRK-014#^ara-mrk-14-1]]')).toEqual([]);
   });
 });

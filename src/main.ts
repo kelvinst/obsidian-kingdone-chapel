@@ -25,6 +25,7 @@ import {
   parseVerseLine,
   parseVerses,
   verseInId,
+  verseEmbeds,
 } from './utils';
 import { bookName, bookNameAt, nameLang, translationsName } from './books';
 import { VersionSuggestModal } from './modal';
@@ -59,11 +60,6 @@ const VERSE_SELECTOR = '.markdown-preview-sizer li, .markdown-preview-sizer p';
 const PREVIEW_TOP_OFFSET = 48;
 /** Scroll movement (px) that releases a verse clicked in reading mode. */
 const SCROLL_SLACK = 4;
-/**
- * A line that is nothing but an embed of another version's verse — the whole
- * of what a generated version writes where a translation writes words.
- */
-const EMBED_LINE = /^!\[\[([^\]|#]+)#\^([^\]|]+)(?:\|[^\]]*)?\]\]$/;
 
 /**
  * File `key` in `into`, unless another file already claims it.
@@ -1261,32 +1257,36 @@ export default class KingdoneChapelPlugin extends Plugin {
 
   /**
    * The words `text` holds, with every embed of another version's verse
-   * answered by the verse it points at.
+   * answered by the verse it points at, in the place it was written.
    *
    * A generated version writes no text of its own: each of its verses is an
    * embed of the translation it answers, with its own block id under it, and
-   * `parseVerses` reads that embed line as the verse's text. That is the
-   * honest answer about the file and the wrong thing to hand a reader — the
-   * sidebar only gets away with it because it renders the embed. Anywhere the
-   * words themselves are wanted, follow the link instead, which is why
-   * `verseIn` hands every caller what this answers.
+   * `parseVerses` reads that embed as the verse's text. That is the honest
+   * answer about the file and the wrong thing to hand a reader — the sidebar
+   * only gets away with it because it renders the embed. Anywhere the words
+   * themselves are wanted, follow the link instead, which is why `verseIn`
+   * hands every caller what this answers.
    *
    * An embed nothing answers is dropped rather than read out as markup, and a
    * verse embedding its way back to itself stops where it comes round.
+   * Whatever the version wrote around an embed is left standing.
    */
   async resolveEmbeds(
     text: string,
     from: TFile,
     seen: Set<string> = new Set(),
   ): Promise<string> {
-    const out: string[] = [];
-    for (const line of text.split('\n')) {
-      const embed = EMBED_LINE.exec(line.trim());
-      out.push(
-        embed ? await this.embedded(embed[1], embed[2], from, seen) : line,
-      );
+    const embeds = verseEmbeds(text);
+    if (!embeds.length) return text;
+
+    let out = '';
+    let at = 0;
+    for (const embed of embeds) {
+      out += text.slice(at, embed.at);
+      out += await this.embedded(embed.path, embed.block, from, seen);
+      at = embed.at + embed.length;
     }
-    return out.join('\n').trim();
+    return (out + text.slice(at)).trim();
   }
 
   /** The verse an embed points at, followed through whatever it embeds in turn. */

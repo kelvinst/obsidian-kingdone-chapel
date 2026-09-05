@@ -319,3 +319,35 @@ function gapAt(lines: string[], line: number): string {
   if (lines[line].trim()) return '\n\n';
   return line > 0 && lines[line - 1].trim() ? '\n' : '';
 }
+
+/** An embed of one verse of another version, and where in the text it sits. */
+export interface VerseEmbed {
+  path: string;
+  block: string;
+  at: number;
+  length: number;
+}
+
+/**
+ * Every verse another version is embedded from, in the order the text writes
+ * them.
+ *
+ * A generated version holds no words of its own: a verse is an embed of the
+ * translation it answers, carrying a label and standing over the version's own
+ * block id — and whatever else the version has to say may be written beside
+ * it. Read as it stands the verse is markup, which is honest but unreadable,
+ * so name what each embed points at and where it sits, and let the caller put
+ * the words in its place.
+ *
+ * Only an embed naming a block names a verse: one embedding a whole file names
+ * a chapter, and a plain link is not an embed at all.
+ */
+export function verseEmbeds(text: string): VerseEmbed[] {
+  const pattern = /!\[\[([^[\]|#]+)#\^([^[\]|#]+)(?:\|[^[\]]*)?\]\]/g;
+  return Array.from(text.matchAll(pattern), (found) => ({
+    path: found[1],
+    block: found[2],
+    at: found.index,
+    length: found[0].length,
+  }));
+}
