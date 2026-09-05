@@ -9,6 +9,7 @@ import type { EditorState, Range } from '@codemirror/state';
 import { editorLivePreviewField } from 'obsidian';
 
 import { runsIn } from './syntax';
+import { CODE_BLOCK, touched, unquoted } from './source';
 
 /**
  * The three marks while the note is being edited.
@@ -56,9 +57,6 @@ const LABEL = '\uFFFD';
  */
 const NOT_PROSE =
   /`[^`\n]*`|\$(?![\s$])[^$\n]*[^\s$]\$|!?\[\[[^\]\n]*\]\]|\[[^\]\n]*\]\([^)\n]*\)|\^[\w-]+(?=[ \t]*$)/gm;
-
-/** A line opening or closing a code block. */
-const CODE_BLOCK = /^\s*(?:```|~~~)/;
 
 /**
  * A line that begins a block of its own: a list item, a heading, a quote, a
@@ -111,11 +109,6 @@ const TABLE_ROW = /^\s*\|/;
  */
 const DELIMITER_ROW = /^(?=.*\|)[\s:|-]*-[\s:|-]*$/;
 
-/** What a line says once its quote markers are taken off. */
-function unquoted(text: string): string {
-  return text.replace(/^(\s*>)+\s?/, '');
-}
-
 /**
  * Blank out what is not prose, keeping every other character where it was.
  *
@@ -135,11 +128,6 @@ function mask(text: string): string {
 /** Whether a run's content is anything of the note's own, or only stand-ins. */
 function prose(text: string): boolean {
   return text.split(OPAQUE).join('') !== '';
-}
-
-/** Whether anything is selected, or the cursor sits, within `from`-`to`. */
-function touched(state: EditorState, from: number, to: number): boolean {
-  return state.selection.ranges.some((r) => r.from <= to && r.to >= from);
 }
 
 /**
