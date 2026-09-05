@@ -36,6 +36,8 @@ import { Breadcrumbs } from './breadcrumbs';
 import { Diagnostics } from './diagnostics';
 import { renderMarks } from './marks';
 import { liveMarks } from './live';
+import { softLinkRenderer } from './softlink-read';
+import { liveSoftLinks } from './softlink-live';
 import {
   collectSources,
   declaresSource,
@@ -190,6 +192,12 @@ export default class KingdoneChapelPlugin extends Plugin {
     // being drawn by different halves of the app.
     this.registerMarkdownPostProcessor(renderMarks);
     this.registerEditorExtension(liveMarks);
+
+    // The `((target#^anchor|display))` soft link: draws like a normal
+    // internal link in both views, but never enters the link cache — see
+    // README.md, "Links the vault does not count".
+    this.registerMarkdownPostProcessor(softLinkRenderer(this.app));
+    this.registerEditorExtension(liveSoftLinks(this.app));
 
     // One command per version, so each can get its own hotkey.
     this.registerVersionCommands();

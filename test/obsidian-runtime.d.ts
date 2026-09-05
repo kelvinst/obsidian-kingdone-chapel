@@ -24,6 +24,10 @@ declare module 'obsidian' {
     ribbons: { icon: string; title: string; callback: () => void }[];
     /** What `saveData` last wrote, which `loadData` reads back. */
     data: unknown;
+    /** Every markdown post-processor `registerMarkdownPostProcessor` was given. */
+    postProcessors: ((el: HTMLElement, ctx: never) => unknown)[];
+    /** Every CodeMirror extension `registerEditorExtension` was given. */
+    editorExtensions: unknown[];
   }
 
   interface Modal {

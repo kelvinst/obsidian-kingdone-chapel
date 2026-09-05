@@ -153,6 +153,34 @@ hides the asterisks of its own bold. Source mode keeps them on the page, being t
 is written, and marks the run all the same. An aside covering whole lines is drawn at its own line
 spacing there, rather than at the spacing of the text around it.
 
+### Links the vault does not count
+
+A note that indexes another — a book note listing its 150 chapters — draws a graph edge for
+every `[[wikilink]]` in it, and the graph view stops being readable. These write a link that
+is never counted:
+
+| You type                                            | You get                     |
+| --------------------------------------------------- | --------------------------- |
+| `((Shedd-19-PSA-023))`                              | a link reading its own name |
+| `((Shedd-19-PSA-023\|23))`                          | the same link, reading `23` |
+| `((Shedd-19-PSA-103#^shedd-psa-103-10\|Sl 103.10))` | a link onto a single verse  |
+
+It behaves like any internal link: click to open it, hold the platform's modifier to open it
+in a new pane, hover for the page preview, and a target no note answers to is greyed out the
+way an unresolved link is.
+
+**What it costs, plainly:** the link exists only on the page. Obsidian never reads it, so it
+is absent from every feature built on the link cache — no graph edge, no entry in the
+backlinks pane of the note it points at, none in the outgoing links pane of the note holding
+it, no change to either note's link count, and nothing for a dataview `file.outlinks` or any
+other plugin reading the same cache. That is the point of the syntax, not a shortcoming of
+it. Where you want the relationship recorded, write a `[[wikilink]]`.
+
+The target may not hold spaces, so ordinary prose in parentheses — `(bla (aside) bla)` — is
+left exactly as written. Tokens inside `` `code` `` and fenced blocks are left alone too.
+Both views draw them: reading view rewrites the note, and in live preview the token is drawn
+as its link until the cursor arrives, when it is handed back for editing.
+
 ### `@` references
 
 Type `@` and a reference anywhere in a note to link to it. The suggestion list shows the
