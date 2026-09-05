@@ -1,3 +1,5 @@
+import { runsIn } from './syntax';
+
 /** A chapter file name, split into its parts. */
 export interface ChapterName {
   version: string;
@@ -361,4 +363,39 @@ export function verseEmbeds(text: string): VerseEmbed[] {
     at: found.index,
     length: found[0].length,
   }));
+}
+
+/** A wiki link, and the label it was given where it has one. */
+const LINK = /\[\[([^[\]|]+)(?:\|([^[\]]*))?\]\]/g;
+
+/**
+ * The words a verse says, for somewhere with room for one line of it.
+ *
+ * A verse is written for the page it sits on: Shedd hangs its refs and its
+ * notes off one in an aside, and writes them as links. Rendered, that is the
+ * verse and its apparatus; written into a preview as plain text, it is markup
+ * standing where the words should be, and the reader picking a reference is
+ * being shown what says nothing about which row is the right one.
+ *
+ * So an aside goes, delimiters and content both, while every other mark keeps
+ * what it holds. A link that survives reads as the label it was given, or as
+ * what it names where it was given none. Whatever the verse is written over is
+ * one line by the end of it.
+ */
+export function verseWords(text: string): string {
+  let out = '';
+  let at = 0;
+  for (const run of runsIn(text)) {
+    // A run inside one already read belongs to it, not to the text.
+    if (run.from < at) continue;
+    out += text.slice(at, run.from);
+    if (run.mark.cls !== 'kcp-small')
+      out += verseWords(text.slice(run.contentFrom, run.contentTo));
+    at = run.to;
+  }
+  out += text.slice(at);
+  return out
+    .replace(LINK, (_, target, label) => label ?? target)
+    .replace(/\s+/g, ' ')
+    .trim();
 }

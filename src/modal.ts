@@ -3,6 +3,7 @@ import type { App } from 'obsidian';
 
 import type { Location, VersionItem } from './types';
 import type KingdoneChapelPlugin from './main';
+import { verseWords } from './utils';
 
 export class VersionSuggestModal extends SuggestModal<VersionItem> {
   plugin: KingdoneChapelPlugin;
@@ -39,8 +40,10 @@ export class VersionSuggestModal extends SuggestModal<VersionItem> {
 
   renderSuggestion(item: VersionItem, el: HTMLElement) {
     el.createEl('div', { text: item.label, cls: 'kcp-version' });
-    if (item.text)
-      el.createEl('small', { text: item.text, cls: 'kcp-preview' });
+    // A row is one line, which has room for the verse and not for the refs and
+    // the notes a version hangs off it.
+    const words = verseWords(item.text);
+    if (words) el.createEl('small', { text: words, cls: 'kcp-preview' });
   }
 
   onChooseSuggestion(item: VersionItem, evt: MouseEvent | KeyboardEvent) {
