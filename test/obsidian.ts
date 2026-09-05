@@ -28,6 +28,17 @@ export const editorLivePreviewField = StateField.define<boolean>({
   update: (value) => value,
 });
 
+/**
+ * The note an editor is showing. The app fills this in; a state built by a test
+ * carries no file, and a link in it resolves from the vault root.
+ */
+export const editorInfoField = StateField.define<{
+  file: { path: string } | null;
+}>({
+  create: () => ({ file: null }),
+  update: (value) => value,
+});
+
 export class Component {
   _loaded = false;
   _children: Component[] = [];
