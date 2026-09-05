@@ -521,6 +521,24 @@ describe('verseWords', () => {
     expect(verseWords('![[ARA-41-MRK-014]] mais')).toBe('mais');
   });
 
+  it('reads a soft link as what the note draws for it', () => {
+    expect(
+      verseWords('Feliz o homem ((Shedd-19-PSA-026#^shedd-psa-26-4|Sl 26.4))'),
+    ).toBe('Feliz o homem Sl 26.4');
+  });
+
+  it('reads a soft link with no label as what it names', () => {
+    expect(verseWords('Veja ((Shedd-19-PSA-026)).')).toBe(
+      'Veja Shedd-19-PSA-026.',
+    );
+  });
+
+  it('leaves a parenthetical that is no soft link as it was written', () => {
+    expect(verseWords('Feliz o homem ((veja o salmo) e o resto)')).toBe(
+      'Feliz o homem ((veja o salmo) e o resto)',
+    );
+  });
+
   it('reads a link as the label it was given', () => {
     expect(
       verseWords('Veja [[Shedd-19-PSA-026#^shedd-psa-26-4|Sl 26.4]].'),

@@ -1,4 +1,5 @@
 import { runsIn } from './syntax';
+import { softLinksIn } from './softlink';
 
 /** A chapter file name, split into its parts. */
 export interface ChapterName {
@@ -383,7 +384,8 @@ const LINK = /(!?)\[\[([^[\]|]+)(?:\|([^[\]]*))?\]\]/g;
  *
  * So an aside goes, delimiters and content both, while every other mark keeps
  * what it holds. A link that survives reads as the label it was given, or as
- * what it names where it was given none. An embed goes with it: one naming a
+ * what it names where it was given none — a soft link the note draws itself
+ * reads as what it draws, for the same reason. An embed goes with it: one naming a
  * verse has been answered by the words already, and one naming anything else —
  * a whole chapter, a picture — has no words to read out. Whatever the verse is
  * written over is one line by the end of it.
@@ -400,7 +402,18 @@ export function verseWords(text: string): string {
     at = run.to;
   }
   out += text.slice(at);
-  return out
+
+  // A soft link is read where it sits rather than by a pattern of its own:
+  // `softLinksIn` already answers which tokens are links and what each draws.
+  let drawn = '';
+  let from = 0;
+  for (const link of softLinksIn(out)) {
+    drawn += out.slice(from, link.from) + link.text;
+    from = link.to;
+  }
+  drawn += out.slice(from);
+
+  return drawn
     .replace(LINK, (_, bang, target, label) => (bang ? '' : (label ?? target)))
     .replace(/\s+/g, ' ')
     .trim();
