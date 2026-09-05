@@ -427,6 +427,14 @@
   width: 5em;
 }
 
+/* The mark that carries what a column is too narrow to say. Quieter than the
+   name it stands beside, and shaped like something to be asked. */
+.kcp-note-hint {
+  margin-left: 0.3em;
+  color: var(--text-faint);
+  cursor: help;
+}
+
 /* The button column is as wide as the button, and is the one that ends the
    row, so nothing follows it. */
 .kcp-note-kinds th:last-child,

@@ -418,17 +418,30 @@ describe('the kinds table', () => {
         (column) => column.textContent,
       ),
       // The last of them stands over the buttons, and names nothing.
-    ).toEqual(['Callout', 'Anchor letter', 'Name', '']);
+    ).toEqual(['Callout', 'Anchor?', 'Name', '']);
   });
 
   it('gives every field a cell of its own, named for what it holds', () => {
     const row = rows()[0];
     expect(row.querySelectorAll('td')).toHaveLength(4);
-    expect(
-      Array.from(row.querySelectorAll<HTMLInputElement>('input')).map(
-        (field) => field.title,
-      ),
-    ).toEqual(['Callout', 'Anchor letter', 'Name']);
+    const named = Array.from(
+      row.querySelectorAll<HTMLInputElement>('input'),
+    ).map((field) => field.title);
+    expect(named[0]).toBe('Callout');
+    expect(named[2]).toBe('Name');
+    // The anchor is named at greater length, since the column cannot hold it.
+    expect(named[1]).toContain('written into the block id');
+  });
+
+  it('says what the anchor is, where the column has no room to', () => {
+    const hint = containerEl.querySelector<HTMLElement>('.kcp-note-hint');
+    expect(hint?.title).toContain('written into the block id');
+    expect(hint?.getAttribute('aria-label')).toBe(hint?.title);
+    // The field says the same, for the row it is read in.
+    const anchor = Array.from(
+      containerEl.querySelectorAll<HTMLInputElement>('.kcp-note-kind input'),
+    )[1];
+    expect(anchor.title).toBe(hint?.title);
   });
 });
 
