@@ -378,3 +378,29 @@ describe('the kinds of note', () => {
     });
   });
 });
+
+describe('the last kind of note', () => {
+  function rows(): HTMLElement[] {
+    return Array.from(
+      containerEl.querySelectorAll<HTMLElement>('.kcp-note-kind'),
+    );
+  }
+
+  function remove(at: number) {
+    const found = Array.from(
+      rows()[at].querySelectorAll<HTMLButtonElement>('button'),
+    ).find((el) => el.textContent === 'Remove');
+    found?.dispatchEvent(new Event('click'));
+  }
+
+  it('stays, since an empty list is read as no answer at all', async () => {
+    remove(2);
+    await vi.waitFor(() => expect(rows()).toHaveLength(2));
+    remove(1);
+    await vi.waitFor(() => expect(rows()).toHaveLength(1));
+
+    remove(0);
+    expect(rows()).toHaveLength(1);
+    expect(world.plugin.settings.noteKinds).toHaveLength(1);
+  });
+});
