@@ -129,11 +129,21 @@ the same verse joins the marker list rather than replacing it, and a note over a
 every verse in it and quotes every one of them in its body.
 
 Three kinds ship with the plugin — **Nota** (`[!note]`, anchored `n1`), **Nótula Homilética**
-(`[!homiletica]`, `h1`) and **Nota dos Revisores** (`[!revisores]`, `r1`) — and the settings tab
+(`[!homiletic]`, `h1`) and **Nota dos Revisores** (`[!reviewers]`, `r1`) — and the settings tab
 lists them as a table: the callout each is written as, the letter its anchors carry, and the
 name it is given in a note's title. Add your own, or write over these; the first in the list is
-the one offered first. The callouts are drawn by your theme or by a CSS snippet, and the ones here are this
-vault's own.
+the one offered first.
+
+`note` is Obsidian's own callout; `homiletic` (a megaphone, amber) and `reviewers` (glasses,
+green) are drawn by this plugin's stylesheet. A callout of your own is a `data-callout` rule in
+your theme or in a CSS snippet:
+
+```css
+.callout[data-callout='marginalia'] {
+  --callout-color: #7a5cad;
+  --callout-icon: lucide-pencil;
+}
+```
 
 ### Chapter breadcrumbs
 
