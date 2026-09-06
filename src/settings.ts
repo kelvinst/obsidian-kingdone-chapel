@@ -1,5 +1,6 @@
 import {
   ButtonComponent,
+  Notice,
   PluginSettingTab,
   Setting,
   TextComponent,
@@ -168,15 +169,18 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
     const table = containerEl.createEl('table', { cls: 'kcp-note-kinds' });
     const head = table.createEl('thead').createEl('tr');
     for (const column of COLUMNS) {
+      // A column has room for a word, and what it holds takes a sentence, so
+      // the sentence is behind a mark beside the word.
       const cell = head.createEl('th', { text: column.name });
-      // A column too narrow to say what it holds says it on hover instead,
-      // which is where a reader asks.
-      if (!column.hint) continue;
       // The app's own tooltip and no other: a `title` beside it would draw a
       // second one, the same words twice over in the window's own hand. Shown
       // the moment it is hovered, since it is there to be asked.
+      const said = column.hint;
       const hint = cell.createSpan({ text: '?', cls: 'kcp-note-hint' });
-      setTooltip(hint, column.hint, { delay: 0 });
+      setTooltip(hint, said, { delay: 0 });
+      // And said again to a reader who clicked it rather than waited over it,
+      // which is the only way of asking on a screen with no pointer.
+      hint.addEventListener('click', () => new Notice(said));
     }
     // The column the Remove buttons stand in, which names nothing.
     head.createEl('th');
@@ -185,16 +189,11 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
     this.plugin.noteKinds().forEach((kind, at) => {
       const row = body.createEl('tr', { cls: 'kcp-note-kind' });
 
-      field(new TextComponent(row.createEl('td')), 'Callout', 'note')
+      field(new TextComponent(row.createEl('td')), CALLOUT, 'note')
         .setValue(kind.callout)
         .onChange((value) => this.setKind(at, { callout: value.trim() }));
 
-      field(
-        new TextComponent(row.createEl('td')),
-        ANCHOR.name,
-        'n',
-        ANCHOR.hint,
-      )
+      field(new TextComponent(row.createEl('td')), ANCHOR, 'n')
         .setValue(kind.letter)
         .onChange((value) => {
           // Letters, and nothing else. A kind anchoring its notes on a digit
@@ -206,7 +205,7 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
           if (LETTERS.test(letter)) this.setKind(at, { letter });
         });
 
-      field(new TextComponent(row.createEl('td')), 'Name', 'Nota')
+      field(new TextComponent(row.createEl('td')), NAME, 'Nota')
         .setValue(kind.title)
         .onChange((value) => this.setKind(at, { title: value.trim() }));
 
@@ -350,18 +349,38 @@ function docs(href: string, text: string): HTMLAnchorElement {
 /** What a letter a kind anchors its notes with may be made of. */
 const LETTERS = /^[a-z]+$/i;
 
-/** The column a kind's letter is typed into, which is the one that needs saying. */
-const ANCHOR = {
+/** One column of the kinds table: what it is called, and what it holds. */
+interface Column {
+  name: string;
+  hint: string;
+}
+
+const CALLOUT: Column = {
+  name: 'Callout',
+  hint:
+    'The callout every note of this kind is written as. `note` is one of ' +
+    "Obsidian's own; `homiletic` and `reviewers` are drawn by this plugin; " +
+    'one of your own is a `data-callout` rule in your theme or in a CSS ' +
+    'snippet. A callout nothing draws is written in plain grey.',
+};
+
+const ANCHOR: Column = {
   name: 'Anchor',
-  hint: "A letter, written into the block id of every note of this kind: `n` anchors them `^shedd-psa-1-n2`. It is what keeps one kind's numbering apart from another's.",
+  hint:
+    'A letter, written into the block id of every note of this kind: `n` ' +
+    "anchors them `^shedd-psa-1-n2`. It is what keeps one kind's numbering " +
+    "apart from another's.",
+};
+
+const NAME: Column = {
+  name: 'Name',
+  hint:
+    'What the kind is called in the title of every note written as it: ' +
+    '`Nota 2 - Salmos 1.1`. The kind is offered under this name too.',
 };
 
 /** What a row of the kinds table says, left to right. */
-const COLUMNS: { name: string; hint?: string }[] = [
-  { name: 'Callout' },
-  ANCHOR,
-  { name: 'Name' },
-];
+const COLUMNS: Column[] = [CALLOUT, ANCHOR, NAME];
 
 /**
  * A letter no kind is anchoring its notes with, for the kind being added.
@@ -390,17 +409,12 @@ function freeLetter(kinds: NoteKind[]): string {
 }
 
 /**
- * A field of a kind, named twice over: the placeholder says what belongs in it
- * while it is empty, and the tooltip says it again once it is full, since a
- * row of four boxes reads as four boxes otherwise.
+ * A field of a kind, said twice over: the placeholder shows what belongs in it
+ * while it is empty, and the tooltip says what its column says, since a row of
+ * four boxes reads as four boxes once they are full.
  */
-function field(
-  text: TextComponent,
-  name: string,
-  example: string,
-  hint = name,
-) {
-  setTooltip(text.inputEl, hint, { delay: 0 });
+function field(text: TextComponent, column: Column, example: string) {
+  setTooltip(text.inputEl, column.hint, { delay: 0 });
   return text.setPlaceholder(example);
 }
 
