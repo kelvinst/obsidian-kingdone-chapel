@@ -118,8 +118,33 @@ function named(versions: string[], word: string): string | null {
   return versions.find((v) => v.toLowerCase() === wanted) || null;
 }
 
-/** Rendered elements a verse can be: a list item now, a paragraph in older chapters. */
-const VERSE_SELECTOR = '.markdown-preview-sizer li, .markdown-preview-sizer p';
+/**
+ * Rendered elements a verse can be: the embed a version written over another
+ * one draws, the paragraph a verse written in place renders as, a list item in
+ * older chapters.
+ */
+const VERSE_SELECTOR =
+  '.markdown-preview-sizer li, .markdown-preview-sizer p,' +
+  ' .markdown-preview-sizer .internal-embed[src]';
+
+/** The digits a verse opens with, which the vault writes raised: `¹`, not `1`. */
+const SUPERSCRIPT_DIGITS = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+
+/**
+ * The number the raised digits at the head of `text` spell, or null where it
+ * opens with anything else.
+ */
+function superscriptVerse(text: string): number | null {
+  let verse = 0;
+  let read = 0;
+  for (const ch of text) {
+    const digit = SUPERSCRIPT_DIGITS.indexOf(ch);
+    if (digit < 0) break;
+    verse = verse * 10 + digit;
+    read++;
+  }
+  return read ? verse : null;
+}
 
 /** How far below the top of a reading pane a verse still counts as the one being read. */
 const PREVIEW_TOP_OFFSET = 48;
@@ -1146,22 +1171,26 @@ export default class KingdoneChapelPlugin extends Plugin {
   /**
    * Verse elements of a reading pane, in document order.
    *
-   * Nothing on the page says which verse an element holds: a list item carries
-   * no number of its own, and the number an older chapter bolds into the
-   * paragraph is the one the file wrote, which a version that merges verses
-   * only writes once. Take the numbers from the file and pair them up in order
-   * instead. Nothing separates the verses, so reading mode renders them as a
-   * single block — either every one is on the page or none is, and a count that
-   * disagrees means something on the page is not a verse, which leaves nothing
-   * to pair against: fall back to the numbers the page writes for itself.
+   * Most verses say which one they are: the vault opens a verse written in
+   * place with its raised number, and a version written over another one is
+   * made of embeds, each naming the verse it draws in its own block id. Read
+   * that and the answer holds however much of the chapter is on the page —
+   * reading mode renders a long one a few screens at a time.
+   *
+   * A list item is the exception: it carries no number of its own, Markdown
+   * numbering the list rather than the file. Take the numbers from the file and
+   * pair them up in order instead, and where a count that disagrees leaves
+   * nothing to pair against, fall back to the numbers the page writes.
    */
   verseParagraphs(
     view: MarkdownView,
     scroller: HTMLElement,
   ): { verse: number; el: HTMLElement }[] {
-    const els = Array.from(
-      scroller.querySelectorAll<HTMLElement>(VERSE_SELECTOR),
-    ).filter((el) => el.tagName === 'LI' || this.isVerseParagraph(el));
+    const els = this.verseElements(scroller);
+
+    const named = els.map((el) => this.namedVerse(el));
+    if (els.length && named.every((verse) => verse !== null))
+      return els.map((el, i) => ({ verse: named[i] as number, el }));
 
     const verses = this.cachedVerses(view.file);
     if (!verses) return []; // the file has not been read yet; the next poll has it
@@ -1177,18 +1206,61 @@ export default class KingdoneChapelPlugin extends Plugin {
   }
 
   /**
+   * The elements holding verses, outermost first and in document order.
+   *
+   * A verse written as an embed renders the verse it embeds inside itself,
+   * paragraph and all, so anything sitting inside a verse already taken is
+   * that verse being drawn rather than another one — counting it would put
+   * every verse on the page twice.
+   */
+  verseElements(scroller: HTMLElement): HTMLElement[] {
+    const found: HTMLElement[] = [];
+    for (const el of Array.from(
+      scroller.querySelectorAll<HTMLElement>(VERSE_SELECTOR),
+    )) {
+      if (found.some((taken) => taken.contains(el))) continue;
+      if (el.tagName === 'LI' || this.namedVerse(el) !== null) found.push(el);
+    }
+    return found;
+  }
+
+  /**
+   * The verse an element names, which is the file's own number for it: the
+   * block id of the verse it embeds, or the number it opens with — raised in
+   * the vault's own chapters, bold in older ones. Null where it names none,
+   * which is what tells a verse from the rest of the page: the chapter's
+   * navigation is a paragraph too.
+   */
+  namedVerse(el: HTMLElement): number | null {
+    const embed = el.matches('.internal-embed[src]')
+      ? el
+      : el.querySelector<HTMLElement>('.internal-embed[src]');
+    const src = embed && embed.getAttribute('src');
+    const at = src ? src.indexOf('#^') : -1;
+    if (src && at >= 0) {
+      const verse = verseInId(src.slice(at + 2));
+      if (verse !== null) return verse;
+    }
+
+    const strong = el.firstElementChild;
+    if (strong && strong.tagName === 'STRONG') {
+      const m = (strong.textContent || '').trim().match(/^(\d+)$/);
+      return m ? parseInt(m[1], 10) : null;
+    }
+    return superscriptVerse((el.textContent || '').trimStart());
+  }
+
+  /**
    * The verse an element writes for itself, for when the file's verses cannot
    * be paired with the page. This is the number the reader sees, which is the
-   * right one everywhere except a version that merges verses — Markdown numbers
+   * right one everywhere except a list that merges verses — Markdown numbers
    * a list from its opening item and ignores the rest, so MENS reads one verse
    * low from its first merge onwards. Close beats nothing.
    */
   writtenVerse(el: HTMLElement): number | null {
-    if (el.tagName !== 'LI') {
-      const strong = el.firstElementChild;
-      const m = strong && (strong.textContent || '').trim().match(/^(\d+)$/);
-      return m ? parseInt(m[1], 10) : null;
-    }
+    const named = this.namedVerse(el);
+    if (named !== null) return named;
+    if (el.tagName !== 'LI') return null;
     const list = el.parentElement;
     if (!list || list.tagName !== 'OL') return null;
     const index = Array.prototype.indexOf.call(list.children, el);
@@ -1210,17 +1282,6 @@ export default class KingdoneChapelPlugin extends Plugin {
       item.el.contains(el),
     );
     return found ? found.verse : null;
-  }
-
-  /**
-   * Whether `el` is a verse of an older chapter, which opens its paragraph with
-   * the number in bold. Only tells the verses apart from the rest of the page —
-   * the chapter's navigation is a paragraph too — never which verse it is.
-   */
-  isVerseParagraph(el: Element): boolean {
-    const strong = el.firstElementChild;
-    if (!strong || strong.tagName !== 'STRONG') return false;
-    return /^\d+$/.test((strong.textContent || '').trim());
   }
 
   /** Resolve the chapter file of `version` matching the current location. */
