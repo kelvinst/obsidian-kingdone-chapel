@@ -1182,6 +1182,167 @@ describe('a chapter in reading mode', () => {
   });
 });
 
+describe('a chapter in reading mode, written the way the vault writes it', () => {
+  let page: HTMLElement;
+  let scroller: HTMLElement;
+  let read: Harness;
+
+  const PSALM =
+    '# Salmos 1 - NVI\n\n' +
+    '¹ Um ^nvi-psa-1-1\n\n' +
+    '² Dois ^nvi-psa-1-2\n\n' +
+    '³ Três ^nvi-psa-1-3\n';
+
+  const QUOTED =
+    '# Salmos 1 - SHEDD\n\n' +
+    '![[NVI-19-PSA-001#^nvi-psa-1-1|flat]]\n^shedd-psa-1-1\n\n' +
+    '![[NVI-19-PSA-001#^nvi-psa-1-2|flat]]\n^shedd-psa-1-2\n\n' +
+    '![[NVI-19-PSA-001#^nvi-psa-1-3|flat]]\n^shedd-psa-1-3\n';
+
+  /** Where an element sits on screen, which nothing in jsdom works out. */
+  function place(el: Element, top: number) {
+    el.getBoundingClientRect = () =>
+      ({ top, bottom: top + 20, height: 20 }) as DOMRect;
+  }
+
+  /** A rendered chapter, with the tops its verses sit at. */
+  function render(html: string, tops: number[]) {
+    page.innerHTML = `
+      <div class="markdown-preview-view">
+        <div class="markdown-preview-sizer"><h1>Salmos 1</h1>${html}</div>
+      </div>`;
+    scroller = page.querySelector('.markdown-preview-view') as HTMLElement;
+    place(scroller, 0);
+    Object.defineProperty(scroller, 'scrollTop', {
+      value: 0,
+      configurable: true,
+    });
+    const verses = page.querySelectorAll('.markdown-preview-sizer > p');
+    tops.forEach((top, i) => place(verses[i], top));
+  }
+
+  /** The paragraph an embed of another version's verse renders as, empty. */
+  function embed(anchor: string) {
+    return (
+      '<p><span class="internal-embed markdown-embed"' +
+      ` src="NVI-19-PSA-001#^${anchor}" alt="flat"></span></p>`
+    );
+  }
+
+  /**
+   * The verse each embed on the page draws inside itself.
+   *
+   * Obsidian builds this by hand rather than by parsing markup, so a `div`
+   * inside the `p` holding the embed stays where it was put; parsing the same
+   * markup would close the paragraph before it.
+   */
+  function fillEmbeds(texts: string[]) {
+    page.querySelectorAll('.internal-embed').forEach((held, i) => {
+      const content = document.createElement('div');
+      content.className = 'markdown-embed-content';
+      const view = content.createDiv({ cls: 'markdown-preview-view' });
+      const sizer = view.createDiv({ cls: 'markdown-preview-sizer' });
+      sizer.createEl('p', { text: texts[i] });
+      held.append(content);
+    });
+  }
+
+  /** The pane `path` is being read in, its verses already parsed. */
+  async function reading(path: string) {
+    const file = read.vault.getAbstractFileByPath(path) as TFile;
+    await read.plugin.chapterVerses(file);
+    return pane(read.app, { file, mode: 'preview', preview: page });
+  }
+
+  beforeEach(() => {
+    page = document.createElement('div');
+    document.body.append(page);
+    read = harness(
+      {
+        'Bibles/NVI/NVI-19-PSA-001.md': PSALM,
+        'Bibles/SHEDD/SHEDD-19-PSA-001.md': QUOTED,
+      },
+      { language: 'pt' },
+    );
+  });
+
+  afterEach(() => {
+    page.remove();
+    read.plugin.previewLock = null;
+  });
+
+  it('reads a verse written in place, which opens with its number', async () => {
+    render('<p>¹ Um</p><p>² Dois</p><p>³ Três</p>', [-50, 10, 200]);
+    const view = await reading('Bibles/NVI/NVI-19-PSA-001.md');
+    expect(
+      read.plugin.verseParagraphs(view, scroller).map((v) => v.verse),
+    ).toEqual([1, 2, 3]);
+    expect(read.plugin.previewVerse(view)).toBe(2);
+  });
+
+  it('reads a verse a generated version writes as an embed', async () => {
+    render(
+      embed('nvi-psa-1-1') + embed('nvi-psa-1-2') + embed('nvi-psa-1-3'),
+      [-50, 10, 200],
+    );
+    fillEmbeds(['¹ Um', '² Dois', '³ Três']);
+    const view = await reading('Bibles/SHEDD/SHEDD-19-PSA-001.md');
+    // The verse the embed draws inside itself is that verse being shown, not
+    // another one: three verses on the page, not six.
+    expect(
+      read.plugin.verseParagraphs(view, scroller).map((v) => v.verse),
+    ).toEqual([1, 2, 3]);
+    expect(read.plugin.previewVerse(view)).toBe(2);
+  });
+
+  it('reads a verse off a chapter the pane has only part of on screen', async () => {
+    render('<p>² Dois</p><p>³ Três</p>', [10, 200]);
+    const view = await reading('Bibles/NVI/NVI-19-PSA-001.md');
+    expect(read.plugin.previewVerse(view)).toBe(2);
+  });
+
+  it('holds the verse a click landed on inside an embed', async () => {
+    render(embed('nvi-psa-1-1') + embed('nvi-psa-1-2'), [-50, 10]);
+    fillEmbeds(['¹ Um', '² Dois']);
+    const view = await reading('Bibles/SHEDD/SHEDD-19-PSA-001.md');
+    read.workspace.activeView = view;
+    const inner = page.querySelectorAll('.markdown-embed-content p')[0];
+    read.plugin.lockPreviewVerse({ target: inner } as unknown as MouseEvent);
+    expect(read.plugin.previewLock).toMatchObject({ verse: 1 });
+  });
+
+  it('reads past a block the pane has not drawn yet', async () => {
+    // Reading mode leaves an empty block where a verse it has not rendered
+    // goes, and lays the ones it has rendered out below it.
+    render('<p></p><p>² Dois</p><p>³ Três</p>', [-50, 10, 200]);
+    const view = await reading('Bibles/NVI/NVI-19-PSA-001.md');
+    expect(
+      read.plugin.verseParagraphs(view, scroller).map((v) => v.verse),
+    ).toEqual([2, 3]);
+    expect(read.plugin.previewVerse(view)).toBe(2);
+  });
+
+  it('leaves out a list that is no verse of the chapter', async () => {
+    render(
+      '<p><strong>1</strong> Um</p><ul><li>Uma nota que ninguém numerou</li></ul>',
+      [10],
+    );
+    const view = await reading('Bibles/NVI/NVI-19-PSA-001.md');
+    expect(
+      read.plugin.verseParagraphs(view, scroller).map((v) => v.verse),
+    ).toEqual([1]);
+  });
+
+  it('reads nothing off an embed that names no verse', async () => {
+    render(
+      '<p><span class="internal-embed" src="NVI-19-PSA-001">Um</span></p>',
+      [10],
+    );
+    const view = await reading('Bibles/SHEDD/SHEDD-19-PSA-001.md');
+    expect(read.plugin.verseParagraphs(view, scroller)).toEqual([]);
+  });
+});
+
 describe('lockPreviewVerse', () => {
   let page: HTMLElement;
   let file: TFile;
