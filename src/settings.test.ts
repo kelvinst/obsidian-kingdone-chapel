@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { clearNotices, notices } from '../test/obsidian';
 import { chapter, harness } from '../test/harness';
 import type { Harness } from '../test/harness';
 import { DEFAULT_SETTINGS } from './types';
@@ -67,6 +68,7 @@ function withKelvin(): KingdoneChapelSettingTab {
 }
 
 beforeEach(() => {
+  clearNotices();
   world = harness(vault, { labels: { NVI: 'Nova Versão Internacional' } });
   tab = new KingdoneChapelSettingTab(world.app, world.plugin);
   containerEl = tab.containerEl;
@@ -418,7 +420,7 @@ describe('the kinds table', () => {
         (column) => column.textContent,
       ),
       // The last of them stands over the buttons, and names nothing.
-    ).toEqual(['Callout', 'Anchor?', 'Name', '']);
+    ).toEqual(['Callout?', 'Anchor?', 'Name?', '']);
   });
 
   it('gives every field a cell of its own, named for what it holds', () => {
@@ -427,14 +429,21 @@ describe('the kinds table', () => {
     const named = Array.from(
       row.querySelectorAll<HTMLInputElement>('input'),
     ).map((field) => field.getAttribute('aria-label'));
-    expect(named[0]).toBe('Callout');
-    expect(named[2]).toBe('Name');
-    // The anchor is named at greater length, since the column cannot hold it.
+    // Each says what its column says, at the length the column cannot hold.
+    expect(named[0]).toContain('The callout every note of this kind');
     expect(named[1]).toContain('written into the block id');
+    expect(named[2]).toContain('called in the title of every note');
   });
 
-  it('says what the anchor is, where the column has no room to', () => {
-    const hint = containerEl.querySelector<HTMLElement>('.kcp-note-hint');
+  it('says what every column holds, where the column has no room to', () => {
+    const hints = Array.from(
+      containerEl.querySelectorAll<HTMLElement>('.kcp-note-hint'),
+    ).map((hint) => hint.getAttribute('aria-label') || '');
+    expect(hints).toHaveLength(3);
+    expect(hints[0]).toContain('The callout every note of this kind');
+    expect(hints[2]).toContain('called in the title of every note');
+
+    const hint = containerEl.querySelectorAll<HTMLElement>('.kcp-note-hint')[1];
     const said = hint?.getAttribute('aria-label') || '';
     expect(said).toContain('written into the block id');
     // The app draws the tooltip from the label: a `title` beside it would be
@@ -451,6 +460,17 @@ describe('the kinds table', () => {
   it('is shown the moment it is hovered, rather than after a wait', () => {
     const hint = containerEl.querySelector<HTMLElement>('.kcp-note-hint');
     expect(hint?.getAttribute('data-tooltip-delay')).toBe('0');
+  });
+
+  it('is said again to a reader who clicked the mark rather than hovered', () => {
+    for (const hint of Array.from(
+      containerEl.querySelectorAll<HTMLElement>('.kcp-note-hint'),
+    )) {
+      hint.dispatchEvent(new Event('click'));
+      expect(notices[notices.length - 1].message).toBe(
+        hint.getAttribute('aria-label'),
+      );
+    }
   });
 });
 
