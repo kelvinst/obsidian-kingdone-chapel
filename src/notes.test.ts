@@ -719,6 +719,17 @@ describe('refsWrite', () => {
     expect(written.cursor).toEqual({ line: 0, ch: lines[0].indexOf('@') + 1 });
   });
 
+  it('puts the cursor back on the `@` of a list that already names refs', () => {
+    const text = chapter(verse(1, ',,**Refs**: [[Sl 26.4]]; @.,,'));
+    const written = refs(text)!;
+    expect(applied(text, [written.write])).toBe(text);
+    const lines = text.split('\n');
+    expect(written.cursor).toEqual({
+      line: written.write.from.line,
+      ch: lines[written.write.from.line].indexOf('@') + 1,
+    });
+  });
+
   it('reads a verse the chapter does not carry as nothing to write on', () => {
     expect(refs(chapter(verse(2)))).toBeNull();
   });
