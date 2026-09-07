@@ -997,6 +997,33 @@ export default class KingdoneChapelPlugin extends Plugin {
   }
 
   /**
+   * The verse the line the cursor is on writes, or null where it writes none.
+   *
+   * That line alone, rather than the nearest verse above it the way
+   * `verseAtLine` reads one. A note is written about a verse and says which in
+   * its title, so a cursor left below the verses can be read generously; a refs
+   * aside is written *into* the verse, and the same reading would open one on
+   * the last verse of the chapter for a cursor sitting in the notes at the foot
+   * of it, and carry the cursor up there with it.
+   */
+  cursorLineVerse(view: MarkdownView): number | null {
+    const editor = view.editor;
+    let line: number;
+    try {
+      line = editor.getCursor(
+        editor.somethingSelected() ? 'from' : 'head',
+      ).line;
+    } catch (e) {
+      return null;
+    }
+
+    const inBlock = view.file && this.blockVerse(view.file, line);
+    if (inBlock) return inBlock;
+    const parsed = parseVerseLine(editor.getLine(line));
+    return parsed ? parsed.verse : null;
+  }
+
+  /**
    * Open the refs aside of the verse the cursor is in, with the `@` a reference
    * is written from already in it.
    *
@@ -1011,23 +1038,25 @@ export default class KingdoneChapelPlugin extends Plugin {
     const editor = target.view.editor;
 
     const verses = this.noteVerses(target.view);
-    if (!verses) {
-      new Notice('This line is no verse of the chapter.');
+    if (verses && verses.length > 1) {
+      new Notice('Refs are written on one verse at a time.');
       return;
     }
-    if (verses.length > 1) {
-      new Notice('Refs are written on one verse at a time.');
+
+    const verse = this.cursorLineVerse(target.view);
+    if (verse === null) {
+      new Notice('This line is no verse of the chapter.');
       return;
     }
 
     const written = refsWrite(
       editor.getValue(),
-      `${target.prefix}-${verses[0]}`,
+      `${target.prefix}-${verse}`,
       [REFS],
       noteHeadings(this.settings.language),
     );
     if (!written) {
-      new Notice(`This chapter writes no verse ${verses[0]}.`);
+      new Notice(`This chapter writes no verse ${verse}.`);
       return;
     }
 
