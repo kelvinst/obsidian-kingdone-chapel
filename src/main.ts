@@ -1219,14 +1219,23 @@ export default class KingdoneChapelPlugin extends Plugin {
    * every verse on the page twice. Document order puts a verse before whatever
    * it draws inside itself, so the one taken last is the only one that can be
    * holding what comes next.
+   *
+   * An embed naming no verse at all — a whole note, a block that is not one —
+   * is passed over rather than taken, and what it draws is no more a verse of
+   * this chapter than what a verse draws is a second one. So the last embed
+   * seen is held apart from the last verse taken: whichever of them the
+   * element sits in, it belongs to that and not to the page.
    */
   verseElements(scroller: HTMLElement): VerseElement[] {
     const found: VerseElement[] = [];
+    let inside: HTMLElement | null = null;
     for (const el of Array.from(
       scroller.querySelectorAll<HTMLElement>(VERSE_SELECTOR),
     )) {
       const last = found.length ? found[found.length - 1].el : null;
       if (last && last.contains(el)) continue;
+      if (inside && inside.contains(el)) continue;
+      if (el.matches('.internal-embed[src]')) inside = el;
       const verse = this.namedVerse(el);
       if (el.tagName === 'LI' || verse !== null) found.push({ verse, el });
     }

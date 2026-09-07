@@ -1349,6 +1349,21 @@ describe('a chapter in reading mode, written the way the vault writes it', () =>
     const view = await reading('Bibles/SHEDD/SHEDD-19-PSA-001.md');
     expect(read.plugin.verseParagraphs(view, scroller)).toEqual([]);
   });
+
+  it('leaves out what an embed that names no verse draws', async () => {
+    render(
+      '<p><span class="internal-embed" src="NOTAS-Salmos"></span></p>' +
+        '<p>¹ Um</p>',
+      [-50, 10],
+    );
+    // The note is drawn on the page and is no verse of the chapter, so what it
+    // holds is not one either — the verse the chapter writes is the only one.
+    fillEmbeds(['⁵ Uma nota sobre o salmo']);
+    const view = await reading('Bibles/NVI/NVI-19-PSA-001.md');
+    expect(
+      read.plugin.verseParagraphs(view, scroller).map((v) => v.verse),
+    ).toEqual([1]);
+  });
 });
 
 describe('lockPreviewVerse', () => {
