@@ -174,9 +174,19 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
       const said = column.hint;
       const hint = cell.createSpan({ text: '?', cls: 'kcp-note-hint' });
       tooltip(hint, said);
-      // And said again to a reader who clicked it rather than waited over it,
-      // which is the only way of asking on a screen with no pointer.
+      // And said again to a reader who asked rather than waited over it: a
+      // click, or the keys a button answers, since a hover is no way of asking
+      // on a screen with no pointer and no way at all from a keyboard. It
+      // stands in the tab order as the button it behaves like.
+      hint.tabIndex = 0;
+      hint.setAttribute('role', 'button');
       hint.addEventListener('click', () => new Notice(said));
+      hint.addEventListener('keydown', (evt) => {
+        if (evt.key !== 'Enter' && evt.key !== ' ') return;
+        // Space would scroll the tab out from under the reader otherwise.
+        evt.preventDefault();
+        new Notice(said);
+      });
     }
     // The column the Remove buttons stand in, which names nothing.
     head.createEl('th');
