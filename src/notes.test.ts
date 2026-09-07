@@ -709,6 +709,16 @@ describe('refsWrite', () => {
     );
   });
 
+  it('leaves the cursor on the `@` where the list closes without a stop', () => {
+    const text = '![[x]] ,,**Refs**: [[Sl 26.4]],, ^shedd-psa-1-1\n';
+    const written = refs(text)!;
+    const lines = applied(text, [written.write]).split('\n');
+    expect(lines[0]).toBe('![[x]] ,,**Refs**: [[Sl 26.4]]; @,, ^shedd-psa-1-1');
+    // What follows the `@` is the aside's own marks rather than a full stop,
+    // and the cursor still sits between the two.
+    expect(written.cursor).toEqual({ line: 0, ch: lines[0].indexOf('@') + 1 });
+  });
+
   it('reads a verse the chapter does not carry as nothing to write on', () => {
     expect(refs(chapter(verse(2)))).toBeNull();
   });

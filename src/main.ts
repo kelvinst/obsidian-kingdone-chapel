@@ -1063,7 +1063,7 @@ export default class KingdoneChapelPlugin extends Plugin {
     const { write, cursor } = written;
     editor.replaceRange(write.text, write.from, write.to);
     editor.setCursor(cursor);
-    this.startTyping(editor);
+    this.startTyping(editor, 'i');
   }
 
   /**
@@ -1173,16 +1173,21 @@ export default class KingdoneChapelPlugin extends Plugin {
    * An editor already typing is left as it is, since the key is a letter there
    * rather than a mode, and the note would open with one.
    *
-   * `a` rather than `i`: normal mode holds the cursor on a character, so the
-   * cursor set on the note's line is pulled back off the space that ends it,
-   * and appending after that space is what lands where the note is typed.
+   * Which key depends on where the cursor was left. Normal mode holds the
+   * cursor on a character rather than between two, so a note — whose cursor is
+   * set past the space ending its line — is pulled back onto that space, and
+   * only `a`, appending after it, lands where the note is typed. A refs aside
+   * leaves the cursor on whatever closes its list — the full stop, or the `,,`
+   * ending an aside left without one — with the `@` behind it: `a` would open
+   * the typing the far side of that, and `i` is what keeps it between the `@`
+   * and whatever follows it, which is where the reference goes.
    *
    * The handler is asked first and the key itself sent second, because the
    * handler is the quiet way and does not always take — the extension listens
    * for the key on the editor's own element, which is what a reader pressing
    * `a` would reach.
    */
-  startTyping(editor: Editor) {
+  startTyping(editor: Editor, key: 'a' | 'i' = 'a') {
     const held = editor as unknown as { cm?: Adapter & { cm?: Adapter } };
     // `cm` is the view the editor draws in, and the adapter sits beside it
     // under the same name; an app handing over the adapter itself is answered
@@ -1194,15 +1199,15 @@ export default class KingdoneChapelPlugin extends Plugin {
     const published = (window as unknown as { CodeMirrorAdapter?: VimAdapter })
       .CodeMirrorAdapter;
     const vim = published?.Vim || adapter.constructor?.Vim;
-    if (vim) vim.handleKey(adapter, 'a', 'mapping');
+    if (vim) vim.handleKey(adapter, key, 'mapping');
     if (adapter.state.vim.insertMode) return;
 
     const typing = view?.contentDOM;
     if (!typing) return;
     typing.dispatchEvent(
       new KeyboardEvent('keydown', {
-        key: 'a',
-        code: 'KeyA',
+        key,
+        code: key === 'a' ? 'KeyA' : 'KeyI',
         bubbles: true,
         cancelable: true,
       }),

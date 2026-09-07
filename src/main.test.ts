@@ -3001,6 +3001,31 @@ describe('a note written in a Vim editor', () => {
     expect(asked.keys).toEqual([]);
   });
 
+  it('opens a refs aside with `i`, which does not step past the `@`', () => {
+    const asked = vim();
+    const { view, editor } = editing();
+    world.plugin.writeRefs(world.plugin.chapterPane(view)!);
+
+    // `a` appends past the character the cursor sits on, which is the full
+    // stop closing the list — the reference would be typed the far side of it.
+    expect(asked.keys).toEqual(['i']);
+    expect(editor.getLine(editor.cursor.line).slice(0, editor.cursor.ch)).toBe(
+      ',,**Refs**: @',
+    );
+  });
+
+  it('presses `i` itself where the handler did not take', () => {
+    const asked = vim(true);
+    const typed: string[] = [];
+    const dom = document.createElement('div');
+    dom.addEventListener('keydown', (evt) => typed.push(evt.key));
+    const { view } = editing(adapterOf(), dom);
+    world.plugin.writeRefs(world.plugin.chapterPane(view)!);
+
+    expect(asked.keys).toEqual(['i']);
+    expect(typed).toEqual(['i']);
+  });
+
   it('asks the adapter for the Vim the app publishes nowhere', () => {
     const keys: string[] = [];
     class Adapter {
