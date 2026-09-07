@@ -1,6 +1,10 @@
-import { Decoration, EditorView, ViewPlugin } from '@codemirror/view';
-import type { DecorationSet, PluginValue, ViewUpdate } from '@codemirror/view';
-import { RangeSet } from '@codemirror/state';
+import { Decoration, ViewPlugin } from '@codemirror/view';
+import type {
+  DecorationSet,
+  EditorView,
+  PluginValue,
+  ViewUpdate,
+} from '@codemirror/view';
 import type { EditorState, Range } from '@codemirror/state';
 import { editorLivePreviewField } from 'obsidian';
 
@@ -51,12 +55,6 @@ const CLOSE = /-->(.*)$/;
 
 /** What is put over such a line, taken off the page by `styles.css`. */
 const HIDDEN = Decoration.line({ class: 'kcp-comment-line' });
-
-/**
- * And what stands for it in the set of ground no cursor walks on. It is never
- * drawn — `EditorView.atomicRanges` reads the bounds and nothing else.
- */
-const SKIP = Decoration.replace({});
 
 /**
  * The runs of lines that are a comment and nothing else.
@@ -116,85 +114,43 @@ function blocks(state: EditorState, bottom: number) {
   return found;
 }
 
-/**
- * The comments actually coming off the page: what `blocks` found, once the
- * cursor and the viewport have had their say.
- */
-function taken(
-  state: EditorState,
-  visible: readonly { from: number; to: number }[],
-): { from: number; to: number; lines: number[] }[] {
-  // Source mode is the note as it is written, markup and all — the same stand
-  // `live.ts` takes on a delimiter. Absent, as in a state built by hand, take
-  // it for live preview.
-  if (!(state.field(editorLivePreviewField, false) ?? true)) return [];
-
-  const bottom = visible.length ? visible[visible.length - 1].to : -1;
-  return blocks(state, bottom).filter(
-    (block) =>
-      // Inside the comment, the comment is what is being edited.
-      !touched(state, block.from, block.to) &&
-      // A note is drawn a screenful at a time; the rest of it is not worth
-      // decorating.
-      visible.some((range) => range.from <= block.to && range.to >= block.from),
-  );
-}
-
 /** Every comment line on screen that the cursor is not in. */
 export function build(
   state: EditorState,
   visible: readonly { from: number; to: number }[],
 ): DecorationSet {
+  // Source mode is the note as it is written, markup and all — the same stand
+  // `live.ts` takes on a delimiter. Absent, as in a state built by hand, take
+  // it for live preview.
+  if (!(state.field(editorLivePreviewField, false) ?? true)) {
+    return Decoration.set([]);
+  }
+
   const into: Range<Decoration>[] = [];
-  for (const block of taken(state, visible)) {
+  const bottom = visible.length ? visible[visible.length - 1].to : -1;
+
+  for (const block of blocks(state, bottom)) {
+    // Inside the comment, the comment is what is being edited.
+    if (touched(state, block.from, block.to)) continue;
+    // A note is drawn a screenful at a time; the rest of it is not worth
+    // decorating.
+    if (
+      !visible.some((range) => range.from <= block.to && range.to >= block.from)
+    ) {
+      continue;
+    }
     for (const from of block.lines) into.push(HIDDEN.range(from));
   }
-  return Decoration.set(into, true);
-}
 
-/**
- * The same comments, as ground the cursor does not walk on.
- *
- * A line with no box on the page is a line vertical motion steps over —
- * there is no geometry to land in — so the down arrow, and vim's `j` and `gj`,
- * all pass a hidden comment by. Horizontal motion does not: it counts
- * positions in the document rather than pixels on the screen, so a right
- * arrow at the end of the line above would drop the cursor into a line
- * nothing is drawing, where it sits invisible until it is moved again.
- *
- * Handing these to `EditorView.atomicRanges` settles the disagreement the one
- * way that is honest: the comment is ground no motion walks on, and a right
- * arrow steps over it exactly as a down arrow does. What is off the page is
- * off the page, whichever key is asking.
- *
- * The newline on either side is inside the range on purpose. A range that
- * stopped at the comment's own ends would let the cursor land on them — the
- * boundary of an atomic range is a position, not a hole — and the point is to
- * step from the line above to the line below in one press.
- */
-export function skipped(
-  state: EditorState,
-  visible: readonly { from: number; to: number }[],
-): RangeSet<Decoration> {
-  return RangeSet.of(
-    taken(state, visible).map((block) =>
-      SKIP.range(
-        Math.max(0, block.from - 1),
-        Math.min(state.doc.length, block.to + 1),
-      ),
-    ),
-    true,
-  );
+  return Decoration.set(into, true);
 }
 
 /** What the editor is given: the decorations, kept up with what it shows. */
 export class LiveComments implements PluginValue {
   decorations: DecorationSet;
-  atomic: RangeSet<Decoration>;
 
   constructor(view: EditorView) {
     this.decorations = build(view.state, view.visibleRanges);
-    this.atomic = skipped(view.state, view.visibleRanges);
   }
 
   update(update: ViewUpdate) {
@@ -210,17 +166,10 @@ export class LiveComments implements PluginValue {
         update.startState.field(editorLivePreviewField, false)
     ) {
       this.decorations = build(update.view.state, update.view.visibleRanges);
-      this.atomic = skipped(update.view.state, update.view.visibleRanges);
     }
   }
 }
 
 export const liveComments = ViewPlugin.fromClass(LiveComments, {
   decorations: (comments) => comments.decorations,
-  // What is off the page is ground no motion walks on, so the editor is told
-  // where it is as well as what it looks like.
-  provide: (plugin) =>
-    EditorView.atomicRanges.of(
-      (view) => view.plugin(plugin)?.atomic ?? Decoration.none,
-    ),
 });

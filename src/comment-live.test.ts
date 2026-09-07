@@ -4,9 +4,7 @@ import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { editorLivePreviewField } from 'obsidian';
 
-import { EditorSelection } from '@codemirror/state';
-
-import { LiveComments, build, liveComments, skipped } from './comment-live';
+import { LiveComments, build, liveComments } from './comment-live';
 
 /**
  * The lines a note has taken off it, by their text.
@@ -187,59 +185,6 @@ describe('build', () => {
   });
 });
 
-describe('skipped', () => {
-  /** The spans no cursor walks on, as `from-to`. */
-  function ground(
-    doc: string,
-    cursor = 0,
-    visible: { from: number; to: number }[] = [{ from: 0, to: doc.length }],
-  ): string[] {
-    const state = EditorState.create({ doc, selection: { anchor: cursor } });
-    const out: string[] = [];
-    skipped(state, visible).between(0, doc.length, (from, to) => {
-      out.push(`${from}-${to}`);
-    });
-    return out;
-  }
-
-  it('takes in the newline on either side of the comment', () => {
-    // The line above ends at 9 and the line below opens at 21, so stepping
-    // from one to the other is a single press across one span.
-    const doc = ['Um verso.', '<!-- a -->', 'Fim.'].join('\n');
-    expect(ground(doc)).toEqual(['9-21']);
-  });
-
-  it('stops at the head of a note the comment opens', () => {
-    const doc = ['<!-- a -->', 'Fim.'].join('\n');
-    expect(ground(doc, doc.length)).toEqual(['0-11']);
-  });
-
-  it('stops at the foot of a note the comment closes', () => {
-    const doc = ['Um verso.', '<!-- a -->'].join('\n');
-    expect(ground(doc)).toEqual([`9-${doc.length}`]);
-  });
-
-  it('walks the whole of a comment written over several lines', () => {
-    const doc = ['Um verso.', '<!--', 'por quê', '-->', 'Fim.'].join('\n');
-    expect(ground(doc)).toEqual([`9-${doc.indexOf('Fim.')}`]);
-  });
-
-  it('is ground the cursor walks on again once it is standing there', () => {
-    const doc = ['Um verso.', '<!-- a -->', 'Fim.'].join('\n');
-    expect(ground(doc, doc.indexOf('<!--') + 2)).toEqual([]);
-  });
-
-  it('leaves source mode alone', () => {
-    const doc = ['Um verso.', '<!-- a -->'].join('\n');
-    const state = EditorState.create({
-      doc,
-      selection: { anchor: 0 },
-      extensions: [editorLivePreviewField.init(() => false)],
-    });
-    expect(skipped(state, [{ from: 0, to: doc.length }]).size).toBe(0);
-  });
-});
-
 describe('source mode', () => {
   /** The decorations of a note the editor is drawing one way or the other. */
   function drawn(doc: string, live: boolean): number {
@@ -338,60 +283,6 @@ describe('LiveComments', () => {
 });
 
 describe('liveComments', () => {
-  it('steps a right arrow over the comment, as a down arrow steps over it', () => {
-    // A hidden line has no box, so vertical motion passes it by; horizontal
-    // motion counts positions rather than pixels and would otherwise drop the
-    // cursor into a line nothing is drawing.
-    const doc = ['Um verso.', '<!-- a -->', 'Fim.'].join('\n');
-    const view = new EditorView({
-      state: EditorState.create({ doc, extensions: [liveComments] }),
-      parent: document.body,
-    });
-    const above = view.state.doc.line(1);
-    const below = view.state.doc.line(3);
-    view.dispatch({ selection: EditorSelection.cursor(above.to) });
-    expect(view.moveByChar(view.state.selection.main, true).head).toBe(
-      below.from,
-    );
-    view.destroy();
-  });
-
-  it('steps a left arrow back over it the same way', () => {
-    const doc = ['Um verso.', '<!-- a -->', 'Fim.'].join('\n');
-    const view = new EditorView({
-      state: EditorState.create({ doc, extensions: [liveComments] }),
-      parent: document.body,
-    });
-    const above = view.state.doc.line(1);
-    const below = view.state.doc.line(3);
-    view.dispatch({ selection: EditorSelection.cursor(below.from) });
-    expect(view.moveByChar(view.state.selection.main, false).head).toBe(
-      above.to,
-    );
-    view.destroy();
-  });
-
-  it('walks an editor that never had the plugin on flat ground', () => {
-    // The facet is asked for its ranges by whatever editor is holding it, and
-    // one that never loaded the plugin has no comments to step over. The
-    // fallback is what says so rather than throwing at the reader.
-    const doc = ['Um verso.', '<!-- a -->', 'Fim.'].join('\n');
-    const view = new EditorView({
-      state: EditorState.create({ doc, extensions: [liveComments] }),
-      parent: document.body,
-    });
-    const bare = new EditorView({
-      state: EditorState.create({ doc }),
-      parent: document.body,
-    });
-    const asked = view.state
-      .facet(EditorView.atomicRanges)
-      .map((ranges) => ranges(bare).size);
-    expect(asked).toContain(0);
-    view.destroy();
-    bare.destroy();
-  });
-
   it('returns an extension the editor accepts', () => {
     const view = new EditorView({
       state: EditorState.create({
