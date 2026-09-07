@@ -454,8 +454,11 @@ function joined(
       return `${inside.slice(0, at)}${opened(link, markers[0])} ${inside.slice(at)}`;
     }
     // The refs before it close with a full stop, which is what separates the
-    // two lists. One left without it is closed here rather than run into.
+    // two lists. One left without it is closed here rather than run into, and
+    // an aside saying nothing at all is opened with the list itself: there is
+    // nothing in front of it for the full stop to close.
     const said = inside.trimEnd();
+    if (!said) return opened(link, markers[0]);
     return `${said}${said.endsWith('.') ? '' : '.'} ${opened(link, markers[0])}`;
   }
 
