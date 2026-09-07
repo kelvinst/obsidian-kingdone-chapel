@@ -462,6 +462,36 @@ describe('the kinds table', () => {
     expect(hint?.getAttribute('data-tooltip-delay')).toBe('0');
   });
 
+  it('stands in the tab order, as the button it behaves like', () => {
+    for (const hint of Array.from(
+      containerEl.querySelectorAll<HTMLElement>('.kcp-note-hint'),
+    )) {
+      expect(hint.tabIndex).toBe(0);
+      expect(hint.getAttribute('role')).toBe('button');
+    }
+  });
+
+  it('is said to a reader who asked for it from the keyboard', () => {
+    const hint = containerEl.querySelector<HTMLElement>('.kcp-note-hint');
+    for (const key of ['Enter', ' ']) {
+      clearNotices();
+      const evt = new KeyboardEvent('keydown', { key, cancelable: true });
+      hint?.dispatchEvent(evt);
+      expect(notices[notices.length - 1]?.message).toBe(
+        hint?.getAttribute('aria-label'),
+      );
+      // Space scrolls the tab away otherwise, out from under the reader.
+      expect(evt.defaultPrevented).toBe(true);
+    }
+  });
+
+  it('leaves every other key to the tab it is read in', () => {
+    const hint = containerEl.querySelector<HTMLElement>('.kcp-note-hint');
+    clearNotices();
+    hint?.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }));
+    expect(notices).toHaveLength(0);
+  });
+
   it('is said again to a reader who clicked the mark rather than hovered', () => {
     for (const hint of Array.from(
       containerEl.querySelectorAll<HTMLElement>('.kcp-note-hint'),
