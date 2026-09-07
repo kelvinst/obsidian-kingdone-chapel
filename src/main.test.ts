@@ -628,6 +628,27 @@ describe('verseIn', () => {
       });
     });
 
+    it('names the file a bare link was written in', async () => {
+      // The marker a note leaves in a verse's aside names a block of the
+      // version's own chapter by writing no file at all. The words are read
+      // against the translation they were drawn from, where that block is not.
+      world.vault.write(
+        SHEDD,
+        '![[ARA-01-GEN-001#^ara-gen-1-1|flat]]\n' +
+          ',,**Notas**: [[#^shedd-gen-1-n1|n1]].,,\n' +
+          '^shedd-gen-1-1',
+      );
+      expect(await world.plugin.verseIn(shedd, 1)).toEqual({
+        verse: 1,
+        text:
+          'No princípio, criou Deus.\n' +
+          ',,**Notas**: [[SHEDD-01-GEN-001#^shedd-gen-1-n1|n1]].,,',
+        source: world.vault.getAbstractFileByPath(
+          chapterPath('ARA', 1, 'GEN', 1),
+        ),
+      });
+    });
+
     it('drops an embed it cannot follow, keeping the words beside it', async () => {
       world.vault.write(
         SHEDD,
@@ -1348,6 +1369,27 @@ describe('a chapter in reading mode, written the way the vault writes it', () =>
     );
     const view = await reading('Bibles/SHEDD/SHEDD-19-PSA-001.md');
     expect(read.plugin.verseParagraphs(view, scroller)).toEqual([]);
+  });
+
+  it('leaves out the notes and the quotes a chapter carries at its foot', async () => {
+    render(
+      '<p>¹ Um</p><p>² Dois</p>' +
+        '<div class="callout" data-callout="note"><div class="callout-content">' +
+        embed('nvi-psa-1-1') +
+        '</div></div>' +
+        '<div class="callout" data-callout="quote"><div class="callout-content">' +
+        embed('nvi-psa-1-2') +
+        '</div></div>',
+      [10, 200],
+    );
+    // A note quotes the verse it is about and a `## Citações` quote the
+    // passage a note refers to — every one an embed naming a verse, and none
+    // of them a verse of the chapter being read.
+    fillEmbeds(['¹ Um', '² Dois']);
+    const view = await reading('Bibles/NVI/NVI-19-PSA-001.md');
+    expect(
+      read.plugin.verseParagraphs(view, scroller).map((v) => v.verse),
+    ).toEqual([1, 2]);
   });
 
   it('leaves out what an embed that names no verse draws', async () => {
