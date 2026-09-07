@@ -112,6 +112,18 @@ function said(verses: number[]): string {
   return `${one ? 'verse' : 'verses'} ${verses.join(', ')}`;
 }
 
+/**
+ * The same words with every bare link naming the file that wrote them.
+ *
+ * A link written `[[#^shedd-psa-1-n1|n1]]` names a block of its own file and
+ * says so by writing no file at all, which only holds while it is read there.
+ * Naming the file leaves the link pointing where it was written, wherever it
+ * is read.
+ */
+function qualified(text: string, file: TFile): string {
+  return text.replace(/\[\[#/g, `[[${file.basename}#`);
+}
+
 /** The version `word` names, matched without case, or null where none does. */
 function named(versions: string[], word: string): string | null {
   const wanted = word.toLowerCase();
@@ -1225,6 +1237,12 @@ export default class KingdoneChapelPlugin extends Plugin {
    * this chapter than what a verse draws is a second one. So the last embed
    * seen is held apart from the last verse taken: whichever of them the
    * element sits in, it belongs to that and not to the page.
+   *
+   * A callout holds no verse of the chapter either. The notes a chapter
+   * carries are written as callouts at its foot, each quoting the verse it is
+   * about, and the passages a note refers to go into another one under
+   * `## Citações` — every one of them an embed naming a verse, and none of
+   * them a verse of the chapter being read.
    */
   verseElements(scroller: HTMLElement): VerseElement[] {
     const found: VerseElement[] = [];
@@ -1232,6 +1250,7 @@ export default class KingdoneChapelPlugin extends Plugin {
     for (const el of Array.from(
       scroller.querySelectorAll<HTMLElement>(VERSE_SELECTOR),
     )) {
+      if (el.closest('.callout')) continue;
       const last = found.length ? found[found.length - 1].el : null;
       if (last && last.contains(el)) continue;
       if (inside && inside.contains(el)) continue;
@@ -1725,19 +1744,36 @@ export default class KingdoneChapelPlugin extends Plugin {
     const embeds = verseEmbeds(text);
     if (!embeds.length) return { text, source: from };
 
-    let out = '';
+    // What the version wrote itself, kept apart from what the embeds answered:
+    // only the first of them is written where the words end up being rendered.
+    const own: string[] = [];
+    const drawn: string[] = [];
     let at = 0;
     let source: TFile | null = null;
     for (const embed of embeds) {
-      out += text.slice(at, embed.at);
+      own.push(text.slice(at, embed.at));
       const answer = await this.embedded(embed.path, embed.block, from, seen);
-      out += answer.text;
+      drawn.push(answer.text);
       // An embed that answered with nothing drew no words, so it is not where
       // the words came from.
       if (!source && answer.text) source = answer.source;
       at = embed.at + embed.length;
     }
-    return { text: (out + text.slice(at)).trim(), source: source || from };
+    own.push(text.slice(at));
+
+    // A link the version wrote bare names a block of the file that wrote it and
+    // of no other — `[[#^shedd-psa-1-n1|n1]]` is the marker a note leaves in a
+    // verse's aside. Rendered against the file the words were drawn from it
+    // points at a block that is not there, so the file is written into the link
+    // while it is still known. Only what the version wrote: what an embed
+    // answered is already read against the file that wrote it.
+    const away = !!source && source !== from;
+    let out = '';
+    for (let i = 0; i < own.length; i++) {
+      out += away ? qualified(own[i], from) : own[i];
+      if (i < drawn.length) out += drawn[i];
+    }
+    return { text: out.trim(), source: source || from };
   }
 
   /** The verse an embed points at, followed through whatever it embeds in turn. */
