@@ -2709,6 +2709,58 @@ describe('writing the refs on a verse', () => {
     expect(notices[notices.length - 1].message).toContain('no verse 1');
   });
 
+  it('says so where the cursor is in the notes at the foot of the chapter', () => {
+    // The walk `verseAtLine` does would answer this line with the last verse
+    // above it, which is not the verse the reader is looking at.
+    const { view, editor } = editing(
+      CHAPTER +
+        '\n## Notas\n\n<!-- prettier-ignore -->\n> [!note]+ Nota 1\n>\n' +
+        '> A descrição.\n^nvi-gen-1-n1\n',
+    );
+    const written = editor.text;
+    editor.at(14);
+    world.plugin.writeRefs(world.plugin.chapterPane(view)!);
+
+    expect(editor.text).toBe(written);
+    expect(notices[notices.length - 1].message).toContain('no verse');
+  });
+
+  it('reads the verse off the block the cache says the line is in', () => {
+    const { view, editor } = editing();
+    vi.spyOn(world.metadataCache, 'getFileCache').mockReturnValue({
+      blocks: {
+        'nvi-gen-1-2': { position: { start: { line: 7 }, end: { line: 8 } } },
+      },
+    });
+    editor.at(7);
+    world.plugin.writeRefs(world.plugin.chapterPane(view)!);
+
+    expect(editor.text).toContain(
+      '![[ARA-01-GEN-001#^ara-gen-1-2|flat]]\n,,**Refs**: @.,,\n^nvi-gen-1-2',
+    );
+  });
+
+  it('writes on the verse a selection inside one opens on', () => {
+    const { view, editor } = editing();
+    editor.anchor = { line: 5, ch: 0 };
+    editor.cursor = { line: 5, ch: 4 };
+    editor.selected = true;
+    world.plugin.writeRefs(world.plugin.chapterPane(view)!);
+
+    expect(editor.text).toContain(
+      '![[ARA-01-GEN-001#^ara-gen-1-1|flat]]\n,,**Refs**: @.,,\n^nvi-gen-1-1',
+    );
+  });
+
+  it('says so where the cursor cannot be read at all', () => {
+    const { view, editor } = editing();
+    editor.broken = true;
+    world.plugin.writeRefs(world.plugin.chapterPane(view)!);
+
+    expect(editor.text).toBe(CHAPTER);
+    expect(notices[notices.length - 1].message).toContain('no verse');
+  });
+
   it('offers the command only in a chapter being written', async () => {
     await world.plugin.onload();
     const command = world.plugin.commands.find(
