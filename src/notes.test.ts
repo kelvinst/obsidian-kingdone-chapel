@@ -656,6 +656,52 @@ describe('refsWrite', () => {
     expect(written.cursor).toEqual({ line: 1, ch: lines[1].indexOf('@') + 1 });
   });
 
+  it('puts the cursor back on the `@` of an aside left unwritten', () => {
+    const text = chapter(verse(1, ',,**Refs**: @.,,'));
+    const written = refs(text)!;
+    expect(applied(text, [written.write])).toBe(text);
+    const lines = text.split('\n');
+    expect(written.cursor).toEqual({
+      line: written.write.from.line,
+      ch: lines[written.write.from.line].indexOf('@') + 1,
+    });
+  });
+
+  it('joins the refs of an aside written without the bold marks', () => {
+    const text = '![[x]] ,,Refs: [[Sl 26.4]].,, ^shedd-psa-1-1\n';
+    expect(applied(text, [refs(text)!.write])).toBe(
+      '![[x]] ,,Refs: [[Sl 26.4]]; @.,, ^shedd-psa-1-1\n',
+    );
+  });
+
+  it('writes in front of a notes list written without the bold marks', () => {
+    const text = '![[x]] ,,Notas: [[#^shedd-psa-1-n1|n1]].,, ^shedd-psa-1-1\n';
+    expect(applied(text, [refs(text)!.write])).toBe(
+      '![[x]] ,,**Refs**: @. Notas: [[#^shedd-psa-1-n1|n1]].,, ' +
+        '^shedd-psa-1-1\n',
+    );
+  });
+
+  it('adds to the refs of a plain aside, not to the notes after them', () => {
+    const text =
+      '![[x]] ,,Refs: [[Sl 26.4]]. Notas: [[#^shedd-psa-1-n1|n1]].,, ' +
+      '^shedd-psa-1-1\n';
+    expect(applied(text, [refs(text)!.write])).toBe(
+      '![[x]] ,,Refs: [[Sl 26.4]]; @. Notas: [[#^shedd-psa-1-n1|n1]].,, ' +
+        '^shedd-psa-1-1\n',
+    );
+  });
+
+  it('reads the bold marks where an aside carries any at all', () => {
+    const text =
+      '![[x]] ,,Refs: [[Sl 26.4]]. **Notas**: [[#^shedd-psa-1-n1|n1]].,, ' +
+      '^shedd-psa-1-1\n';
+    expect(applied(text, [refs(text)!.write])).toBe(
+      '![[x]] ,,Refs: [[Sl 26.4]]. **Refs**: @. **Notas**: ' +
+        '[[#^shedd-psa-1-n1|n1]].,, ^shedd-psa-1-1\n',
+    );
+  });
+
   it('reads a verse the chapter does not carry as nothing to write on', () => {
     expect(refs(chapter(verse(2)))).toBeNull();
   });

@@ -462,6 +462,18 @@ function joined(
   const [from, to] = listed;
   const said = inside.slice(from, to);
   const found = said.lastIndexOf(']]');
+
+  // A list already ending in what this write would add — a refs aside opened
+  // and then left unwritten, and the command run on it a second time — is left
+  // as it stands rather than given a second one. The cursor mark alone goes
+  // back into it, which is what the reader pressed the key for.
+  const bare = said.replace(/\.\s*$/, '').trimEnd();
+  const alone = link.replace(CURSOR, '');
+  if (found < 0 && alone && bare.endsWith(alone)) {
+    const at = from + bare.length;
+    return `${inside.slice(0, at)}${CURSOR}${inside.slice(at)}`;
+  }
+
   // A list naming no note yet — one whose link was deleted, or a placeholder
   // written by hand — has nothing to add to, so the link goes at the end of
   // what it does say, in front of the full stop that closes it.
@@ -496,7 +508,32 @@ function markerList(
     const next = inside.indexOf('**', at + label.length);
     return [at, next < 0 ? inside.length : next];
   }
+
+  // An aside written by hand carries its labels without the bold marks, and
+  // its lists are told apart by those labels alone. Only where nothing in the
+  // aside is bolded: one written both ways is read by its bold marks, which
+  // are what the generator wrote the lists with.
+  if (inside.includes('**')) return null;
+
+  const plain = plainLabels(inside);
+  for (const marker of markers) {
+    const at = plain.findIndex((label) => label.name === marker);
+    if (at < 0) continue;
+    const next = plain[at + 1];
+    return [plain[at].at, next ? next.at : inside.length];
+  }
   return null;
+}
+
+/** A label an unbolded aside names a list with: a capitalised word and a colon. */
+const PLAIN_LABEL = /(?:^|[^\p{L}])(\p{Lu}[\p{L}]*):/gu;
+
+/** Every list an unbolded aside names, in the order it names them. */
+function plainLabels(inside: string): { at: number; name: string }[] {
+  return [...inside.matchAll(PLAIN_LABEL)].map((found) => ({
+    at: found.index + found[0].length - found[1].length - 1,
+    name: found[1],
+  }));
 }
 
 /**
