@@ -476,8 +476,16 @@
    itself — and nothing to whoever is reading or writing it. `comment-live.ts`
    decides which lines those are, over the source; this is only what taking
    one off the page means. `%%…%%` is the comment addressed to the writer and
-   is left alone. */
+   is left alone.
 
-.cm-line.kcp-comment-line {
+   Written through `.markdown-source-view.mod-cm6` for the weight it carries,
+   not for the reach: Obsidian lays out the editor's lines through a selector
+   of its own that long, and a bare `.cm-line.kcp-comment-line` is outranked by
+   it — the class lands on the line and the line is drawn anyway. The vault
+   snippet this replaces was written the same way for the same reason. The
+   plugin's other line rule, `.kcp-small-line`, sets a font size, which nothing
+   in Obsidian contests, so it never had to say so. */
+
+.markdown-source-view.mod-cm6 .cm-line.kcp-comment-line {
   display: none;
 }
