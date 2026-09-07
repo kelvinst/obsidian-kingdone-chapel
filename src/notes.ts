@@ -470,9 +470,13 @@ function joined(
   // and then left unwritten, and the command run on it a second time — is left
   // as it stands rather than given a second one. The cursor mark alone goes
   // back into it, which is what the reader pressed the key for.
+  //
+  // Whatever else the list names: the `@` waiting to be written into is the
+  // one closing it, and a list that already carries a reference or two is the
+  // usual case for a second press rather than the odd one.
   const bare = said.replace(/\.\s*$/, '').trimEnd();
   const alone = link.replace(CURSOR, '');
-  if (found < 0 && alone && bare.endsWith(alone)) {
+  if (alone && bare.endsWith(alone)) {
     const at = from + bare.length;
     return `${inside.slice(0, at)}${CURSOR}${inside.slice(at)}`;
   }
