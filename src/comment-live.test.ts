@@ -4,7 +4,7 @@ import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { editorLivePreviewField } from 'obsidian';
 
-import { LiveComments, build, liveComments } from './comment-live';
+import { CommentFold, build, liveComments } from './comment-live';
 
 /**
  * The lines a note has taken off it, by their text.
@@ -12,16 +12,14 @@ import { LiveComments, build, liveComments } from './comment-live';
  * The cursor starts where an editor puts it, at the top of the note, so a note
  * whose first line is plain is a note read with the cursor out of the way.
  */
-function hidden(
-  doc: string,
-  cursor = 0,
-  visible: { from: number; to: number }[] = [{ from: 0, to: doc.length }],
-): string[] {
+function hidden(doc: string, cursor = 0): string[] {
   const state = EditorState.create({ doc, selection: { anchor: cursor } });
-  const set = build(state, visible);
+  const set = build(state);
   const out: string[] = [];
-  set.between(0, doc.length, (from) => {
-    out.push(state.doc.lineAt(from).text);
+  set.between(0, doc.length, (from, to) => {
+    const first = state.doc.lineAt(from).number;
+    const last = state.doc.lineAt(to).number;
+    for (let n = first; n <= last; n++) out.push(state.doc.line(n).text);
   });
   return out;
 }
@@ -92,7 +90,7 @@ describe('build', () => {
       doc,
       selection: { anchor: doc.length - 4, head: doc.length },
     });
-    expect(build(state, [{ from: 0, to: doc.length }]).size).toBe(0);
+    expect(build(state).size).toBe(0);
   });
 
   it('takes a comment written over several lines off whole', () => {
@@ -154,34 +152,118 @@ describe('build', () => {
       '> <!-- prettier-ignore -->',
     ]);
   });
+});
 
-  it('reads nothing below what is on screen', () => {
-    const doc = below('<!-- a -->');
-    expect(hidden(doc, 0, [{ from: 0, to: 5 }])).toEqual([]);
-  });
-
-  it('reads nothing when nothing is visible at all', () => {
-    // No visible ranges is a viewport of nothing rather than one of
-    // everything, so the bottom it computes is before the very first line.
-    expect(hidden(below('<!-- a -->'), 0, [])).toEqual([]);
-  });
-
-  it('skips a comment sitting in the gap between two visible ranges', () => {
-    const doc = below('<!-- a -->', '<!-- skip -->', '<!-- c -->');
+describe('the fold', () => {
+  /** The widget a note's one folded comment is drawn by. */
+  function fold(doc: string): CommentFold {
     const state = EditorState.create({ doc, selection: { anchor: 0 } });
-    const first = state.doc.line(3);
-    const last = state.doc.line(5);
-    expect(
-      hidden(doc, 0, [
-        { from: first.from, to: first.to },
-        { from: last.from, to: last.to },
-      ]),
-    ).toEqual(['<!-- a -->', '<!-- c -->']);
+    const set = build(state);
+    let found: CommentFold | null = null;
+    set.between(0, doc.length, (from, to, value) => {
+      found = value.spec.widget as CommentFold;
+    });
+    if (!found) throw new Error('nothing folded');
+    return found;
+  }
+
+  /** What such a fold puts on the page. */
+  function drawn(doc: string): HTMLElement {
+    return fold(doc).toDOM({
+      dom: document.body,
+      dispatch: () => {},
+      focus: () => {},
+    } as never);
+  }
+
+  it('folds a comment written over several lines into one row', () => {
+    // Three lines hidden as three rows is three rows of nothing; one fold is
+    // the row the eye and the down arrow are both given.
+    const doc = below('<!--', 'por quê', '-->');
+    const state = EditorState.create({ doc, selection: { anchor: 0 } });
+    expect(build(state).size).toBe(1);
   });
 
-  it('still counts a fence opened above what is visible', () => {
-    const doc = ['```', '<!-- a -->', '```'].join('\n');
-    expect(hidden(doc, 0, [{ from: 4, to: doc.length }])).toEqual([]);
+  it('covers the comment from its first line to its last', () => {
+    const doc = below('<!--', 'por quê', '-->');
+    const state = EditorState.create({ doc, selection: { anchor: 0 } });
+    const set = build(state);
+    const at: number[] = [];
+    set.between(0, doc.length, (from, to) => {
+      at.push(from, to);
+    });
+    expect(at).toEqual([state.doc.line(3).from, state.doc.line(5).to]);
+  });
+
+  it('draws an ellipsis where the comment was', () => {
+    expect(
+      drawn(below('<!-- prettier-ignore -->')).querySelector(
+        '.cm-foldPlaceholder',
+      )?.textContent,
+    ).toBe('…');
+  });
+
+  it("wears the editor's own fold class, so the theme draws it", () => {
+    // Obsidian already styles what it collapses; a colour picked here would
+    // be one more thing to keep right in every theme.
+    const el = drawn(below('<!-- a -->'));
+    expect(el.querySelector('.cm-foldPlaceholder')).not.toBeNull();
+  });
+
+  it('stands as a line of its own, not as something hung off one', () => {
+    // A list's ellipsis hangs off its parent row; a comment has no parent, and
+    // an ellipsis with no row of its own leaves the down arrow nothing to
+    // land on — which is the whole complaint.
+    expect(drawn(below('<!-- a -->')).classList.contains('cm-line')).toBe(true);
+  });
+
+  it('says how much is folded when it is more than a line', () => {
+    expect(drawn(below('<!--', 'por quê', '-->')).textContent).toContain(
+      '3 lines',
+    );
+  });
+
+  it('says no count for a comment written on one line', () => {
+    // The row itself says where it is; a count of one says nothing more.
+    expect(drawn(below('<!-- a -->')).textContent).toBe('…');
+  });
+
+  it('puts the cursor into the comment when it is clicked', () => {
+    // Clicking a fold opens it, the way clicking one opens a list — and the
+    // cursor arriving is what `build` already reads to give the comment back.
+    const doc = below('<!-- a -->');
+    const at = doc.indexOf('<!--');
+    const state = EditorState.create({ doc, selection: { anchor: 0 } });
+    const set = build(state);
+    let widget: CommentFold | null = null;
+    set.between(0, doc.length, (from, to, value) => {
+      widget = value.spec.widget as CommentFold;
+    });
+    const sent: unknown[] = [];
+    let focused = false;
+    const el = widget!.toDOM({
+      dom: document.body,
+      dispatch: (spec: unknown) => sent.push(spec),
+      focus: () => {
+        focused = true;
+      },
+    } as never);
+    el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    expect(sent).toEqual([{ selection: { anchor: at } }]);
+    expect(focused).toBe(true);
+  });
+
+  it('is the same fold as another standing over the same comment', () => {
+    // Without this the editor rebuilds the row on every keystroke elsewhere.
+    expect(new CommentFold(4, 1).eq(new CommentFold(4, 1))).toBe(true);
+  });
+
+  it('is a different fold from one over a comment of another size', () => {
+    expect(new CommentFold(4, 1).eq(new CommentFold(4, 3))).toBe(false);
+  });
+
+  it('is a different fold from one standing somewhere else', () => {
+    expect(new CommentFold(4, 1).eq(new CommentFold(9, 1))).toBe(false);
   });
 });
 
@@ -193,7 +275,7 @@ describe('source mode', () => {
       selection: { anchor: 0 },
       extensions: [editorLivePreviewField.init(() => live)],
     });
-    return build(state, [{ from: 0, to: doc.length }]).size;
+    return build(state).size;
   }
 
   it('hides the comment in live preview', () => {
@@ -206,92 +288,63 @@ describe('source mode', () => {
   });
 });
 
-describe('LiveComments', () => {
+describe('liveComments', () => {
   /** An editor drawing one view of a note or the other. */
-  function drawing(doc: string, live: boolean): EditorView {
-    const state = EditorState.create({
-      doc,
-      extensions: [editorLivePreviewField.init(() => live)],
-    });
-    return {
-      state,
-      visibleRanges: [{ from: 0, to: doc.length }],
-    } as unknown as EditorView;
-  }
-
-  it('reads the note when it is built', () => {
-    expect(
-      new LiveComments(drawing(below('<!-- a -->'), true)).decorations.size,
-    ).toBe(1);
-  });
-
-  it('leaves the decorations alone when nothing it reads changed', () => {
-    const view = drawing(below('<!-- a -->'), true);
-    const comments = new LiveComments(view);
-    const before = comments.decorations;
-    comments.update({
-      docChanged: false,
-      selectionSet: false,
-      viewportChanged: false,
-      startState: view.state,
-      state: view.state,
-      view,
-    } as never);
-    expect(comments.decorations).toBe(before);
-  });
-
-  it('reads the note again when the cursor moves', () => {
-    const doc = below('<!-- a -->');
-    const view = drawing(doc, true);
-    const comments = new LiveComments(view);
-    const onIt = {
+  function editing(doc: string, live: boolean): EditorView {
+    return new EditorView({
       state: EditorState.create({
         doc,
-        selection: { anchor: doc.length },
-        extensions: [editorLivePreviewField.init(() => true)],
-      }),
-      visibleRanges: [{ from: 0, to: doc.length }],
-    } as unknown as EditorView;
-    comments.update({
-      docChanged: false,
-      selectionSet: true,
-      viewportChanged: false,
-      startState: view.state,
-      state: onIt.state,
-      view: onIt,
-    } as never);
-    expect(comments.decorations.size).toBe(0);
-  });
-
-  it('reads the editor again when it is switched to source mode', () => {
-    const doc = below('<!-- a -->');
-    const preview = drawing(doc, true);
-    const comments = new LiveComments(preview);
-    expect(comments.decorations.size).toBe(1);
-
-    const source = drawing(doc, false);
-    comments.update({
-      docChanged: false,
-      selectionSet: false,
-      viewportChanged: false,
-      startState: preview.state,
-      state: source.state,
-      view: source,
-    } as never);
-    expect(comments.decorations.size).toBe(0);
-  });
-});
-
-describe('liveComments', () => {
-  it('returns an extension the editor accepts', () => {
-    const view = new EditorView({
-      state: EditorState.create({
-        doc: below('<!-- prettier-ignore -->'),
-        extensions: [liveComments],
+        extensions: [editorLivePreviewField.init(() => live), liveComments],
       }),
       parent: document.body,
     });
-    expect(view.dom.querySelector('.kcp-comment-line')).not.toBeNull();
+  }
+
+  it('folds the note it is given as it is built', () => {
+    const view = editing(below('<!-- prettier-ignore -->'), true);
+    expect(view.state.field(liveComments).size).toBe(1);
+    view.destroy();
+  });
+
+  it('draws the fold on the page', () => {
+    const view = editing(below('<!-- prettier-ignore -->'), true);
+    expect(view.dom.querySelector('.kcp-comment-fold')).not.toBeNull();
+    view.destroy();
+  });
+
+  it('leaves the folds alone when nothing it reads changed', () => {
+    const view = editing(below('<!-- a -->'), true);
+    const before = view.state.field(liveComments);
+    view.dispatch({});
+    expect(view.state.field(liveComments)).toBe(before);
+    view.destroy();
+  });
+
+  it('reads the note again when the cursor moves onto a comment', () => {
+    const doc = below('<!-- a -->');
+    const view = editing(doc, true);
+    view.dispatch({ selection: { anchor: doc.length } });
+    expect(view.state.field(liveComments).size).toBe(0);
+    view.destroy();
+  });
+
+  it('reads the note again when it is edited', () => {
+    const view = editing(below('Verso.'), true);
+    expect(view.state.field(liveComments).size).toBe(0);
+    view.dispatch({
+      changes: {
+        from: view.state.doc.length,
+        insert: '\n<!-- prettier-ignore -->',
+      },
+      selection: { anchor: 0 },
+    });
+    expect(view.state.field(liveComments).size).toBe(1);
+    view.destroy();
+  });
+
+  it('draws nothing in an editor set to source mode', () => {
+    const view = editing(below('<!-- a -->'), false);
+    expect(view.state.field(liveComments).size).toBe(0);
     view.destroy();
   });
 });
