@@ -468,3 +468,16 @@
   --callout-color: #1d9e75;
   --callout-icon: lucide-glasses;
 }
+
+/* --- comments the writer is not addressed by ---
+
+   An `<!-- … -->` comment says something to whatever machinery reads the note
+   — Prettier, above all, whose `prettier-ignore` markers this plugin writes
+   itself — and nothing to whoever is reading or writing it. `comment-live.ts`
+   decides which lines those are, over the source; this is only what taking
+   one off the page means. `%%…%%` is the comment addressed to the writer and
+   is left alone. */
+
+.cm-line.kcp-comment-line {
+  display: none;
+}
