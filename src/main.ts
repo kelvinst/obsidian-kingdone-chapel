@@ -1180,7 +1180,9 @@ export default class KingdoneChapelPlugin extends Plugin {
    * leaves the cursor on whatever closes its list — the full stop, or the `,,`
    * ending an aside left without one — with the `@` behind it: `a` would open
    * the typing the far side of that, and `i` is what keeps it between the `@`
-   * and whatever follows it, which is where the reference goes.
+   * and whatever follows it, which is where the reference goes. Where nothing
+   * follows it on the line, `i` is asked for what normal mode cannot give, and
+   * is answered by appending after the character the cursor is pulled onto.
    *
    * The handler is asked first and the key itself sent second, because the
    * handler is the quiet way and does not always take — the extension listens
@@ -1195,6 +1197,22 @@ export default class KingdoneChapelPlugin extends Plugin {
     const view = held.cm;
     const adapter = view?.cm || (view?.state?.vim ? view : null);
     if (!adapter?.state?.vim || adapter.state.vim.insertMode) return;
+
+    // Normal mode holds the cursor on a character, so one left at the end of a
+    // line has nothing to sit in front of and is pulled onto the last
+    // character there. Appending after that character is where inserting in
+    // front of the one past it would have gone, which is what was asked for.
+    //
+    // Here rather than in the caller: an editor that is not in Vim mode has
+    // the cursor where it was put, and reading the line to move it back would
+    // be moving it away from where the typing goes.
+    if (key === 'i') {
+      const at = editor.getCursor();
+      if (at.ch === editor.getLine(at.line).length) {
+        editor.setCursor({ line: at.line, ch: at.ch - 1 });
+        key = 'a';
+      }
+    }
 
     const published = (window as unknown as { CodeMirrorAdapter?: VimAdapter })
       .CodeMirrorAdapter;
