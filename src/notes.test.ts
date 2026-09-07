@@ -702,6 +702,13 @@ describe('refsWrite', () => {
     );
   });
 
+  it('opens the list alone in an aside that says nothing', () => {
+    const text = '![[x]] ,,,, ^shedd-psa-1-1\n';
+    expect(applied(text, [refs(text)!.write])).toBe(
+      '![[x]] ,,**Refs**: @.,, ^shedd-psa-1-1\n',
+    );
+  });
+
   it('reads a verse the chapter does not carry as nothing to write on', () => {
     expect(refs(chapter(verse(2)))).toBeNull();
   });
