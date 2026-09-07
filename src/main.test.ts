@@ -1419,16 +1419,88 @@ describe('lockPreviewVerse', () => {
   });
 });
 
-describe('writtenVerse', () => {
+describe('the verse an element names', () => {
   function element(html: string, selector: string): HTMLElement {
     const holder = document.createElement('div');
     holder.innerHTML = html;
     return holder.querySelector(selector) as HTMLElement;
   }
 
+  /** A paragraph holding an embed, which Obsidian builds rather than parses. */
+  function embedding(before: string, src: string): HTMLElement {
+    const p = document.createElement('p');
+    if (before) p.append(before);
+    const held = p.createSpan({ cls: 'internal-embed' });
+    held.setAttribute('src', src);
+    held.createSpan({ text: '¹ O verso citado' });
+    return p;
+  }
+
+  it('reads the raised number a verse opens with', () => {
+    expect(
+      world.plugin.namedVerse(element('<p id="a">¹² Doze</p>', '#a')),
+    ).toBe(12);
+  });
+
+  it('reads the number an older chapter bolds into the paragraph', () => {
+    expect(
+      world.plugin.namedVerse(
+        element('<p id="a"><strong>7</strong> Sete</p>', '#a'),
+      ),
+    ).toBe(7);
+  });
+
+  it('reads past the bold a verse writes after its own number', () => {
+    expect(
+      world.plugin.namedVerse(
+        element(
+          '<p id="a">¹ <strong>Bem-aventurado</strong> o homem</p>',
+          '#a',
+        ),
+      ),
+    ).toBe(1);
+  });
+
+  it('reads the verse the embed a version is written as names', () => {
+    expect(
+      world.plugin.namedVerse(embedding('', 'ARA-41-MRK-014#^ara-mrk-14-9')),
+    ).toBe(9);
+  });
+
+  it('reads its own number rather than the one an embed of another verse draws', () => {
+    expect(
+      world.plugin.namedVerse(
+        embedding('¹ Como está escrito: ', 'ARA-43-JHN-003#^ara-jhn-3-16'),
+      ),
+    ).toBe(1);
+  });
+
+  it('reads nothing off an embed naming no verse of its own', () => {
+    expect(world.plugin.namedVerse(embedding('', 'Notas#resumo'))).toBeNull();
+  });
+
+  it('reads nothing off a paragraph that opens with something else', () => {
+    expect(
+      world.plugin.namedVerse(element('<p id="a">Sem número</p>', '#a')),
+    ).toBeNull();
+    expect(
+      world.plugin.namedVerse(
+        element('<p id="a"><strong>Nota</strong> ...</p>', '#a'),
+      ),
+    ).toBeNull();
+    expect(
+      world.plugin.namedVerse(
+        element('<p id="a"><em>Um cabeçalho</em></p>', '#a'),
+      ),
+    ).toBeNull();
+    expect(
+      world.plugin.namedVerse(element('<p id="a"> </p>', '#a')),
+    ).toBeNull();
+  });
+
   it('counts a list item from the number the list opens on', () => {
     expect(
-      world.plugin.writtenVerse(
+      world.plugin.listVerse(
         element('<ol start="4"><li>a</li><li id="b">b</li></ol>', '#b'),
       ),
     ).toBe(5);
@@ -1436,26 +1508,13 @@ describe('writtenVerse', () => {
 
   it('reads nothing off a list item outside an ordered list', () => {
     expect(
-      world.plugin.writtenVerse(element('<ul><li id="a">a</li></ul>', '#a')),
+      world.plugin.listVerse(element('<ul><li id="a">a</li></ul>', '#a')),
     ).toBeNull();
   });
 
-  it('reads the number an older chapter bolds into the paragraph', () => {
+  it('counts nothing off what is no list item at all', () => {
     expect(
-      world.plugin.writtenVerse(
-        element('<p id="a"><strong>7</strong> Sete</p>', '#a'),
-      ),
-    ).toBe(7);
-  });
-
-  it('reads nothing off a paragraph that opens with something else', () => {
-    expect(
-      world.plugin.writtenVerse(element('<p id="a">Sem número</p>', '#a')),
-    ).toBeNull();
-    expect(
-      world.plugin.writtenVerse(
-        element('<p id="a"><strong>Nota</strong> ...</p>', '#a'),
-      ),
+      world.plugin.listVerse(element('<p id="a">¹ Um</p>', '#a')),
     ).toBeNull();
   });
 });
