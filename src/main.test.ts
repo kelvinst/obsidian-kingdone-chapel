@@ -596,6 +596,11 @@ describe('verseIn', () => {
       expect(await world.plugin.verseIn(shedd, 1)).toEqual({
         verse: 1,
         text: 'No princípio, criou Deus.',
+        // The words are the translation's, and a link in them means what it
+        // means there, so the file they were drawn from comes with them.
+        source: world.vault.getAbstractFileByPath(
+          chapterPath('ARA', 1, 'GEN', 1),
+        ),
       });
     });
 
@@ -617,6 +622,9 @@ describe('verseIn', () => {
       expect(await world.plugin.verseIn(shedd, 1)).toEqual({
         verse: 1,
         text: 'No princípio, criou Deus. — nota',
+        source: world.vault.getAbstractFileByPath(
+          chapterPath('ARA', 1, 'GEN', 1),
+        ),
       });
     });
 

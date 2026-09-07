@@ -21,15 +21,19 @@ beforeEach(() => {
     verse: 16,
     file: here,
   };
-  const item = (version: string, label: string, text: string): VersionItem => ({
-    version,
-    label,
-    group: '',
-    file: vault.write(`Bibles/${version}/${version}-43-JHN-003.md`),
-    text,
-    matchedVerse: 16,
-    isCurrent: false,
-  });
+  const item = (version: string, label: string, text: string): VersionItem => {
+    const file = vault.write(`Bibles/${version}/${version}-43-JHN-003.md`);
+    return {
+      version,
+      label,
+      group: '',
+      file,
+      text,
+      source: file,
+      matchedVerse: 16,
+      isCurrent: false,
+    };
+  };
 
   jumpTo = vi.spyOn(plugin, 'jumpTo').mockResolvedValue();
   modal = new VersionSuggestModal(app, plugin, loc, [
