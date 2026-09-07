@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   markerWrite,
+  refsWrite,
   nextNoteNumber,
   noteAnchor,
   noteBlock,
@@ -553,5 +554,109 @@ describe('two verses one aside is read as covering', () => {
     const marked = applied(text, written.writes);
     expect(marked.match(/\[\[#\^shedd-psa-1-n1\|n1\]\]/g)).toHaveLength(1);
     expect(marked).toContain('^shedd-psa-1-2');
+  });
+});
+
+describe('refsWrite', () => {
+  const refs = (text: string) =>
+    refsWrite(text, 'shedd-psa-1-1', ['Refs'], ['Notas', 'Notes']);
+
+  it('opens an aside on a verse carrying none', () => {
+    const text = chapter(verse(1), verse(2));
+    expect(applied(text, [refs(text)!.write])).toContain(
+      '![[ARA-19-PSA-001#^ara-psa-1-1|flat]]\n' +
+        ',,**Refs**: @.,,\n' +
+        '^shedd-psa-1-1',
+    );
+  });
+
+  it('leaves the cursor on the `@` it wrote', () => {
+    const text = chapter(verse(1));
+    const written = refs(text)!;
+    const lines = applied(text, [written.write]).split('\n');
+    expect(lines[written.cursor.line].slice(0, written.cursor.ch)).toBe(
+      ',,**Refs**: @',
+    );
+  });
+
+  it('writes the refs in front of the notes a verse already carries', () => {
+    const text = chapter(verse(1, ',,**Notas**: [[#^shedd-psa-1-n1|n1]].,,'));
+    expect(applied(text, [refs(text)!.write])).toContain(
+      ',,**Refs**: @. **Notas**: [[#^shedd-psa-1-n1|n1]].,,',
+    );
+  });
+
+  it('extends the refs a verse already carries', () => {
+    const text = chapter(
+      verse(1, ',,**Refs**: [[Shedd-19-PSA-026#^shedd-psa-26-4|Sl 26.4]].,,'),
+    );
+    const written = refs(text)!;
+    const lines = applied(text, [written.write]).split('\n');
+    expect(lines[written.cursor.line]).toBe(
+      ',,**Refs**: [[Shedd-19-PSA-026#^shedd-psa-26-4|Sl 26.4]]; @.,,',
+    );
+    expect(written.cursor.ch).toBe(lines[written.cursor.line].indexOf('@') + 1);
+  });
+
+  it('says the refs after whatever else an aside says', () => {
+    const text = chapter(verse(1, ',,uma nota,,'));
+    expect(applied(text, [refs(text)!.write])).toContain(
+      ',,uma nota. **Refs**: @.,,',
+    );
+  });
+
+  it('writes on a verse whose aside and id share the one line', () => {
+    const text =
+      '![[ARA-19-PSA-001#^ara-psa-1-1|flat]] ,,**Notas**: ' +
+      '[[#^shedd-psa-1-n1|n1]].,, ^shedd-psa-1-1\n';
+    const written = refs(text)!;
+    const lines = applied(text, [written.write]).split('\n');
+    expect(lines[0]).toBe(
+      '![[ARA-19-PSA-001#^ara-psa-1-1|flat]] ,,**Refs**: @. **Notas**: ' +
+        '[[#^shedd-psa-1-n1|n1]].,, ^shedd-psa-1-1',
+    );
+    expect(written.cursor).toEqual({ line: 0, ch: lines[0].indexOf('@') + 1 });
+  });
+
+  it('opens the refs of a verse whose aside Prettier wrapped over lines', () => {
+    const text =
+      '![[ARA-19-PSA-001#^ara-psa-1-1|flat]] ,,**Notas**:\n' +
+      '[[#^shedd-psa-1-n1|n1]];\n' +
+      '[[#^shedd-psa-1-n2|n2]].,, ^shedd-psa-1-1\n';
+    const written = refs(text)!;
+    const lines = applied(text, [written.write]).split('\n');
+    expect(lines[0]).toBe(
+      '![[ARA-19-PSA-001#^ara-psa-1-1|flat]] ,,**Refs**: @. **Notas**:',
+    );
+    expect(written.cursor).toEqual({ line: 0, ch: lines[0].indexOf('@') + 1 });
+  });
+
+  it('writes an aside of its own on a verse written on the one line', () => {
+    const text = '![[ARA-19-PSA-001#^ara-psa-1-1|flat]] ^shedd-psa-1-1\n';
+    expect(applied(text, [refs(text)!.write])).toBe(
+      '![[ARA-19-PSA-001#^ara-psa-1-1|flat]] ,,**Refs**: @.,, ' +
+        '^shedd-psa-1-1\n',
+    );
+  });
+
+  it('writes on a verse whose id opens the chapter', () => {
+    const text = '^shedd-psa-1-1\n';
+    const written = refs(text)!;
+    expect(applied(text, [written.write])).toBe(
+      ',,**Refs**: @.,,\n^shedd-psa-1-1\n',
+    );
+    expect(written.cursor).toEqual({ line: 0, ch: ',,**Refs**: @'.length });
+  });
+
+  it('follows the cursor down an aside Prettier wrapped over lines', () => {
+    const text = '![[x]] ,,uma nota\nque segue,, ^shedd-psa-1-1\n';
+    const written = refs(text)!;
+    const lines = applied(text, [written.write]).split('\n');
+    expect(lines[1]).toBe('que segue. **Refs**: @.,, ^shedd-psa-1-1');
+    expect(written.cursor).toEqual({ line: 1, ch: lines[1].indexOf('@') + 1 });
+  });
+
+  it('reads a verse the chapter does not carry as nothing to write on', () => {
+    expect(refs(chapter(verse(2)))).toBeNull();
   });
 });
