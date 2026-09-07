@@ -56,6 +56,7 @@ import { renderMarks } from './marks';
 import { liveMarks } from './live';
 import { softLinkRenderer } from './softlink-read';
 import { liveSoftLinks } from './softlink-live';
+import { liveComments } from './comment-live';
 import {
   collectSources,
   declaresSource,
@@ -331,6 +332,13 @@ export default class KingdoneChapelPlugin extends Plugin {
     // README.md, "Links the vault does not count".
     this.registerMarkdownPostProcessor(softLinkRenderer(this.app));
     this.registerEditorExtension(liveSoftLinks(this.app));
+
+    // An `<!-- html comment -->` is addressed to the machinery reading the
+    // note — Prettier's own `prettier-ignore` markers among them, which
+    // `notes.ts` writes itself — so it comes off the page while the note is
+    // written, and comes back when the cursor reaches it. `%%…%%` is the
+    // comment addressed to whoever is writing, and stays.
+    this.registerEditorExtension(liveComments);
 
     // One command per version, so each can get its own hotkey.
     this.registerVersionCommands();

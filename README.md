@@ -256,6 +256,27 @@ reading view it stops the link from being drawn at all.
 Both views draw them: reading view rewrites the note, and in live preview the token is drawn
 as its link until the cursor arrives, when it is handed back for editing.
 
+### Comments the writer is not addressed by
+
+Both kinds of comment a note can carry are invisible to whoever reads it, so the difference
+between them is free to say who they are _for_:
+
+| You write             | While reading | While writing             |
+| --------------------- | ------------- | ------------------------- |
+| `%% conferir isto %%` | hidden        | on the page               |
+| `<!-- gerado -->`     | hidden        | hidden until you reach it |
+
+`%%…%%` is a note to yourself and stays where you put it. `<!-- … -->` is a note to whatever
+machinery reads the file — Prettier above all, whose `prettier-ignore` markers this plugin
+writes itself around every note callout — so it comes off the page in live preview and comes
+straight back when the cursor lands on it, still editable and still deletable.
+
+Only a line that is a comment _whole_ is taken off. A line ending in `<!-- why -->` after
+some prose keeps all of it, and so does a comment written inside a fenced block, which is a
+comment being shown rather than one being addressed to anybody. A comment spanning several
+lines hides as one and returns as one. Source mode shows the note as it is written, comments
+and all.
+
 ### `@` references
 
 Type `@` and a reference anywhere in a note to link to it. The suggestion list shows the

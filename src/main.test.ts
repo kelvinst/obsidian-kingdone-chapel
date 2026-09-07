@@ -1823,7 +1823,8 @@ describe('onload', () => {
   it('draws its own links in both views', async () => {
     await world.plugin.onload();
 
-    expect(world.plugin.editorExtensions.length).toBe(2);
+    // The marks, the soft links, and the html comments taken off the page.
+    expect(world.plugin.editorExtensions.length).toBe(3);
     // Counting `postProcessors` would pass just as well with the mark
     // renderer registered twice and the soft-link one dropped, so this runs
     // each registered post-processor over a token instead and asks whether
