@@ -54,6 +54,8 @@ import { KingdoneChapelSettingTab } from './settings';
 import { KingdoneChapelView } from './view';
 import { Breadcrumbs } from './breadcrumbs';
 import { Diagnostics } from './diagnostics';
+import type { Diagnostic } from './diagnostics';
+import { Sweep } from './sweep';
 import { renderMarks } from './marks';
 import { liveMarks } from './live';
 import { softLinkRenderer } from './softlink-read';
@@ -172,6 +174,13 @@ interface VerseElement {
 }
 
 /** How far below the top of a reading pane a verse still counts as the one being read. */
+/** What a finished sweep is worth saying: a count, or that there is none. */
+function countedProblems(found: Diagnostic[]): string {
+  if (!found.length) return 'Nothing wrong with the versions here.';
+  const one = found.length === 1;
+  return `${found.length} problem${one ? '' : 's'} found in the Bible versions.`;
+}
+
 const PREVIEW_TOP_OFFSET = 48;
 /** Scroll movement (px) that releases a verse clicked in reading mode. */
 const SCROLL_SLACK = 4;
@@ -230,6 +239,10 @@ export default class KingdoneChapelPlugin extends Plugin {
   chapterConflicts: Map<string, TFile[]> = new Map();
   /** What is wrong with the versions the vault holds, as far as it is known. */
   diagnostics = new Diagnostics(this);
+  /** The pass over the vault this session made, while it is being made. */
+  sweep: Sweep | null = null;
+  /** What that pass will answer, for anything waiting on it to be over. */
+  swept: Promise<Diagnostic[]> | null = null;
   /** Last location read from a real editor, kept for when focus leaves it. */
   lastLocation: Location | null = null;
   /** Verse clicked in reading mode, held until that pane scrolls again. */
@@ -428,8 +441,14 @@ export default class KingdoneChapelPlugin extends Plugin {
       this.app.metadataCache.offref(settled);
       moved();
       this.registerVersionCommands();
+      // The one pass over the vault this session makes. Here rather than in
+      // `onload` for the same reason the commands are: which folders are
+      // versions is read from a cache that is still filling on a cold start,
+      // and a sweep begun over half an answer would read half a vault.
+      this.startSweep();
     });
     this.registerEvent(settled);
+    this.register(() => this.sweep?.cancel());
     this.register(() => this.cancelQueuedRefresh());
     this.register(() => this.cancelQueuedTyping());
 
@@ -459,6 +478,27 @@ export default class KingdoneChapelPlugin extends Plugin {
     this.app.workspace.onLayoutReady(() => {
       if (this.settings.openSidebarOnStart) this.activateView(false);
       else this.keepOneViewPane();
+    });
+  }
+
+  /**
+   * Read the vault through, once, saying so at both ends.
+   *
+   * The notice that opens it is given no timeout on purpose: a sweep outlasts
+   * the seconds a notice is allowed, and one that faded half way through
+   * would be a promise made and then quietly dropped. It waits to be clicked,
+   * and clicking it opens the sidebar the findings are read in.
+   */
+  startSweep() {
+    const started = new Notice('Checking the Bible versions…', 0);
+    started.containerEl.addEventListener('click', () => this.activateView());
+
+    const sweep = (this.sweep = new Sweep(this));
+    this.swept = sweep.run().then((found) => {
+      started.hide();
+      new Notice(countedProblems(found));
+      this.sweep = null;
+      return found;
     });
   }
 

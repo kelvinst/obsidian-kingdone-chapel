@@ -2123,6 +2123,89 @@ describe('onload', () => {
     world.plugin.unload();
     expect(clear).toHaveBeenCalled();
   });
+
+  it('reads the whole vault by itself once the cache has settled', async () => {
+    await world.plugin.onload();
+    const read = vi.spyOn(world.plugin.diagnostics, 'ofChapter');
+
+    world.metadataCache.trigger('resolved');
+    await world.plugin.swept;
+
+    // Every chapter of both versions, and nothing that is no chapter.
+    expect(read.mock.calls.map(([file]) => file.path).sort()).toEqual([
+      chapterPath('ARA', 1, 'GEN', 1),
+      chapterPath('ARA', 43, 'JHN', 1),
+      chapterPath('NVI', 1, 'GEN', 1),
+      chapterPath('NVI', 1, 'GEN', 2),
+      chapterPath('NVI', 43, 'JHN', 1),
+    ]);
+  });
+
+  it('says it has started, and waits to be clicked rather than going away', async () => {
+    world.workspace.rightLeaf = world.workspace.addLeaf('empty');
+    await world.plugin.onload();
+    clearNotices();
+
+    world.metadataCache.trigger('resolved');
+    const started = notices[0];
+    // Nothing dismisses it on a timer: a sweep outlives the seconds a notice
+    // is given, and one that vanished mid-sweep would be a promise dropped.
+    expect(started?.timeout).toBe(0);
+
+    started?.containerEl?.click();
+    await world.plugin.swept;
+    expect(world.workspace.revealed).not.toEqual([]);
+  });
+
+  it('names what it found once it has read everything', async () => {
+    world.vault.write(chapterPath('NVI', 1, 'GEN', 1), '1. Um\n2. Dois');
+    await world.plugin.onload();
+    clearNotices();
+
+    world.metadataCache.trigger('resolved');
+    await world.plugin.swept;
+
+    expect(notices.at(-1)?.message).toContain('2');
+  });
+
+  it('counts the one problem a vault has as one, not as many', async () => {
+    world.vault.write(chapterPath('NVI', 1, 'GEN', 1), '1. Um');
+    await world.plugin.onload();
+    clearNotices();
+
+    world.metadataCache.trigger('resolved');
+    await world.plugin.swept;
+
+    expect(notices.at(-1)?.message).toBe(
+      '1 problem found in the Bible versions.',
+    );
+  });
+
+  it('says as much when there is nothing wrong with the vault', async () => {
+    await world.plugin.onload();
+    clearNotices();
+
+    world.metadataCache.trigger('resolved');
+    await world.plugin.swept;
+
+    expect(notices.at(-1)?.message).toBe(
+      'Nothing wrong with the versions here.',
+    );
+  });
+
+  it('stops the sweep where it stands when it is unloaded', async () => {
+    await world.plugin.onload();
+    const read = vi.spyOn(world.plugin.diagnostics, 'ofChapter');
+
+    world.metadataCache.trigger('resolved');
+    world.plugin.unload();
+    await world.plugin.swept;
+
+    // Started, and stopped before the end of a vault it had the turns to
+    // finish: the whole of it is read where nothing calls the sweep off.
+    expect(read.mock.calls.length).toBeGreaterThan(0);
+    expect(read.mock.calls.length).toBeLessThan(5);
+  });
 });
 
 describe('a command per version', () => {

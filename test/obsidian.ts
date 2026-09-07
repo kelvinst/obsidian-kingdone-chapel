@@ -170,20 +170,32 @@ export class MarkdownView extends ItemView {
 }
 
 /** Every notice raised since the last reset, newest last. */
-export const notices: { message: string; timeout?: number }[] = [];
+export const notices: {
+  message: string;
+  timeout?: number;
+  /** The element Obsidian draws it in, which a test can click. */
+  containerEl: HTMLElement;
+}[] = [];
 
 export function clearNotices() {
   notices.length = 0;
 }
 
 export class Notice {
-  noticeEl: HTMLElement | null = null;
+  /** The whole notice, which is what a click lands on. */
+  containerEl: HTMLElement = document.createElement('div');
+  /** The same element under the name deprecated since 1.8.7. */
+  noticeEl: HTMLElement = this.containerEl;
 
   constructor(
     public message: string | DocumentFragment,
     public timeout?: number,
   ) {
-    notices.push({ message: String(message), timeout });
+    notices.push({
+      message: String(message),
+      timeout,
+      containerEl: this.containerEl,
+    });
   }
 
   setMessage(message: string) {
