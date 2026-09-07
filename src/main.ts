@@ -1235,8 +1235,14 @@ export default class KingdoneChapelPlugin extends Plugin {
   async verseIn(file: TFile, verse: number | null): Promise<Verse | null> {
     const match = await this.verseLineIn(file, verse);
     if (!match) return null;
-    const text = await this.resolveEmbeds(match.text, file);
-    return text === match.text ? match : { verse: match.verse, text };
+    const drawn = await this.drawnFrom(match.text, file);
+    // A verse written where it was found says nothing about a source: it is
+    // the file it was read out of, which every caller already has.
+    if (drawn.source === file)
+      return drawn.text === match.text
+        ? match
+        : { verse: match.verse, text: drawn.text };
+    return { verse: match.verse, text: drawn.text, source: drawn.source };
   }
 
   /** The verse as the file writes it, before any embed it holds is followed. */
@@ -1276,17 +1282,40 @@ export default class KingdoneChapelPlugin extends Plugin {
     from: TFile,
     seen: Set<string> = new Set(),
   ): Promise<string> {
+    return (await this.drawnFrom(text, from, seen)).text;
+  }
+
+  /**
+   * The same words, with the file they were drawn from beside them.
+   *
+   * The words a verse ends up saying may be written somewhere else entirely,
+   * and a link inside them means what it means where it was written: rendering
+   * them against the version that embedded them resolves the link from the
+   * wrong folder. So carry the file the first embed answered from — a verse is
+   * one embed and whatever the version says around it, so the first is the one
+   * the words came from — and `from` where nothing was followed.
+   */
+  private async drawnFrom(
+    text: string,
+    from: TFile,
+    seen: Set<string> = new Set(),
+  ): Promise<{ text: string; source: TFile }> {
     const embeds = verseEmbeds(text);
-    if (!embeds.length) return text;
+    if (!embeds.length) return { text, source: from };
 
     let out = '';
     let at = 0;
+    let source: TFile | null = null;
     for (const embed of embeds) {
       out += text.slice(at, embed.at);
-      out += await this.embedded(embed.path, embed.block, from, seen);
+      const answer = await this.embedded(embed.path, embed.block, from, seen);
+      out += answer.text;
+      // An embed that answered with nothing drew no words, so it is not where
+      // the words came from.
+      if (!source && answer.text) source = answer.source;
       at = embed.at + embed.length;
     }
-    return (out + text.slice(at)).trim();
+    return { text: (out + text.slice(at)).trim(), source: source || from };
   }
 
   /** The verse an embed points at, followed through whatever it embeds in turn. */
@@ -1295,26 +1324,27 @@ export default class KingdoneChapelPlugin extends Plugin {
     id: string,
     from: TFile,
     seen: Set<string>,
-  ): Promise<string> {
+  ): Promise<{ text: string; source: TFile | null }> {
+    const nothing = { text: '', source: null };
     const key = `${path}#${id}`;
-    if (seen.has(key)) return '';
+    if (seen.has(key)) return nothing;
     const dest = this.app.metadataCache.getFirstLinkpathDest(
       getLinkpath(path),
       from.path,
     );
-    if (!dest) return '';
+    if (!dest) return nothing;
     // An id that ends anywhere but on a number names something other than a
     // verse, and asking for no verse at all would answer with the chapter's
     // first one — a verse nobody pointed at.
     const wanted = verseInId(id);
-    if (wanted === null) return '';
+    if (wanted === null) return nothing;
     // The embed names one verse, so it is that verse or none: the nearest
     // verse before it answers a reader asking for a passage, not a link.
     const found = (await this.chapterVerses(dest)).find(
       (v) => v.verse === wanted,
     );
-    if (!found) return '';
-    return this.resolveEmbeds(found.text, dest, new Set(seen).add(key));
+    if (!found) return nothing;
+    return this.drawnFrom(found.text, dest, new Set(seen).add(key));
   }
 
   /** One entry per available version for `loc`, for the sidebar and the picker. */
@@ -1335,6 +1365,7 @@ export default class KingdoneChapelPlugin extends Plugin {
         group: source.group,
         file,
         text: match ? match.text : '',
+        source: match && match.source ? match.source : file,
         matchedVerse: match ? match.verse : null,
         isCurrent: version === loc.version,
       });

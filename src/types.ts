@@ -74,6 +74,15 @@ export interface ChapterTarget {
 export interface Verse {
   verse: number;
   text: string;
+  /**
+   * The file the words were finally drawn from — the verse's own file, or, for
+   * a version that writes its verses as embeds, the one the embed answered
+   * from. What is read out of a file is not always written in it, and anything
+   * rendering the words has to resolve their links from where they were
+   * written. Absent on a verse straight out of `parseVerses`, which has read a
+   * file and followed nothing.
+   */
+  source?: TFile;
 }
 
 /** One version's take on the current passage, for the sidebar and the picker. */
@@ -89,6 +98,8 @@ export interface VersionItem {
   group: string;
   file: TFile;
   text: string;
+  /** The file `text` was drawn from, which is `file` unless an embed answered it. */
+  source: TFile;
   matchedVerse: number | null;
   isCurrent: boolean;
 }
