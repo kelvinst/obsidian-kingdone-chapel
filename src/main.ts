@@ -146,6 +146,12 @@ function superscriptVerse(text: string): number | null {
   return read ? verse : null;
 }
 
+/** A verse on the page: the element holding it, and the verse it names if it does. */
+interface VerseElement {
+  verse: number | null;
+  el: HTMLElement;
+}
+
 /** How far below the top of a reading pane a verse still counts as the one being read. */
 const PREVIEW_TOP_OFFSET = 48;
 /** Scroll movement (px) that releases a verse clicked in reading mode. */
@@ -1187,82 +1193,106 @@ export default class KingdoneChapelPlugin extends Plugin {
     scroller: HTMLElement,
   ): { verse: number; el: HTMLElement }[] {
     const els = this.verseElements(scroller);
-
-    const named = els.map((el) => this.namedVerse(el));
-    if (els.length && named.every((verse) => verse !== null))
-      return els.map((el, i) => ({ verse: named[i] as number, el }));
+    if (els.length && els.every((item) => item.verse !== null))
+      return els.map(({ verse, el }) => ({ verse: verse as number, el }));
 
     const verses = this.cachedVerses(view.file);
     if (!verses) return []; // the file has not been read yet; the next poll has it
     if (verses.length === els.length)
-      return els.map((el, i) => ({ verse: verses[i].verse, el }));
+      return els.map(({ el }, i) => ({ verse: verses[i].verse, el }));
 
     const out: { verse: number; el: HTMLElement }[] = [];
-    for (const el of els) {
-      const verse = this.writtenVerse(el);
-      if (verse !== null) out.push({ verse, el });
+    for (const { verse, el } of els) {
+      const found = verse !== null ? verse : this.listVerse(el);
+      if (found !== null) out.push({ verse: found, el });
     }
     return out;
   }
 
   /**
-   * The elements holding verses, outermost first and in document order.
+   * The elements holding verses, each with the verse it names, outermost first
+   * and in document order.
    *
    * A verse written as an embed renders the verse it embeds inside itself,
    * paragraph and all, so anything sitting inside a verse already taken is
    * that verse being drawn rather than another one — counting it would put
-   * every verse on the page twice.
+   * every verse on the page twice. Document order puts a verse before whatever
+   * it draws inside itself, so the one taken last is the only one that can be
+   * holding what comes next.
    */
-  verseElements(scroller: HTMLElement): HTMLElement[] {
-    const found: HTMLElement[] = [];
+  verseElements(scroller: HTMLElement): VerseElement[] {
+    const found: VerseElement[] = [];
     for (const el of Array.from(
       scroller.querySelectorAll<HTMLElement>(VERSE_SELECTOR),
     )) {
-      if (found.some((taken) => taken.contains(el))) continue;
-      if (el.tagName === 'LI' || this.namedVerse(el) !== null) found.push(el);
+      const last = found.length ? found[found.length - 1].el : null;
+      if (last && last.contains(el)) continue;
+      const verse = this.namedVerse(el);
+      if (el.tagName === 'LI' || verse !== null) found.push({ verse, el });
     }
     return found;
   }
 
   /**
-   * The verse an element names, which is the file's own number for it: the
-   * block id of the verse it embeds, or the number it opens with — raised in
-   * the vault's own chapters, bold in older ones. Null where it names none,
-   * which is what tells a verse from the rest of the page: the chapter's
-   * navigation is a paragraph too.
+   * The verse an element names, which is the file's own number for it: the one
+   * it opens with — raised in the vault's own chapters, bold in older ones —
+   * or, for a verse that is an embed of another version's, the verse that
+   * embed names. Null where it names none, which is what tells a verse from
+   * the rest of the page: the chapter's navigation is a paragraph too.
+   *
+   * What the element opens with is asked for first. A version written over
+   * another one may write beside the embed as well as around it, and the
+   * number an embed draws is the embedded verse's own — the right one where a
+   * verse is nothing but an embed of the verse it rests on, and the wrong one
+   * for a verse that quotes some other passage halfway through.
    */
   namedVerse(el: HTMLElement): number | null {
+    const opening = this.openingVerse(el);
+    if (opening !== null) return opening;
+
     const embed = el.matches('.internal-embed[src]')
       ? el
       : el.querySelector<HTMLElement>('.internal-embed[src]');
     const src = embed && embed.getAttribute('src');
     const at = src ? src.indexOf('#^') : -1;
-    if (src && at >= 0) {
-      const verse = verseInId(src.slice(at + 2));
-      if (verse !== null) return verse;
-    }
-
-    const strong = el.firstElementChild;
-    if (strong && strong.tagName === 'STRONG') {
-      const m = (strong.textContent || '').trim().match(/^(\d+)$/);
-      return m ? parseInt(m[1], 10) : null;
-    }
-    return superscriptVerse((el.textContent || '').trimStart());
+    return src && at >= 0 ? verseInId(src.slice(at + 2)) : null;
   }
 
   /**
-   * The verse an element writes for itself, for when the file's verses cannot
-   * be paired with the page. This is the number the reader sees, which is the
-   * right one everywhere except a list that merges verses — Markdown numbers
-   * a list from its opening item and ignores the rest, so MENS reads one verse
-   * low from its first merge onwards. Close beats nothing.
+   * The number an element opens with, read off what it writes before anything
+   * else — never past the first thing that is not a number, so a verse opening
+   * with a word, or with the embed it is made of, names nothing here.
+   *
+   * Read node by node rather than off the whole of the element's text: the
+   * text of a verse written as an embed is the whole of the verse it draws,
+   * and it is the opening of this one that is being asked for.
    */
-  writtenVerse(el: HTMLElement): number | null {
-    const named = this.namedVerse(el);
-    if (named !== null) return named;
-    if (el.tagName !== 'LI') return null;
+  openingVerse(el: HTMLElement): number | null {
+    for (const node of Array.from(el.childNodes)) {
+      const text = node.textContent || '';
+      if (node.nodeType === Node.TEXT_NODE) {
+        if (!text.trim()) continue; // the space between two blocks
+        return superscriptVerse(text.trimStart());
+      }
+      // The bold an older chapter opens its verses with. Anything else — a
+      // link, an embed, a word in italics — opens no verse.
+      if ((node as Element).tagName !== 'STRONG') return null;
+      const m = text.trim().match(/^(\d+)$/);
+      return m ? parseInt(m[1], 10) : null;
+    }
+    return null;
+  }
+
+  /**
+   * The verse Markdown numbers a list item, for when the file's verses cannot
+   * be paired with the page. This is the number the reader sees, which is the
+   * right one except in a version that merges verses — Markdown numbers a list
+   * from its opening item and ignores the rest, so MENS reads one verse low
+   * from its first merge onwards. Close beats nothing.
+   */
+  listVerse(el: HTMLElement): number | null {
     const list = el.parentElement;
-    if (!list || list.tagName !== 'OL') return null;
+    if (el.tagName !== 'LI' || !list || list.tagName !== 'OL') return null;
     const index = Array.prototype.indexOf.call(list.children, el);
     return index < 0 ? null : (list as HTMLOListElement).start + index;
   }
