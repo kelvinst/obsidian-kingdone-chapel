@@ -474,18 +474,17 @@
    An `<!-- … -->` comment says something to whatever machinery reads the note
    — Prettier, above all, whose `prettier-ignore` markers this plugin writes
    itself — and nothing to whoever is reading or writing it. `comment-live.ts`
-   decides which lines those are, over the source; this is only what taking
-   one off the page means. `%%…%%` is the comment addressed to the writer and
-   is left alone.
+   decides which lines those are, over the source, and folds them into a row
+   carrying an ellipsis; this is only what that row is left to look like.
 
-   Written through `.markdown-source-view.mod-cm6` for the weight it carries,
-   not for the reach: Obsidian lays out the editor's lines through a selector
-   of its own that long, and a bare `.cm-line.kcp-comment-line` is outranked by
-   it — the class lands on the line and the line is drawn anyway. The vault
-   snippet this replaces was written the same way for the same reason. The
-   plugin's other line rule, `.kcp-small-line`, sets a font size, which nothing
-   in Obsidian contests, so it never had to say so. */
+   Almost nothing, on purpose. The ellipsis wears `.cm-foldPlaceholder`, the
+   class Obsidian already styles for the folds of its own that it draws, so a
+   folded comment reads as something the editor collapsed and stays right in
+   whatever theme the vault is wearing. Nothing here picks a colour. The row
+   wears `.cm-line` for the same reason: the editor's own line metrics, so the
+   fold stands as tall as the line it stands in for and the cursor can be
+   moved onto it. What is left is to say the row is asking to be clicked. */
 
-.markdown-source-view.mod-cm6 .cm-line.kcp-comment-line {
-  display: none;
+.kcp-comment-fold {
+  cursor: pointer;
 }

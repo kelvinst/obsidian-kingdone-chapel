@@ -1,10 +1,6 @@
-import { Decoration, ViewPlugin } from '@codemirror/view';
-import type {
-  DecorationSet,
-  EditorView,
-  PluginValue,
-  ViewUpdate,
-} from '@codemirror/view';
+import { Decoration, EditorView, WidgetType } from '@codemirror/view';
+import type { DecorationSet } from '@codemirror/view';
+import { StateField } from '@codemirror/state';
 import type { EditorState, Range } from '@codemirror/state';
 import { editorLivePreviewField } from 'obsidian';
 
@@ -53,8 +49,78 @@ const OPEN = /^ {0,3}<!--/;
  */
 const CLOSE = /-->(.*)$/;
 
-/** What is put over such a line, taken off the page by `styles.css`. */
-const HIDDEN = Decoration.line({ class: 'kcp-comment-line' });
+/**
+ * The row a folded comment leaves behind: an ellipsis, and nothing else.
+ *
+ * `display: none` over the comment's lines was tried first and cost more than
+ * it saved. A hidden line has no box, and vertical motion is geometric, so the
+ * down arrow — and vim's `j` and `gj` — stepped straight over it; a click
+ * could not land on it either, and nothing on the page said there was
+ * anything there to reach for. A comment nobody can see and nobody can move to
+ * is a comment nobody can edit or delete.
+ *
+ * So the comment is folded rather than hidden, which is what was being asked
+ * for all along: the row stays and an ellipsis stands in for what is no longer
+ * shown, exactly as Obsidian draws a list item whose children are collapsed.
+ * A reader who has ever collapsed a list already knows what the ellipsis means
+ * and that clicking it brings the content back, and `.cm-foldPlaceholder` is
+ * the class the theme styles, so the fold stays right in whatever theme the
+ * vault is wearing rather than carrying a colour picked here.
+ *
+ * The one place it must differ from a list's fold: a list hangs its ellipsis
+ * off the parent row, and a comment has no parent — nothing owns it and the
+ * line above it is no part of it. So the ellipsis takes the comment's own row,
+ * `cm-line` and all. That is not cosmetic; a fold with no row of its own is
+ * `display: none` again, stepped over by the same arrow for the same reason.
+ */
+export class CommentFold extends WidgetType {
+  constructor(
+    /** Where the comment starts, so a click can put the cursor in it. */
+    readonly from: number,
+    /** How many lines are folded, which the row says when it is more than one. */
+    readonly lines: number,
+  ) {
+    super();
+  }
+
+  /**
+   * Two folds are the same where they stand over the same comment. Without
+   * this the editor rebuilds every fold on every keystroke elsewhere in the
+   * note.
+   */
+  eq(other: CommentFold): boolean {
+    return other.from === this.from && other.lines === this.lines;
+  }
+
+  toDOM(view: EditorView): HTMLElement {
+    const row = view.dom.ownerDocument.createElement('div');
+    row.className = 'cm-line kcp-comment-fold';
+
+    const mark = row.ownerDocument.createElement('span');
+    mark.className = 'cm-foldPlaceholder';
+    // A count of one says nothing the row does not already say by standing
+    // there; over several lines it is the only thing that says how much is
+    // folded away under the one row.
+    mark.textContent = this.lines > 1 ? `… ${this.lines} lines` : '…';
+    row.append(mark);
+
+    // Clicking a fold opens it, the way clicking one opens a list — and the
+    // cursor arriving is what `build` already reads to give the comment back.
+    // The selection is set here rather than left to the editor because the
+    // editor has nowhere to put it: the comment's own positions are under a
+    // replacing decoration, which is what `WidgetType`'s default
+    // `ignoreEvent` is for — the row is the fold's business, not the editor's.
+    // On `mousedown` rather than `click`, so no drag-select starts on a row
+    // that has no text to select.
+    row.addEventListener('mousedown', (event) => {
+      event.preventDefault();
+      view.dispatch({ selection: { anchor: this.from } });
+      view.focus();
+    });
+
+    return row;
+  }
+}
 
 /**
  * The runs of lines that are a comment and nothing else.
@@ -68,7 +134,7 @@ const HIDDEN = Decoration.line({ class: 'kcp-comment-line' });
  * being shown rather than one being addressed to anybody, and a note
  * explaining the note format would otherwise lose the lines it is explaining.
  */
-function blocks(state: EditorState, bottom: number) {
+function blocks(state: EditorState) {
   const found: { from: number; to: number; lines: number[] }[] = [];
   let code = false;
   let codeDepth = 0;
@@ -76,10 +142,6 @@ function blocks(state: EditorState, bottom: number) {
 
   for (let number = 1; number <= state.doc.lines; number++) {
     const line = state.doc.line(number);
-    // Past the foot of what is on screen there is nothing left to decorate,
-    // bar the block straddling it, which has to be closed before it is known
-    // to be a block at all.
-    if (line.from > bottom && !open) break;
     const said = unquoted(line.text);
 
     // A code block ends on a fence written as deep as the one that opened it.
@@ -114,11 +176,17 @@ function blocks(state: EditorState, bottom: number) {
   return found;
 }
 
-/** Every comment line on screen that the cursor is not in. */
-export function build(
-  state: EditorState,
-  visible: readonly { from: number; to: number }[],
-): DecorationSet {
+/**
+ * A fold over every comment in the note that the cursor is not in.
+ *
+ * The whole note is read, not the screenful of it on show. A block decoration
+ * may only reach the editor from the state, never from a view plugin, and the
+ * state is not told where the viewport is — so the viewport bound the hiding
+ * carried while it was a line decoration goes with it. What is left is a
+ * regex over each line of the note per keystroke, which is what the bound was
+ * already costing whenever the note was scrolled to its foot.
+ */
+export function build(state: EditorState): DecorationSet {
   // Source mode is the note as it is written, markup and all — the same stand
   // `live.ts` takes on a delimiter. Absent, as in a state built by hand, take
   // it for live preview.
@@ -127,49 +195,51 @@ export function build(
   }
 
   const into: Range<Decoration>[] = [];
-  const bottom = visible.length ? visible[visible.length - 1].to : -1;
 
-  for (const block of blocks(state, bottom)) {
+  for (const block of blocks(state)) {
     // Inside the comment, the comment is what is being edited.
     if (touched(state, block.from, block.to)) continue;
-    // A note is drawn a screenful at a time; the rest of it is not worth
-    // decorating.
-    if (
-      !visible.some((range) => range.from <= block.to && range.to >= block.from)
-    ) {
-      continue;
-    }
-    for (const from of block.lines) into.push(HIDDEN.range(from));
+    // One decoration over the whole run, block and all: a comment written over
+    // several lines is one comment and folds to one row, and `block: true` is
+    // what makes that row a row — the same shape CodeMirror's own
+    // `codeFolding()` gives its placeholder.
+    into.push(
+      Decoration.replace({
+        block: true,
+        widget: new CommentFold(block.from, block.lines.length),
+      }).range(block.from, block.to),
+    );
   }
 
   return Decoration.set(into, true);
 }
 
-/** What the editor is given: the decorations, kept up with what it shows. */
-export class LiveComments implements PluginValue {
-  decorations: DecorationSet;
+/**
+ * What the editor is given: the folds, kept up with the note under them.
+ *
+ * A state field rather than the view plugin the other live extensions are —
+ * CodeMirror refuses a block decoration handed to it by a plugin, since a
+ * plugin is rebuilt from what is on screen and a block changes what "on
+ * screen" means. `codeFolding()` is a state field for the same reason.
+ */
+export const liveComments = StateField.define<DecorationSet>({
+  create: (state) => build(state),
 
-  constructor(view: EditorView) {
-    this.decorations = build(view.state, view.visibleRanges);
-  }
-
-  update(update: ViewUpdate) {
+  update(folds, tr) {
     // The selection among them: a comment comes back when the cursor arrives
     // and goes again when it leaves. And the view the editor is drawing —
     // switching to source mode moves neither the note nor the cursor, and the
     // comments would otherwise stay as live preview left them.
     if (
-      update.docChanged ||
-      update.selectionSet ||
-      update.viewportChanged ||
-      update.state.field(editorLivePreviewField, false) !==
-        update.startState.field(editorLivePreviewField, false)
+      tr.docChanged ||
+      !tr.startState.selection.eq(tr.state.selection) ||
+      tr.startState.field(editorLivePreviewField, false) !==
+        tr.state.field(editorLivePreviewField, false)
     ) {
-      this.decorations = build(update.view.state, update.view.visibleRanges);
+      return build(tr.state);
     }
-  }
-}
+    return folds;
+  },
 
-export const liveComments = ViewPlugin.fromClass(LiveComments, {
-  decorations: (comments) => comments.decorations,
+  provide: (field) => EditorView.decorations.from(field),
 });
