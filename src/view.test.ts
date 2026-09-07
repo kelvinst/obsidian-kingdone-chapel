@@ -217,6 +217,24 @@ describe('a card', () => {
     ]);
   });
 
+  // A version built on a translation writes no words of its own, so what the
+  // card shows was written in the translation — and a link inside it means
+  // what it means there. Rendering it against the version that embedded it
+  // would resolve that link from the wrong folder.
+  it('renders a verse drawn from an embed against the file that wrote it', async () => {
+    world.vault.write(
+      chapterPath('SHEDD', 1, 'GEN', 1),
+      '![[ARA-01-GEN-001#^ara-gen-1-1|flat]] — nota\n^shedd-gen-1-1',
+    );
+    world.plugin.invalidateIndex();
+    MarkdownRenderer.rendered = [];
+    await view.refresh(true);
+    expect(MarkdownRenderer.rendered).toContainEqual({
+      markdown: 'No princípio, criou Deus — nota',
+      path: chapterPath('ARA', 1, 'GEN', 1),
+    });
+  });
+
   it('marks the version being read when it is in the list', async () => {
     world.plugin.settings.showCurrentVersion = true;
     await view.refresh(true);

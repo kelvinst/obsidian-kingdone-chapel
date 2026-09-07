@@ -141,7 +141,13 @@ export class KingdoneChapelView extends ItemView {
 
     const body = card.createDiv({ cls: 'kcp-text' });
     if (item.text) {
-      MarkdownRenderer.render(this.app, item.text, body, item.file.path, this);
+      MarkdownRenderer.render(
+        this.app,
+        item.text,
+        body,
+        item.source.path,
+        this,
+      );
     } else {
       body.setText('—');
     }
@@ -161,18 +167,17 @@ export class KingdoneChapelView extends ItemView {
 
   /**
    * Put a card's verse on the clipboard — the words it shows rather than the
-   * source that produced them, since a version built on a translation writes
-   * its verses as embeds and an embed pasted anywhere is not a verse.
+   * source that produced them. `versionsFor` already followed whatever embeds
+   * a version built on a translation writes its verses as, so the card holds
+   * words to copy and never the markup that produced them.
    *
    * A card with nothing behind it says so instead of claiming a copy, and so
-   * does a copy that fails — reading a file that has since gone away, or a
-   * clipboard the window is not focused enough to write to.
+   * does a copy that fails — a clipboard the window is not focused enough to
+   * write to.
    */
   async copy(item: VersionItem) {
     try {
-      const text = item.text
-        ? await this.plugin.resolveEmbeds(item.text, item.file)
-        : '';
+      const text = item.text;
       if (!text) {
         new Notice(`${item.label} has nothing to copy here.`);
         return;
