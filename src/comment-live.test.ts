@@ -120,6 +120,23 @@ describe('build', () => {
     expect(hidden(below('```', '<!-- prettier-ignore -->', '```'))).toEqual([]);
   });
 
+  it('leaves a comment inside an indented code block alone', () => {
+    // Four spaces is a code block of its own, fences or no fences, and the
+    // reader is handed what is in it as code.
+    expect(hidden(below('    <!-- prettier-ignore -->'))).toEqual([]);
+  });
+
+  it('leaves a comment inside a tab-indented code block alone', () => {
+    expect(hidden(below('\t<!-- prettier-ignore -->'))).toEqual([]);
+  });
+
+  it('takes a comment indented short of a code block off the page', () => {
+    // Three spaces is as far as a comment may be pushed and still be one.
+    expect(hidden(below('   <!-- prettier-ignore -->'))).toEqual([
+      '   <!-- prettier-ignore -->',
+    ]);
+  });
+
   it('leaves a comment inside a fence written inside a callout alone', () => {
     expect(
       hidden(below('> [!note]', '> ```', '> <!-- a -->', '> ```')),

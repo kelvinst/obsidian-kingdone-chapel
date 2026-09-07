@@ -34,8 +34,17 @@ import { CODE_BLOCK, touched, unquoted } from './source';
  * "is this whole line a comment?" can be asked is here, over the source.
  */
 
-/** A line that opens a comment, with nothing of the note's own before it. */
-const OPEN = /^\s*<!--/;
+/**
+ * A line that opens a comment, with nothing of the note's own before it.
+ *
+ * Three spaces of indent at most, which is the bound CommonMark puts on an
+ * HTML block: a fourth makes the line an indented code block, and a comment
+ * written in one is a comment being shown — the reader is handed it as code,
+ * and taking it off the page here would hide from whoever is writing the note
+ * something whoever reads it can see. A tab indents such a block too, which is
+ * the other thing a plain `\s*` would have let through.
+ */
+const OPEN = /^ {0,3}<!--/;
 
 /**
  * What follows the end of a comment on the line that closes it, if anything.
