@@ -521,6 +521,15 @@ export function quoteHeadings(preferred: Lang | ''): string[] {
   ];
 }
 
+/**
+ * The label a verse says its references under, in its aside.
+ *
+ * One word rather than one per language, the way the note kinds are named
+ * once: `Refs` is the short form of the same word in both, and it is written
+ * in the vault's own notes rather than in this plugin's chrome.
+ */
+export const REFS = 'Refs';
+
 /** The heading a chapter keeps its notes under, in each language written here. */
 export const NOTES: Record<Lang, string> = { pt: 'Notas', en: 'Notes' };
 

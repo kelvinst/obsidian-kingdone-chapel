@@ -406,12 +406,17 @@ function line(at: number, lines: string[], text: string): Write {
 }
 
 /** `held`, with the note's link in its aside — or with an aside, where it has none. */
-function marked(held: string, link: string, markers: string[]): string {
+function marked(
+  held: string,
+  link: string,
+  markers: string[],
+  ahead: string[] = [],
+): string {
   const aside = held.match(ASIDE);
   if (!aside) return `${held.trimEnd()} ,,${opened(link, markers[0])},,`;
 
   const [, before, inside, after] = aside;
-  return `${before},,${joined(inside, link, markers)},,${after}`;
+  return `${before},,${joined(inside, link, markers, ahead)},,${after}`;
 }
 
 /** What a marker list reads as when the verse is being marked for the first time. */
@@ -428,10 +433,26 @@ function opened(link: string, marker: string): string {
  * and its refs in whichever order it was written in, and a link added after
  * the last link of the lot would be filed under the wrong one where the notes
  * come first.
+ *
+ * A list the aside keeps none of is opened at the end of what it says, unless
+ * it is one of the lists named by `ahead` — the ones this one is read before.
+ * Refs come before notes where an aside has both, which is how the vault
+ * writes them, so a refs list opened onto an aside already carrying notes is
+ * written in front of them rather than after.
  */
-function joined(inside: string, link: string, markers: string[]): string {
+function joined(
+  inside: string,
+  link: string,
+  markers: string[],
+  ahead: string[] = [],
+): string {
   const listed = markerList(inside, markers);
   if (!listed) {
+    const first = markerList(inside, ahead);
+    if (first) {
+      const [at] = first;
+      return `${inside.slice(0, at)}${opened(link, markers[0])} ${inside.slice(at)}`;
+    }
     // The refs before it close with a full stop, which is what separates the
     // two lists. One left without it is closed here rather than run into.
     const said = inside.trimEnd();
@@ -568,4 +589,89 @@ function gapAt(lines: string[], line: number): string {
 /** A name written into a pattern, with whatever it carries taken literally. */
 function escape(raw: string): string {
   return raw.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
+}
+
+/**
+ * Where the cursor is left: written into the aside and taken out of it again.
+ *
+ * A character no chapter carries, so that the mark is found by what it is
+ * rather than by counting: the aside is assembled out of several pieces, some
+ * of them lines the chapter already had, and only the piece that wrote the `@`
+ * knows where in all of it that ended up.
+ */
+const CURSOR = '\u0000';
+
+/** What a reference is written from: the `@`, with the cursor just past it. */
+const TYPED = `@${CURSOR}`;
+
+/** The refs aside as it goes in: the one edit, and where the typing goes on from. */
+export interface WrittenRefs {
+  write: Write;
+  /** The point the reference is typed from, just past the `@` that opens it. */
+  cursor: At;
+}
+
+/**
+ * The refs aside a verse is given, and where the reference is typed into it, or
+ * null where the chapter carries no such verse.
+ *
+ * The `@` is written along with the label, because a refs aside is opened in
+ * order to write a reference in it and `@` is how one is written: the popup
+ * opens on the first letter typed after it, exactly as it does for an `@` typed
+ * by hand.
+ */
+export function refsWrite(
+  text: string,
+  verse: string,
+  refs: string[],
+  notes: string[],
+): WrittenRefs | null {
+  const lines = text.split('\n');
+  const outside = outsideFences(lines);
+  const at = lines.findIndex(
+    (held, i) => outside[i] && held.trimEnd().endsWith(`^${verse}`),
+  );
+  if (at < 0) return null;
+
+  const held = lines[at].trimEnd();
+  const written = held.slice(0, held.length - verse.length - 1).trimEnd();
+
+  // The same three shapes a marker is written into, read the same way: the
+  // verse written all on the one line, the aside on the lines above the id,
+  // and the verse carrying no aside at all.
+  if (written) {
+    const from = asideFrom(lines, at, written);
+    const said = [...lines.slice(from, at), written].join('\n');
+    return placed(
+      span(from, at, lines, `${marked(said, TYPED, refs, notes)} ^${verse}`),
+    );
+  }
+
+  if (at > 0) {
+    const from = asideFrom(lines, at - 1, lines[at - 1]);
+    const said = lines.slice(from, at).join('\n');
+    if (ASIDE.test(said)) {
+      return placed(
+        span(from, at - 1, lines, marked(said, TYPED, refs, notes)),
+      );
+    }
+  }
+
+  return placed(line(at, lines, `,,${opened(TYPED, refs[0])},,\n${lines[at]}`));
+}
+
+/** A write carrying the cursor mark, as the edit and the point the mark stood at. */
+function placed(write: Write): WrittenRefs {
+  const mark = write.text.indexOf(CURSOR);
+  const text = write.text.replace(CURSOR, '');
+  const before = text.slice(0, mark);
+  const down = before.split('\n').length - 1;
+  const from = before.lastIndexOf('\n') + 1;
+  return {
+    write: { ...write, text },
+    cursor: {
+      line: write.from.line + down,
+      ch: before.length - from + (down === 0 ? write.from.ch : 0),
+    },
+  };
 }

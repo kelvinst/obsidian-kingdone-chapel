@@ -33,6 +33,7 @@ import {
   bookNameAt,
   nameLang,
   noteHeadings,
+  REFS,
   quoteHeadings,
   translationsName,
 } from './books';
@@ -42,6 +43,7 @@ import {
   chapterPrefix,
   noteAnchor,
   noteWrites,
+  refsWrite,
 } from './notes';
 import type { NoteKind } from './notes';
 import { WriteNoteModal } from './note-modal';
@@ -85,13 +87,17 @@ interface Adapter {
 }
 
 /** A chapter a note is being written into, as the command reads it. */
-export interface NoteTarget {
+export interface ChapterPane {
   view: MarkdownView;
   /** What the chapter's verse ids open with: `shedd-psa-1`. */
   prefix: string;
   /** The book as it is named in the note's title. */
   book: string;
   chapter: number;
+}
+
+/** A chapter being written in, and the verses of it the writing is about. */
+export interface NoteTarget extends ChapterPane {
   verses: number[];
 }
 
@@ -304,6 +310,18 @@ export default class KingdoneChapelPlugin extends Plugin {
         const target = view ? this.noteTarget(view) : null;
         if (!target) return false;
         if (!checking) new WriteNoteModal(this.app, this, target).open();
+        return true;
+      },
+    });
+
+    this.addCommand({
+      id: 'write-verse-refs',
+      name: 'Write the refs on this verse',
+      checkCallback: (checking) => {
+        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+        const target = view ? this.chapterPane(view) : null;
+        if (!target) return false;
+        if (!checking) this.writeRefs(target);
         return true;
       },
     });
@@ -942,6 +960,25 @@ export default class KingdoneChapelPlugin extends Plugin {
    * editor: reading mode has the verse but nowhere to put the writing.
    */
   noteTarget(view: MarkdownView): NoteTarget | null {
+    const target = this.chapterPane(view);
+    if (!target) return null;
+
+    const verses = this.noteVerses(view);
+    if (!verses) return null;
+
+    return { ...target, verses };
+  }
+
+  /**
+   * The chapter being written in this pane, or null where the pane is not a
+   * version's chapter being edited.
+   *
+   * The chapter alone, without the verses a note would be about: a command that
+   * has something to say about the line the cursor is on — that no verse
+   * answers for it, that it asked about more verses than it can write on — is a
+   * command that has to be offered on that line in order to say it.
+   */
+  chapterPane(view: MarkdownView): ChapterPane | null {
     const file = view.file;
     const editor = view.editor;
     if (!file || !editor || view.getMode() === 'preview') return null;
@@ -951,16 +988,53 @@ export default class KingdoneChapelPlugin extends Plugin {
     const parsed = parseChapterName(file.basename, source.code);
     if (!parsed) return null;
 
-    const verses = this.noteVerses(view);
-    if (!verses) return null;
-
     return {
       view,
       prefix: chapterPrefix(source.code, parsed.book, parsed.chapter),
       book: bookName(parsed.book, nameLang(this.settings.language)),
       chapter: parsed.chapter,
-      verses,
     };
+  }
+
+  /**
+   * Open the refs aside of the verse the cursor is in, with the `@` a reference
+   * is written from already in it.
+   *
+   * One verse: a refs aside belongs to the verse it is about, and a selection
+   * covering several asked for several asides carrying the one reference, which
+   * is a question the popup cannot be asked from inside the chapter. It is said
+   * rather than silently narrowed to the first.
+   */
+  writeRefs(target: ChapterPane) {
+    // The pane was read as a chapter being written, which is what says there is
+    // an editor to write in.
+    const editor = target.view.editor;
+
+    const verses = this.noteVerses(target.view);
+    if (!verses) {
+      new Notice('This line is no verse of the chapter.');
+      return;
+    }
+    if (verses.length > 1) {
+      new Notice('Refs are written on one verse at a time.');
+      return;
+    }
+
+    const written = refsWrite(
+      editor.getValue(),
+      `${target.prefix}-${verses[0]}`,
+      [REFS],
+      noteHeadings(this.settings.language),
+    );
+    if (!written) {
+      new Notice(`This chapter writes no verse ${verses[0]}.`);
+      return;
+    }
+
+    const { write, cursor } = written;
+    editor.replaceRange(write.text, write.from, write.to);
+    editor.setCursor(cursor);
+    this.startTyping(editor);
   }
 
   /**

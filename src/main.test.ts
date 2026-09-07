@@ -1937,6 +1937,7 @@ describe('onload', () => {
       'open-verse-in-another-version',
       'create-version',
       'write-verse-note',
+      'write-verse-refs',
       'open-sidebar',
       'open-in-ara',
       'open-in-nvi',
@@ -2619,6 +2620,109 @@ describe('writing a note on a verse', () => {
     editor.at(5);
     world.workspace.activeView = view;
     expect(command?.checkCallback?.(true)).toBe(true);
+  });
+});
+
+describe('writing the refs on a verse', () => {
+  const CHAPTER =
+    '# Gênesis 1 - NVI\n\n## [[ARA-01-GEN-001|ARA]]\n\n' +
+    '![[ARA-01-GEN-001#^ara-gen-1-1|flat]]\n^nvi-gen-1-1\n\n' +
+    '![[ARA-01-GEN-001#^ara-gen-1-2|flat]]\n^nvi-gen-1-2\n';
+
+  function editing(text = CHAPTER, path = chapterPath('NVI', 1, 'GEN', 1)) {
+    const view = pane(world.app, {
+      file: world.vault.getAbstractFileByPath(path) as TFile,
+      editor: new FakeEditor(text),
+    });
+    return { view, editor: editorOf(view) };
+  }
+
+  it('opens the aside on the verse the cursor is in', () => {
+    const { view, editor } = editing();
+    editor.at(5);
+    world.plugin.writeRefs(world.plugin.chapterPane(view)!);
+
+    expect(editor.text).toContain(
+      '![[ARA-01-GEN-001#^ara-gen-1-1|flat]]\n' +
+        ',,**Refs**: @.,,\n' +
+        '^nvi-gen-1-1',
+    );
+  });
+
+  it('leaves the cursor on the `@` the reference is typed after', () => {
+    const { view, editor } = editing();
+    editor.at(5);
+    world.plugin.writeRefs(world.plugin.chapterPane(view)!);
+
+    expect(editor.getLine(editor.cursor.line).slice(0, editor.cursor.ch)).toBe(
+      ',,**Refs**: @',
+    );
+  });
+
+  it('writes the refs in front of the notes the verse already carries', () => {
+    const { view, editor } = editing(
+      '# Gênesis 1 - NVI\n\n![[ARA-01-GEN-001#^ara-gen-1-1|flat]]\n' +
+        ',,**Notas**: [[#^nvi-gen-1-n1|n1]].,,\n^nvi-gen-1-1\n',
+    );
+    // The id, which is the line a pane with no cache behind it reads the
+    // verse off, the way the note tests above read it.
+    editor.at(4);
+    world.plugin.writeRefs(world.plugin.chapterPane(view)!);
+
+    expect(editor.text).toContain(
+      ',,**Refs**: @. **Notas**: [[#^nvi-gen-1-n1|n1]].,,',
+    );
+  });
+
+  it('refuses a selection covering more than one verse', () => {
+    const { view, editor } = editing();
+    editor.anchor = { line: 5, ch: 0 };
+    editor.cursor = { line: 8, ch: 0 };
+    editor.selected = true;
+    world.plugin.writeRefs(world.plugin.chapterPane(view)!);
+
+    expect(editor.text).toBe(CHAPTER);
+    expect(notices[notices.length - 1].message).toContain('one verse');
+  });
+
+  it('says so where the cursor is on no verse of the chapter', () => {
+    const { view, editor } = editing();
+    editor.at(0);
+    world.plugin.writeRefs(world.plugin.chapterPane(view)!);
+
+    expect(editor.text).toBe(CHAPTER);
+    expect(notices[notices.length - 1].message).toContain('no verse');
+  });
+
+  it('says so where the chapter writes no id for the verse it named', () => {
+    // A chapter part-written: the verses are numbered, so the line names a
+    // verse, and none of them carries the block id a refs aside hangs off.
+    const { view, editor } = editing(
+      '# Gênesis 1 - NVI\n\n**1** No princípio, criou Deus.\n',
+    );
+    editor.at(2);
+    world.plugin.writeRefs(world.plugin.chapterPane(view)!);
+
+    expect(editor.text).toBe(
+      '# Gênesis 1 - NVI\n\n**1** No princípio, criou Deus.\n',
+    );
+    expect(notices[notices.length - 1].message).toContain('no verse 1');
+  });
+
+  it('offers the command only in a chapter being written', async () => {
+    await world.plugin.onload();
+    const command = world.plugin.commands.find(
+      (c) => c.id === 'write-verse-refs',
+    );
+    expect(command?.checkCallback?.(true)).toBe(false);
+
+    const { view, editor } = editing();
+    editor.at(5);
+    world.workspace.activeView = view;
+    expect(command?.checkCallback?.(true)).toBe(true);
+
+    command?.checkCallback?.(false);
+    expect(editor.text).toContain(',,**Refs**: @.,,');
   });
 });
 
