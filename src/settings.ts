@@ -4,7 +4,6 @@ import {
   PluginSettingTab,
   Setting,
   TextComponent,
-  setTooltip,
 } from 'obsidian';
 import type { App } from 'obsidian';
 
@@ -172,12 +171,9 @@ export class KingdoneChapelSettingTab extends PluginSettingTab {
       // A column has room for a word, and what it holds takes a sentence, so
       // the sentence is behind a mark beside the word.
       const cell = head.createEl('th', { text: column.name });
-      // The app's own tooltip and no other: a `title` beside it would draw a
-      // second one, the same words twice over in the window's own hand. Shown
-      // the moment it is hovered, since it is there to be asked.
       const said = column.hint;
       const hint = cell.createSpan({ text: '?', cls: 'kcp-note-hint' });
-      setTooltip(hint, said, { delay: 0 });
+      tooltip(hint, said);
       // And said again to a reader who clicked it rather than waited over it,
       // which is the only way of asking on a screen with no pointer.
       hint.addEventListener('click', () => new Notice(said));
@@ -409,12 +405,27 @@ function freeLetter(kinds: NoteKind[]): string {
 }
 
 /**
+ * The app's own tooltip, and no other: a `title` beside it would draw a second
+ * one, the same words twice over in the window's own hand. Shown the moment
+ * the element is hovered, since a mark like that is there to be asked.
+ *
+ * Written as the attributes the app reads rather than through `setTooltip`,
+ * which arrived in 1.4.4 and took its delay in 1.4.11 — later than the version
+ * this plugin says it runs on, and calling it there is a settings tab that
+ * stops drawing halfway down.
+ */
+function tooltip(el: HTMLElement, said: string) {
+  el.setAttribute('aria-label', said);
+  el.setAttribute('data-tooltip-delay', '0');
+}
+
+/**
  * A field of a kind, said twice over: the placeholder shows what belongs in it
  * while it is empty, and the tooltip says what its column says, since a row of
  * four boxes reads as four boxes once they are full.
  */
 function field(text: TextComponent, column: Column, example: string) {
-  setTooltip(text.inputEl, column.hint, { delay: 0 });
+  tooltip(text.inputEl, column.hint);
   return text.setPlaceholder(example);
 }
 
