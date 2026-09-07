@@ -3026,6 +3026,28 @@ describe('a note written in a Vim editor', () => {
     expect(typed).toEqual(['i']);
   });
 
+  it('appends where the `@` it wrote ends the line', () => {
+    const asked = vim();
+    const editor = new FakeEditor(
+      '# Gênesis 1 - NVI\n\n![[ARA-01-GEN-001#^ara-gen-1-1|flat]] ,,**Refs**:\n' +
+        '**Notas**: [[#^nvi-gen-1-n1|n1]].,, ^nvi-gen-1-1\n',
+    );
+    editor.cm = { cm: adapterOf() };
+    const view = pane(world.app, {
+      file: world.vault.getAbstractFileByPath(
+        chapterPath('NVI', 1, 'GEN', 1),
+      ) as TFile,
+      editor,
+    });
+    editor.at(3);
+    world.plugin.writeRefs(world.plugin.chapterPane(view)!);
+
+    // Nothing follows the `@`, so normal mode would hold the cursor on it and
+    // `i` would open the typing in front of it.
+    expect(asked.keys).toEqual(['a']);
+    expect(editor.getLine(editor.cursor.line)[editor.cursor.ch]).toBe('@');
+  });
+
   it('asks the adapter for the Vim the app publishes nowhere', () => {
     const keys: string[] = [];
     class Adapter {
