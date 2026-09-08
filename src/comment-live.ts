@@ -62,8 +62,8 @@ const CLOSE = /-->(.*)$/;
  * So the comment is folded rather than hidden, which is what was being asked
  * for all along: the row stays and an ellipsis stands in for what is no longer
  * shown, exactly as Obsidian draws a list item whose children are collapsed.
- * A reader who has ever collapsed a list already knows what the ellipsis means
- * and that clicking it brings the content back, and `.cm-foldPlaceholder` is
+ * A reader who has ever collapsed a list already knows what the fold means and
+ * that clicking it brings the content back, and `.cm-foldPlaceholder` is
  * the class the theme styles, so the fold stays right in whatever theme the
  * vault is wearing rather than carrying a colour picked here.
  *
@@ -99,13 +99,16 @@ export class CommentFold extends WidgetType {
   toDOM(view: EditorView): HTMLElement {
     const mark = view.dom.ownerDocument.createElement('span');
     mark.className = 'cm-foldPlaceholder kcp-comment-fold';
-    // An ellipsis alone says something was folded and not what, and every
-    // fold in a note looks the same as the next. So the fold says what it
-    // stands for. The count comes with it where there is more than one line
-    // under the fold, which is the only thing the ellipsis cannot say by
-    // standing where it stands; a count of one would say nothing more.
-    mark.textContent =
-      this.lines > 1 ? `… ${this.lines}-line comment` : '… comment';
+    // An ellipsis alone says something was folded and not what. So the fold
+    // opens with `%%`, which says "a comment" in the vault's own vocabulary
+    // rather than in English — it is the marker Obsidian gives the other kind
+    // of comment, the one addressed to whoever is writing, and whoever writes
+    // notes here knows it on sight.
+    //
+    // The count comes between the marker and the ellipsis where there is more
+    // than one line under the fold, that being the only thing the fold cannot
+    // say by standing where it stands; a count of one would say nothing more.
+    mark.textContent = `%% ${this.lines > 1 ? `${this.lines} lines` : ''}...`;
     return mark;
   }
 
