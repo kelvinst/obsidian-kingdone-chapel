@@ -109,9 +109,10 @@ const VERSE_HEADING = /^#{1,6}\s/;
  * reference — '1 Cr 16.4' — puts a digit there. That is the whole difference,
  * and a formatter that wraps such a reference leaves its tail opening a line
  * on a number and a dot, so the marker has to ask for the space. A dot ending
- * the line writes a verse with nothing in it, and still opens one.
+ * the line writes no verse either: nothing here writes one with nothing in it,
+ * and a wrap falling a character earlier leaves the same reference behind.
  */
-const VERSE_MARKER = /^\s*(?:\*\*(\d+)\*\*|(\d+)\.(?=\s|$))\s*/;
+const VERSE_MARKER = /^\s*(?:\*\*(\d+)\*\*|(\d+)\.(?=\s))\s*/;
 /** The verse a block id names, in the number it ends on. */
 const VERSE_ID = /-(\d+)$/;
 /**
