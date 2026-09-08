@@ -41,9 +41,13 @@ function foldsIn(
   return out;
 }
 
-/** The lines `set` draws small, by their text. */
-function small(doc: string, cursor = 0): string[] {
-  const state = EditorState.create({ doc, selection: { anchor: cursor } });
+/** The lines the note has drawn small, by their text. */
+function small(doc: string, cursor = 0, live = true): string[] {
+  const state = EditorState.create({
+    doc,
+    selection: { anchor: cursor },
+    extensions: [editorLivePreviewField.init(() => live)],
+  });
   const out: string[] = [];
   build(state).between(0, doc.length, (from, to, value) => {
     if (value.spec.class === 'kcp-small-line')
@@ -236,14 +240,13 @@ describe('small', () => {
     expect(small(below('Verso. <!-- conferir -->'))).toEqual([]);
   });
 
-  it('leaves a comment standing in source mode at its own size', () => {
-    const doc = below('<!-- a -->');
-    const state = EditorState.create({
-      doc,
-      selection: { anchor: 0 },
-      extensions: [editorLivePreviewField.init(() => false)],
-    });
-    expect(build(state).size).toBe(0);
+  it('draws them small in source mode too', () => {
+    // `live.ts` shrinks an aside's lines in both views and takes only its
+    // delimiters off the page in one. A comment is an aside in both views as
+    // well, and a note that reflowed around its comments on every toggle
+    // would be a note moving under whoever toggled.
+    const doc = below('<!-- prettier-ignore -->');
+    expect(small(doc, 0, false)).toEqual(['<!-- prettier-ignore -->']);
   });
 });
 
