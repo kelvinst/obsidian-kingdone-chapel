@@ -155,7 +155,7 @@ function blocks(state: EditorState): Run[] {
   const found: Run[] = [];
   let code = false;
   let codeDepth = 0;
-  let open: { from: number; lines: number[] } | null = null;
+  let open: { from: number; lines: number[]; quoted: boolean } | null = null;
 
   for (let number = 1; number <= state.doc.lines; number++) {
     const line = state.doc.line(number);
@@ -176,15 +176,24 @@ function blocks(state: EditorState): Run[] {
 
     if (!open) {
       if (!OPEN.test(said)) continue;
-      open = { from: line.from, lines: [] };
+      open = { from: line.from, lines: [], quoted: false };
     }
     open.lines.push(line.from);
+    if (said !== line.text) open.quoted = true;
 
     const closed = CLOSE.exec(said);
     if (!closed) continue;
     // A comment whose closing line goes on to say something of the note's own
     // is a comment the note is holding, not a run of lines to take off it.
-    if (closed[1].trim() === '') {
+    //
+    // And a comment written inside a quote is left standing for now. The fold
+    // is a block, and a block put in the middle of a callout is not part of
+    // the quote: the callout it was written in would be broken in two around
+    // a row that is no part of it. Reaching it wants the shape okc-51a is
+    // taking for a comment written inside a line — a replacement over the
+    // comment alone, leaving the `>` markers to hold the callout together —
+    // which is okc-1lz.
+    if (closed[1].trim() === '' && !open.quoted) {
       found.push({ from: open.from, to: line.to, lines: open.lines });
     }
     open = null;

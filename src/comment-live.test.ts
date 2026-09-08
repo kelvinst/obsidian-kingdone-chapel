@@ -147,10 +147,19 @@ describe('build', () => {
     );
   });
 
-  it('takes a quoted comment off the page, markers and all', () => {
-    expect(hidden(below('> [!note]', '> <!-- prettier-ignore -->'))).toEqual([
-      '> <!-- prettier-ignore -->',
-    ]);
+  it('leaves a comment written inside a callout standing', () => {
+    // The fold is a block, and a block in the middle of a callout is no part
+    // of the quote: the callout would be broken in two around a row that is
+    // none of its own. Reaching it wants okc-1lz's shape instead.
+    expect(hidden(below('> [!note]', '> <!-- prettier-ignore -->'))).toEqual(
+      [],
+    );
+  });
+
+  it('leaves a comment only some of whose lines are quoted standing', () => {
+    // One line of it inside a quote is enough to put a block where a block
+    // cannot go.
+    expect(hidden(below('<!--', '> por quê', '-->'))).toEqual([]);
   });
 });
 
