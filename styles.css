@@ -495,7 +495,7 @@
    the inset Obsidian gives a fold placeholder of its own. That inset is there
    because such a fold sits at the end of the line it was folded from, with
    text before it; this one stands where the comment stood, at the head of its
-   own line, and a few pixels of padding and border there leave the `%%`
+   own line, and a few pixels of padding and border there leave the `<!--`
    hanging off the margin every other line is flush to.
 
    Written through `.markdown-source-view.mod-cm6` for the weight it carries,
