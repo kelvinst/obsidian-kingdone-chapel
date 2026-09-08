@@ -476,8 +476,11 @@ function nameTag(raw: string): string {
 }
 
 /**
- * Block id of the quote a passage link points at, in the shape the verse
- * anchors already use: `nvi-mat-26-47-56`. It is built from the passage alone,
+ * Block id of the quote a passage link points at: `quote-nvi-mat-26-47-56`.
+ * The passage is written in the shape the verse anchors use, under a prefix no
+ * anchor carries — a quote of João 14.12-17 would otherwise be
+ * `shedd-jhn-14-12-17`, which reads as verse 17 to everything that asks a block
+ * id which verse it names. It is built from the passage alone,
  * so the same passage referenced twice in a note finds the quote already
  * there instead of writing a second one — whichever name the book was written
  * under either time.
@@ -500,5 +503,5 @@ export function passageId(
   verses: number[],
 ): string {
   const named = slug(version);
-  return `${named || nameTag(version)}-${slug(code)}-${chapter}-${slug(verseSpec(verses))}`;
+  return `quote-${named || nameTag(version)}-${slug(code)}-${chapter}-${slug(verseSpec(verses))}`;
 }

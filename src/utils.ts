@@ -105,6 +105,8 @@ const VERSE_HEADING = /^#{1,6}\s/;
 const VERSE_MARKER = /^\s*(?:\*\*(\d+)\*\*|(\d+)\.)\s*/;
 /** The verse a block id names, in the number it ends on. */
 const VERSE_ID = /-(\d+)$/;
+/** What the id of a quote opens with, and no verse anchor ever carries. */
+const QUOTE_ID = /^quote-/;
 
 /**
  * Read a verse line, taking its number from the block id that closes it.
@@ -123,8 +125,15 @@ const VERSE_ID = /-(\d+)$/;
  * Only an id ending in a number names a verse. One ending anywhere else
  * belongs to something that is not a verse, and one left mid-edit, ending on
  * the dash itself, names nothing at all.
+ *
+ * A quote's id ends in a number too — `quote-shedd-jhn-14-12-17` closes on the
+ * last verse of the passage — and nothing in its shape tells it apart from an
+ * anchor, a verse being `shedd-psa-4-3` all the same. The prefix it opens with
+ * is what says which it is, and this is the one place that has to read it: every
+ * caller wants the same answer, that a quote is no verse of the chapter.
  */
 export function verseInId(id: string): number | null {
+  if (QUOTE_ID.test(id)) return null;
   const named = VERSE_ID.exec(id);
   return named ? Number(named[1]) : null;
 }
