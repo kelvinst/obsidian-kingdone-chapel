@@ -437,17 +437,24 @@ export default class KingdoneChapelPlugin extends Plugin {
     // next refresh, but a command is registered once and then stands, so one
     // registered over half an answer keeps it: a version the cache had not got
     // to yet would have no command until the list was reloaded by hand.
-    const settled = this.app.metadataCache.on('resolved', () => {
+    const settle = () => {
       this.app.metadataCache.offref(settled);
       moved();
       this.registerVersionCommands();
-      // The one pass over the vault this session makes. Here rather than in
-      // `onload` for the same reason the commands are: which folders are
-      // versions is read from a cache that is still filling on a cold start,
-      // and a sweep begun over half an answer would read half a vault.
+      // The one pass over the vault this session makes. Waited for rather
+      // than made in `onload` for the same reason the commands are: which
+      // folders are versions is read from a cache that is still filling on a
+      // cold start, and a sweep begun over half an answer reads half a vault.
       this.startSweep();
-    });
+    };
+    const settled = this.app.metadataCache.on('resolved', settle);
     this.registerEvent(settled);
+    // `resolved` is fired as files are read, so an app that finished reading
+    // them before this plugin was loaded — one turned on by hand, or reloaded
+    // over a running app — is never going to say so. The layout being ready
+    // already is what says the load is that one: on a cold start it is not,
+    // and the event above arrives in its own time.
+    if (this.app.workspace.layoutReady) settle();
     this.register(() => this.sweep?.cancel());
     this.register(() => this.cancelQueuedRefresh());
     this.register(() => this.cancelQueuedTyping());
