@@ -172,6 +172,26 @@ describe('parseVerseLine', () => {
     expect(parseVerseLine('')).toBeNull();
   });
 
+  it('reads a wrapped reference at the start of a line as no verse', () => {
+    // The formatter broke a prose reference — '1 Cr 16.4' — across lines, so
+    // what is really the tail of a sentence opens a line with a number and a
+    // dot. A verse marker puts a space between the dot and the verse; a
+    // reference puts a digit there.
+    expect(
+      parseVerseLine('16.4)),((Shedd-13-1CH-016#^shedd-1ch-16-5|5));'),
+    ).toBeNull();
+    expect(
+      parseVerseLine('15.20)),((Shedd-13-1CH-015#^shedd-1ch-15-21|21));'),
+    ).toBeNull();
+  });
+
+  it('reads a verse whose text opens on a digit', () => {
+    expect(parseVerseLine('16. 1500 homens')).toEqual({
+      verse: 16,
+      text: '1500 homens',
+    });
+  });
+
   it('leaves the text alone apart from the marker and the id', () => {
     expect(
       parseVerseLine('1. **Deus** disse: «faça-se» ^nvi-gen-1-1'),
