@@ -67,11 +67,14 @@ const CLOSE = /-->(.*)$/;
  * the class the theme styles, so the fold stays right in whatever theme the
  * vault is wearing rather than carrying a colour picked here.
  *
- * The one place it must differ from a list's fold: a list hangs its ellipsis
- * off the parent row, and a comment has no parent — nothing owns it and the
- * line above it is no part of it. So the ellipsis takes the comment's own row,
- * `cm-line` and all. That is not cosmetic; a fold with no row of its own is
- * `display: none` again, stepped over by the same arrow for the same reason.
+ * What keeps the row a row is that the comment is replaced the way Obsidian
+ * replaces the `**` around bold text: an ordinary replacement over the text,
+ * leaving the line it was written on to the editor. A block widget was tried
+ * instead and drew its own row, `cm-line` and all — which worked, and meant
+ * impersonating a line, and meant a quoted comment's row was no part of the
+ * callout it was written in. A replacement over the text alone needs none of
+ * that: the line is the editor's, so it has the box the down arrow lands on
+ * and the markers a callout is held together by, and both for free.
  */
 export class CommentFold extends WidgetType {
   constructor(
@@ -94,48 +97,36 @@ export class CommentFold extends WidgetType {
   }
 
   toDOM(view: EditorView): HTMLElement {
-    const row = view.dom.ownerDocument.createElement('div');
-    row.className = 'cm-line kcp-comment-fold';
-
-    const mark = row.ownerDocument.createElement('span');
-    mark.className = 'cm-foldPlaceholder';
+    const mark = view.dom.ownerDocument.createElement('span');
+    mark.className = 'cm-foldPlaceholder kcp-comment-fold';
     // A count of one says nothing the row does not already say by standing
     // there; over several lines it is the only thing that says how much is
     // folded away under the one row.
     mark.textContent = this.lines > 1 ? `… ${this.lines} lines` : '…';
-    row.append(mark);
+    return mark;
+  }
 
-    // Clicking a fold opens it, the way clicking one opens a list — and the
-    // cursor arriving is what `build` already reads to give the comment back.
-    // The selection is set here rather than left to the editor because the
-    // editor has nowhere to put it: the comment's own positions are under a
-    // replacing decoration, which is what `WidgetType`'s default
-    // `ignoreEvent` is for — the row is the fold's business, not the editor's.
-    // On `mousedown` rather than `click`, so no drag-select starts on a row
-    // that has no text to select. Where the comment is is asked of the editor
-    // at the moment of the click rather than held here, because a row whose
-    // fold is `eq` to the one before it is a row the editor keeps and moves
-    // rather than draws again.
-    row.addEventListener('mousedown', (event) => {
-      // The primary button alone, and unmodified. A right press is on its way
-      // to a context menu, which is opened from `mousedown` on some platforms
-      // and would be swallowed by the `preventDefault` below, and a comment
-      // that unfolds under the pointer before the menu is even up is a comment
-      // answering a question nobody asked. A macOS ctrl-click is that same
-      // press wearing the primary button, so it goes the same way.
-      if (event.button !== 0 || event.ctrlKey) return;
-      event.preventDefault();
-      view.dispatch({ selection: { anchor: view.posAtDOM(row) } });
-      view.focus();
-    });
-
-    return row;
+  /**
+   * A click is the editor's business, which is all it has to be: the editor
+   * puts the cursor where the fold was clicked, and the cursor arriving is
+   * what `build` reads to give the comment back. Nothing here has to know
+   * where it stands.
+   */
+  ignoreEvent(): boolean {
+    return false;
   }
 }
 
 /** A run of lines that is a comment and nothing else, by where it lies. */
 interface Run {
+  /** Where the run's first line begins, quote markers and all. */
   from: number;
+  /**
+   * Where the comment's own text begins, past those markers. A quoted comment
+   * is taken off from the `<!--` on and the `>` before it is left standing,
+   * because the `>` is what holds the callout together.
+   */
+  opens: number;
   to: number;
   lines: number[];
 }
@@ -156,7 +147,12 @@ function blocks(state: EditorState): Run[] {
   const found: Run[] = [];
   let code = false;
   let codeDepth = 0;
-  let open: { from: number; lines: number[]; quoted: boolean } | null = null;
+  let open: {
+    from: number;
+    opens: number;
+    lines: number[];
+    quoted: boolean;
+  } | null = null;
 
   for (let number = 1; number <= state.doc.lines; number++) {
     const line = state.doc.line(number);
@@ -177,7 +173,12 @@ function blocks(state: EditorState): Run[] {
 
     if (!open) {
       if (!OPEN.test(said)) continue;
-      open = { from: line.from, lines: [], quoted: false };
+      open = {
+        from: line.from,
+        opens: line.to - said.length,
+        lines: [],
+        quoted: false,
+      };
     }
     open.lines.push(line.from);
     if (said !== line.text) open.quoted = true;
@@ -187,15 +188,20 @@ function blocks(state: EditorState): Run[] {
     // A comment whose closing line goes on to say something of the note's own
     // is a comment the note is holding, not a run of lines to take off it.
     //
-    // And a comment written inside a quote is left standing for now. The fold
-    // is a block, and a block put in the middle of a callout is not part of
-    // the quote: the callout it was written in would be broken in two around
-    // a row that is no part of it. Reaching it wants the shape okc-51a is
-    // taking for a comment written inside a line — a replacement over the
-    // comment alone, leaving the `>` markers to hold the callout together —
-    // which is okc-1lz.
-    if (closed[1].trim() === '' && !open.quoted) {
-      found.push({ from: open.from, to: line.to, lines: open.lines });
+    // And a comment written over several quoted lines is left standing. One
+    // replacement over the run swallows the line breaks inside it, and with
+    // them the `>` opening every line but the first — the callout would lose
+    // the lines it is held together by. Quoted and on one line there is no
+    // break to swallow, so the markers stay where they were written. Taking
+    // the several-line case off wants a replacement per line, which is
+    // okc-1lz.
+    if (closed[1].trim() === '' && !(open.quoted && open.lines.length > 1)) {
+      found.push({
+        from: open.from,
+        opens: open.opens,
+        to: line.to,
+        lines: open.lines,
+      });
     }
     open = null;
   }
@@ -223,15 +229,14 @@ function drawn(state: EditorState, runs: readonly Run[]): DecorationSet {
   for (const block of runs) {
     // Inside the comment, the comment is what is being edited.
     if (touched(state, block.from, block.to)) continue;
-    // One decoration over the whole run, block and all: a comment written over
-    // several lines is one comment and folds to one row, and `block: true` is
-    // what makes that row a row — the same shape CodeMirror's own
-    // `codeFolding()` gives its placeholder.
+    // One replacement over the whole run: a comment written over several lines
+    // is one comment and folds to one ellipsis. Not a block one — the line the
+    // comment was written on is the editor's own, and stays a row of its own
+    // for the cursor to reach without anything here drawing it.
     into.push(
       Decoration.replace({
-        block: true,
         widget: new CommentFold(block.lines.length),
-      }).range(block.from, block.to),
+      }).range(block.opens, block.to),
     );
   }
 
@@ -241,11 +246,12 @@ function drawn(state: EditorState, runs: readonly Run[]): DecorationSet {
 /**
  * A fold over every comment in the note that the cursor is not in.
  *
- * The whole note is read, not the screenful of it on show. A block decoration
- * may only reach the editor from the state, never from a view plugin, and the
- * state is not told where the viewport is — so the viewport bound the hiding
- * carried while it was a line decoration goes with it, and what is left to
- * bound is how often the reading is done rather than how much of it.
+ * The whole note is read, not the screenful of it on show. A replacement
+ * reaching across a line break may only come from the state, never from a view
+ * plugin, and the state is not told where the viewport is — so the viewport
+ * bound the hiding carried while it was a line decoration goes with it, and
+ * what is left to bound is how often the reading is done rather than how much
+ * of it.
  */
 export function build(state: EditorState): DecorationSet {
   return drawn(state, read(state));
@@ -261,9 +267,11 @@ interface Folds {
  * What the editor is given: the folds, kept up with the note under them.
  *
  * A state field rather than the view plugin the other live extensions are —
- * CodeMirror refuses a block decoration handed to it by a plugin, since a
- * plugin is rebuilt from what is on screen and a block changes what "on
- * screen" means. `codeFolding()` is a state field for the same reason.
+ * a comment written over several lines is replaced across the line breaks
+ * between them, and CodeMirror refuses a replacement like that from a plugin,
+ * since a plugin is rebuilt from what is on screen and a replaced line break
+ * changes what "on screen" means. `codeFolding()` is a state field for the
+ * same reason.
  *
  * The runs are kept beside the folds because reading them costs a regex over
  * every line of the note and only the note can change them. A cursor moved is

@@ -147,19 +147,35 @@ describe('build', () => {
     );
   });
 
-  it('leaves a comment written inside a callout standing', () => {
-    // The fold is a block, and a block in the middle of a callout is no part
-    // of the quote: the callout would be broken in two around a row that is
-    // none of its own. Reaching it wants okc-1lz's shape instead.
-    expect(hidden(below('> [!note]', '> <!-- prettier-ignore -->'))).toEqual(
-      [],
-    );
+  it('takes a quoted comment off the page', () => {
+    expect(hidden(below('> [!note]', '> <!-- prettier-ignore -->'))).toEqual([
+      '> <!-- prettier-ignore -->',
+    ]);
   });
 
-  it('leaves a comment only some of whose lines are quoted standing', () => {
-    // One line of it inside a quote is enough to put a block where a block
-    // cannot go.
-    expect(hidden(below('<!--', '> por quê', '-->'))).toEqual([]);
+  it('leaves the markers standing on the line it takes it off', () => {
+    // The `>` is what holds the callout together: replace it along with the
+    // comment and the callout is broken in two around the row.
+    const doc = below('> [!note]', '> <!-- prettier-ignore -->');
+    const state = EditorState.create({ doc, selection: { anchor: 0 } });
+    const at: number[] = [];
+    build(state).between(0, doc.length, (from) => {
+      at.push(from);
+    });
+    expect(at).toEqual([doc.indexOf('<!-- prettier-ignore -->')]);
+  });
+
+  it('leaves a comment written over several quoted lines standing', () => {
+    // Replacing across the line breaks would swallow the markers of every
+    // line but the first, which is okc-1lz.
+    expect(hidden(below('> <!--', '> por quê', '> -->'))).toEqual([]);
+  });
+
+  it('gives a quoted comment back when the cursor is on its markers', () => {
+    // The comment is taken off from the `<!--` on, but it is the whole line
+    // the cursor is tested against — a cursor on the `>` is a cursor there.
+    const doc = below('> [!note]', '> <!-- a -->');
+    expect(hidden(doc, doc.lastIndexOf('>'))).toEqual([]);
   });
 });
 
@@ -205,25 +221,34 @@ describe('the fold', () => {
   });
 
   it('draws an ellipsis where the comment was', () => {
-    expect(
-      drawn(below('<!-- prettier-ignore -->')).querySelector(
-        '.cm-foldPlaceholder',
-      )?.textContent,
-    ).toBe('…');
+    expect(drawn(below('<!-- prettier-ignore -->')).textContent).toBe('…');
   });
 
   it("wears the editor's own fold class, so the theme draws it", () => {
     // Obsidian already styles what it collapses; a colour picked here would
     // be one more thing to keep right in every theme.
     const el = drawn(below('<!-- a -->'));
-    expect(el.querySelector('.cm-foldPlaceholder')).not.toBeNull();
+    expect(el.classList.contains('cm-foldPlaceholder')).toBe(true);
   });
 
-  it('stands as a line of its own, not as something hung off one', () => {
-    // A list's ellipsis hangs off its parent row; a comment has no parent, and
-    // an ellipsis with no row of its own leaves the down arrow nothing to
-    // land on — which is the whole complaint.
-    expect(drawn(below('<!-- a -->')).classList.contains('cm-line')).toBe(true);
+  it('leaves the row to the editor rather than drawing one', () => {
+    // The comment is replaced the way `**` is: the line under it is the
+    // editor's own, so it has the box the down arrow needs without this
+    // having to impersonate one.
+    const doc = below('<!-- a -->');
+    const state = EditorState.create({ doc, selection: { anchor: 0 } });
+    const specs: unknown[] = [];
+    build(state).between(0, doc.length, (from, to, value) => {
+      specs.push(value.spec.block);
+    });
+    expect(specs).toEqual([undefined]);
+    expect(drawn(below('<!-- a -->')).tagName).toBe('SPAN');
+  });
+
+  it('hands its clicks back to the editor', () => {
+    // Which is all a click has to do: the editor puts the cursor where it was
+    // clicked, and the cursor arriving is what gives the comment back.
+    expect(new CommentFold(1).ignoreEvent()).toBe(false);
   });
 
   it('says how much is folded when it is more than a line', () => {
@@ -235,98 +260,6 @@ describe('the fold', () => {
   it('says no count for a comment written on one line', () => {
     // The row itself says where it is; a count of one says nothing more.
     expect(drawn(below('<!-- a -->')).textContent).toBe('…');
-  });
-
-  it('puts the cursor into the comment when it is clicked', () => {
-    // Clicking a fold opens it, the way clicking one opens a list — and the
-    // cursor arriving is what `build` already reads to give the comment back.
-    const doc = below('<!-- a -->');
-    const at = doc.indexOf('<!--');
-    const state = EditorState.create({ doc, selection: { anchor: 0 } });
-    const set = build(state);
-    let widget: CommentFold | null = null;
-    set.between(0, doc.length, (from, to, value) => {
-      widget = value.spec.widget as CommentFold;
-    });
-    const sent: unknown[] = [];
-    let focused = false;
-    const el = widget!.toDOM({
-      dom: document.body,
-      dispatch: (spec: unknown) => sent.push(spec),
-      posAtDOM: () => at,
-      focus: () => {
-        focused = true;
-      },
-    } as never);
-    el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-    expect(sent).toEqual([{ selection: { anchor: at } }]);
-    expect(focused).toBe(true);
-  });
-
-  /** What the fold does with a press: whether it answered it, and how. */
-  function pressed(init: MouseEventInit): {
-    sent: unknown[];
-    prevented: boolean;
-  } {
-    const doc = below('<!-- a -->');
-    const state = EditorState.create({ doc, selection: { anchor: 0 } });
-    const set = build(state);
-    let widget: CommentFold | null = null;
-    set.between(0, doc.length, (from, to, value) => {
-      widget = value.spec.widget as CommentFold;
-    });
-    const sent: unknown[] = [];
-    const el = widget!.toDOM({
-      dom: document.body,
-      dispatch: (spec: unknown) => sent.push(spec),
-      posAtDOM: () => 0,
-      focus: () => {},
-    } as never);
-    const press = new MouseEvent('mousedown', {
-      bubbles: true,
-      cancelable: true,
-      ...init,
-    });
-    el.dispatchEvent(press);
-    return { sent, prevented: press.defaultPrevented };
-  }
-
-  it('is opened by the primary button alone', () => {
-    // A right press is on its way to a context menu, not to the comment.
-    expect(pressed({ button: 2 })).toEqual({ sent: [], prevented: false });
-  });
-
-  it('is not opened by a ctrl-click', () => {
-    // Which is how a context menu is asked for on macOS, wearing the primary
-    // button as it goes.
-    expect(pressed({ button: 0, ctrlKey: true })).toEqual({
-      sent: [],
-      prevented: false,
-    });
-  });
-
-  it('asks the editor where it is rather than remembering', () => {
-    // A row the editor keeps and moves is a row whose remembered position
-    // would be the one it was drawn at, not the one it now stands at.
-    const doc = below('<!-- a -->');
-    const state = EditorState.create({ doc, selection: { anchor: 0 } });
-    const set = build(state);
-    let widget: CommentFold | null = null;
-    set.between(0, doc.length, (from, to, value) => {
-      widget = value.spec.widget as CommentFold;
-    });
-    let asked: unknown = null;
-    const el = widget!.toDOM({
-      dom: document.body,
-      dispatch: () => {},
-      posAtDOM: (node: unknown) => {
-        asked = node;
-        return 0;
-      },
-      focus: () => {},
-    } as never);
-    el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-    expect(asked).toBe(el);
   });
 
   it('is the same fold as another drawing the same row', () => {
