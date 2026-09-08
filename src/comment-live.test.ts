@@ -287,8 +287,10 @@ describe('the fold', () => {
     ]);
   });
 
-  it('draws an ellipsis where the comment was', () => {
-    expect(drawn(below('<!-- prettier-ignore -->')).textContent).toBe('…');
+  it('says what it stands for, where the comment was', () => {
+    expect(drawn(below('<!-- prettier-ignore -->')).textContent).toBe(
+      '… comment',
+    );
   });
 
   it("wears the editor's own fold class, so the theme draws it", () => {
@@ -319,14 +321,15 @@ describe('the fold', () => {
   });
 
   it('says how much is folded when it is more than a line', () => {
-    expect(drawn(below('<!--', 'por quê', '-->')).textContent).toContain(
-      '3 lines',
+    expect(drawn(below('<!--', 'por quê', '-->')).textContent).toBe(
+      '… 3-line comment',
     );
   });
 
-  it('says no count for a comment written on one line', () => {
-    // The row itself says where it is; a count of one says nothing more.
-    expect(drawn(below('<!-- a -->')).textContent).toBe('…');
+  it('counts no lines for a comment written on one', () => {
+    // The fold stands on the line it stands for; a count of one says nothing
+    // that the ellipsis sitting there does not already say.
+    expect(drawn(below('<!-- a -->')).textContent).toBe('… comment');
   });
 
   it('is the same fold as another drawing the same row', () => {

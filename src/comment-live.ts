@@ -78,7 +78,7 @@ const CLOSE = /-->(.*)$/;
  */
 export class CommentFold extends WidgetType {
   constructor(
-    /** How many lines are folded, which the row says when it is more than one. */
+    /** How many lines are folded, which the fold says when it is more than one. */
     readonly lines: number,
   ) {
     super();
@@ -99,10 +99,13 @@ export class CommentFold extends WidgetType {
   toDOM(view: EditorView): HTMLElement {
     const mark = view.dom.ownerDocument.createElement('span');
     mark.className = 'cm-foldPlaceholder kcp-comment-fold';
-    // A count of one says nothing the row does not already say by standing
-    // there; over several lines it is the only thing that says how much is
-    // folded away under the one row.
-    mark.textContent = this.lines > 1 ? `… ${this.lines} lines` : '…';
+    // An ellipsis alone says something was folded and not what, and every
+    // fold in a note looks the same as the next. So the fold says what it
+    // stands for. The count comes with it where there is more than one line
+    // under the fold, which is the only thing the ellipsis cannot say by
+    // standing where it stands; a count of one would say nothing more.
+    mark.textContent =
+      this.lines > 1 ? `… ${this.lines}-line comment` : '… comment';
     return mark;
   }
 
