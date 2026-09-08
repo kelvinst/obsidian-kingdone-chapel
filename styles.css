@@ -378,7 +378,12 @@
    span cannot shrink the line it sits in — the height of a line is struck from
    the size of the line — so small text over three lines would otherwise be
    spaced as though it were not small. The run inside then inherits rather than
-   shrinking twice. */
+   shrinking twice.
+
+   `comment-live.ts` puts this on the lines of a comment too. A comment is an
+   aside by any reading — something written beside the note rather than in it —
+   and one small serves both, so a change of mind about the size is a change in
+   one place. */
 .cm-line.kcp-small-line {
   font-size: 0.75em;
 }
@@ -483,8 +488,9 @@
    whatever theme the vault is wearing. Nothing here picks a colour, and
    nothing here draws a row either: the comment is replaced the way the `**`
    around bold text is, so the line under the ellipsis is the editor's own and
-   comes with the editor's own metrics. What is left is to say the ellipsis is
-   asking to be clicked. */
+   comes with the editor's own metrics. The size those lines are drawn at is
+   `.kcp-small-line` above, an aside's size, which is what a comment is. What
+   is left is to say the ellipsis is asking to be clicked. */
 
 .kcp-comment-fold {
   cursor: pointer;

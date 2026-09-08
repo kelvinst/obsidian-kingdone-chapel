@@ -117,6 +117,22 @@ export class CommentFold extends WidgetType {
   }
 }
 
+/**
+ * The size a comment's lines are drawn at: an aside's, which is what a comment
+ * is — something written beside the note rather than in it.
+ *
+ * Taken on the line rather than on the ellipsis, because the height of a line
+ * is struck from the size of the line and a span cannot shrink the one it sits
+ * in. `live.ts` shrinks the lines of a `,,so,,` aside for the same reason and
+ * with the same class, so the plugin has one small rather than two.
+ *
+ * And taken whether or not the comment is folded. Only the taking off the page
+ * answers to the cursor: a line that changed height as the cursor arrived
+ * would move the note under whoever came to read it, and the comment is an
+ * aside while it is being written as much as after.
+ */
+const SMALL = Decoration.line({ class: 'kcp-small-line' });
+
 /** A run of lines that is a comment and nothing else, by where it lies. */
 interface Run {
   /** Where the run's first line begins, quote markers and all. */
@@ -222,11 +238,15 @@ function read(state: EditorState): Run[] {
     : [];
 }
 
-/** A fold over each of `runs` that the cursor is not in. */
+/**
+ * What `runs` are drawn by: the size on every line of them, and a fold over
+ * each the cursor is not in.
+ */
 function drawn(state: EditorState, runs: readonly Run[]): DecorationSet {
   const into: Range<Decoration>[] = [];
 
   for (const block of runs) {
+    for (const from of block.lines) into.push(SMALL.range(from));
     // Inside the comment, the comment is what is being edited.
     if (touched(state, block.from, block.to)) continue;
     // One replacement over the whole run: a comment written over several lines

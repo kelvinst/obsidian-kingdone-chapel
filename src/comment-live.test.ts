@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
+import type { DecorationSet } from '@codemirror/view';
 import { editorLivePreviewField } from 'obsidian';
 
 import { CommentFold, build, liveComments } from './comment-live';
@@ -14,12 +15,39 @@ import { CommentFold, build, liveComments } from './comment-live';
  */
 function hidden(doc: string, cursor = 0): string[] {
   const state = EditorState.create({ doc, selection: { anchor: cursor } });
-  const set = build(state);
   const out: string[] = [];
-  set.between(0, doc.length, (from, to) => {
-    const first = state.doc.lineAt(from).number;
-    const last = state.doc.lineAt(to).number;
+  for (const fold of foldsIn(build(state), doc.length)) {
+    const first = state.doc.lineAt(fold.from).number;
+    const last = state.doc.lineAt(fold.to).number;
     for (let n = first; n <= last; n++) out.push(state.doc.line(n).text);
+  }
+  return out;
+}
+
+/**
+ * The folds in `set`, leaving aside the size its lines are given.
+ *
+ * A comment's lines are drawn small whether the comment is folded or not, so
+ * what a set holds and what it takes off the page are two different questions.
+ */
+function foldsIn(
+  set: DecorationSet,
+  end: number,
+): { from: number; to: number }[] {
+  const out: { from: number; to: number }[] = [];
+  set.between(0, end, (from, to, value) => {
+    if (value.spec.widget instanceof CommentFold) out.push({ from, to });
+  });
+  return out;
+}
+
+/** The lines `set` draws small, by their text. */
+function small(doc: string, cursor = 0): string[] {
+  const state = EditorState.create({ doc, selection: { anchor: cursor } });
+  const out: string[] = [];
+  build(state).between(0, doc.length, (from, to, value) => {
+    if (value.spec.class === 'kcp-small-line')
+      out.push(state.doc.lineAt(from).text);
   });
   return out;
 }
@@ -90,7 +118,7 @@ describe('build', () => {
       doc,
       selection: { anchor: doc.length - 4, head: doc.length },
     });
-    expect(build(state).size).toBe(0);
+    expect(foldsIn(build(state), doc.length)).toEqual([]);
   });
 
   it('takes a comment written over several lines off whole', () => {
@@ -158,11 +186,9 @@ describe('build', () => {
     // comment and the callout is broken in two around the row.
     const doc = below('> [!note]', '> <!-- prettier-ignore -->');
     const state = EditorState.create({ doc, selection: { anchor: 0 } });
-    const at: number[] = [];
-    build(state).between(0, doc.length, (from) => {
-      at.push(from);
-    });
-    expect(at).toEqual([doc.indexOf('<!-- prettier-ignore -->')]);
+    expect(foldsIn(build(state), doc.length).map((fold) => fold.from)).toEqual([
+      doc.indexOf('<!-- prettier-ignore -->'),
+    ]);
   });
 
   it('leaves a comment written over several quoted lines standing', () => {
@@ -179,14 +205,55 @@ describe('build', () => {
   });
 });
 
+describe('small', () => {
+  it('draws the lines a comment covers small', () => {
+    // The same size an aside written `,,so,,` takes, and taken the same way:
+    // on the line, because the height of a line is struck from the size of
+    // the line and a span cannot shrink the line it sits in.
+    expect(small(below('<!-- prettier-ignore -->'))).toEqual([
+      '<!-- prettier-ignore -->',
+    ]);
+  });
+
+  it('draws every line of a comment written over several small', () => {
+    expect(small(below('<!--', 'por quê', '-->'))).toEqual([
+      '<!--',
+      'por quê',
+      '-->',
+    ]);
+  });
+
+  it('keeps them small while the comment is being written', () => {
+    // Only the taking off the page answers to the cursor. A line that changed
+    // height as the cursor arrived would move the note under whoever came to
+    // read it.
+    const doc = below('<!-- prettier-ignore -->');
+    expect(small(doc, doc.length)).toEqual(['<!-- prettier-ignore -->']);
+    expect(hidden(doc, doc.length)).toEqual([]);
+  });
+
+  it('leaves a line that is no comment at its own size', () => {
+    expect(small(below('Verso. <!-- conferir -->'))).toEqual([]);
+  });
+
+  it('leaves a comment standing in source mode at its own size', () => {
+    const doc = below('<!-- a -->');
+    const state = EditorState.create({
+      doc,
+      selection: { anchor: 0 },
+      extensions: [editorLivePreviewField.init(() => false)],
+    });
+    expect(build(state).size).toBe(0);
+  });
+});
+
 describe('the fold', () => {
   /** The widget a note's one folded comment is drawn by. */
   function fold(doc: string): CommentFold {
     const state = EditorState.create({ doc, selection: { anchor: 0 } });
-    const set = build(state);
     let found: CommentFold | null = null;
-    set.between(0, doc.length, (from, to, value) => {
-      found = value.spec.widget as CommentFold;
+    build(state).between(0, doc.length, (from, to, value) => {
+      if (value.spec.widget) found = value.spec.widget as CommentFold;
     });
     if (!found) throw new Error('nothing folded');
     return found;
@@ -206,18 +273,15 @@ describe('the fold', () => {
     // the row the eye and the down arrow are both given.
     const doc = below('<!--', 'por quê', '-->');
     const state = EditorState.create({ doc, selection: { anchor: 0 } });
-    expect(build(state).size).toBe(1);
+    expect(foldsIn(build(state), doc.length)).toHaveLength(1);
   });
 
   it('covers the comment from its first line to its last', () => {
     const doc = below('<!--', 'por quê', '-->');
     const state = EditorState.create({ doc, selection: { anchor: 0 } });
-    const set = build(state);
-    const at: number[] = [];
-    set.between(0, doc.length, (from, to) => {
-      at.push(from, to);
-    });
-    expect(at).toEqual([state.doc.line(3).from, state.doc.line(5).to]);
+    expect(foldsIn(build(state), doc.length)).toEqual([
+      { from: state.doc.line(3).from, to: state.doc.line(5).to },
+    ]);
   });
 
   it('draws an ellipsis where the comment was', () => {
@@ -239,7 +303,7 @@ describe('the fold', () => {
     const state = EditorState.create({ doc, selection: { anchor: 0 } });
     const specs: unknown[] = [];
     build(state).between(0, doc.length, (from, to, value) => {
-      specs.push(value.spec.block);
+      if (value.spec.widget) specs.push(value.spec.block);
     });
     expect(specs).toEqual([undefined]);
     expect(drawn(below('<!-- a -->')).tagName).toBe('SPAN');
@@ -280,7 +344,7 @@ describe('source mode', () => {
       selection: { anchor: 0 },
       extensions: [editorLivePreviewField.init(() => live)],
     });
-    return build(state).size;
+    return foldsIn(build(state), doc.length).length;
   }
 
   it('hides the comment in live preview', () => {
@@ -307,7 +371,10 @@ describe('liveComments', () => {
 
   it('folds the note it is given as it is built', () => {
     const view = editing(below('<!-- prettier-ignore -->'), true);
-    expect(view.state.field(liveComments).over.size).toBe(1);
+    expect(
+      foldsIn(view.state.field(liveComments).over, view.state.doc.length)
+        .length,
+    ).toBe(1);
     view.destroy();
   });
 
@@ -348,13 +415,19 @@ describe('liveComments', () => {
     const doc = below('<!-- a -->');
     const view = editing(doc, true);
     view.dispatch({ selection: { anchor: doc.length } });
-    expect(view.state.field(liveComments).over.size).toBe(0);
+    expect(
+      foldsIn(view.state.field(liveComments).over, view.state.doc.length)
+        .length,
+    ).toBe(0);
     view.destroy();
   });
 
   it('folds a comment as soon as it is written', () => {
     const view = editing(below('Verso.'), true);
-    expect(view.state.field(liveComments).over.size).toBe(0);
+    expect(
+      foldsIn(view.state.field(liveComments).over, view.state.doc.length)
+        .length,
+    ).toBe(0);
     view.dispatch({
       changes: {
         from: view.state.doc.length,
@@ -362,13 +435,19 @@ describe('liveComments', () => {
       },
       selection: { anchor: 0 },
     });
-    expect(view.state.field(liveComments).over.size).toBe(1);
+    expect(
+      foldsIn(view.state.field(liveComments).over, view.state.doc.length)
+        .length,
+    ).toBe(1);
     view.destroy();
   });
 
   it('draws nothing in an editor set to source mode', () => {
     const view = editing(below('<!-- a -->'), false);
-    expect(view.state.field(liveComments).over.size).toBe(0);
+    expect(
+      foldsIn(view.state.field(liveComments).over, view.state.doc.length)
+        .length,
+    ).toBe(0);
     view.destroy();
   });
 });
