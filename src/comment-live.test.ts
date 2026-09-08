@@ -263,8 +263,11 @@ describe('the fold', () => {
     expect(focused).toBe(true);
   });
 
-  it('is opened by the primary button alone', () => {
-    // A right press is on its way to a context menu, not to the comment.
+  /** What the fold does with a press: whether it answered it, and how. */
+  function pressed(init: MouseEventInit): {
+    sent: unknown[];
+    prevented: boolean;
+  } {
     const doc = below('<!-- a -->');
     const state = EditorState.create({ doc, selection: { anchor: 0 } });
     const set = build(state);
@@ -282,11 +285,24 @@ describe('the fold', () => {
     const press = new MouseEvent('mousedown', {
       bubbles: true,
       cancelable: true,
-      button: 2,
+      ...init,
     });
     el.dispatchEvent(press);
-    expect(sent).toEqual([]);
-    expect(press.defaultPrevented).toBe(false);
+    return { sent, prevented: press.defaultPrevented };
+  }
+
+  it('is opened by the primary button alone', () => {
+    // A right press is on its way to a context menu, not to the comment.
+    expect(pressed({ button: 2 })).toEqual({ sent: [], prevented: false });
+  });
+
+  it('is not opened by a ctrl-click', () => {
+    // Which is how a context menu is asked for on macOS, wearing the primary
+    // button as it goes.
+    expect(pressed({ button: 0, ctrlKey: true })).toEqual({
+      sent: [],
+      prevented: false,
+    });
   });
 
   it('asks the editor where it is rather than remembering', () => {
