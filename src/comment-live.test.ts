@@ -419,7 +419,7 @@ describe('liveComments', () => {
     view.destroy();
   });
 
-  it('reads the note again when it is edited', () => {
+  it('folds a comment as soon as it is written', () => {
     const view = editing(below('Verso.'), true);
     expect(view.state.field(liveComments).over.size).toBe(0);
     view.dispatch({
