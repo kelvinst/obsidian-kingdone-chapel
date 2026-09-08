@@ -495,13 +495,18 @@
    the inset Obsidian gives a fold placeholder of its own. That inset is there
    because such a fold sits at the end of the line it was folded from, with
    text before it; this one stands where the comment stood, at the head of its
-   own line, and a few pixels of padding there leave the `%%` hanging off the
-   margin every other line is flush to. Written through `.cm-line` for the
-   weight: the rule being taken back is a bare class, so a bare class of ours
-   would only outrank it by whichever stylesheet the vault loaded last. */
+   own line, and a few pixels of padding and border there leave the `%%`
+   hanging off the margin every other line is flush to.
 
-.cm-line .kcp-comment-fold {
+   Written through `.markdown-source-view.mod-cm6` for the weight it carries,
+   not for the reach — the same thing the rule that used to hide these lines
+   had to do, and for the same reason: Obsidian reaches into the editor
+   through selectors of its own that long, and a bare class of ours is
+   outranked by them however the plugin's stylesheet is ordered. */
+
+.markdown-source-view.mod-cm6 .cm-line .kcp-comment-fold {
   cursor: pointer;
   margin-left: 0;
   padding-left: 0;
+  border-left: none;
 }
