@@ -78,7 +78,7 @@ const CLOSE = /-->(.*)$/;
  */
 export class CommentFold extends WidgetType {
   constructor(
-    /** How many lines are folded, which the fold says when it is more than one. */
+    /** How many lines are folded, which the fold says however many there are. */
     readonly lines: number,
   ) {
     super();
@@ -100,15 +100,16 @@ export class CommentFold extends WidgetType {
     const mark = view.dom.ownerDocument.createElement('span');
     mark.className = 'cm-foldPlaceholder kcp-comment-fold';
     // An ellipsis alone says something was folded and not what. So the fold
-    // opens with `%%`, which says "a comment" in the vault's own vocabulary
-    // rather than in English — it is the marker Obsidian gives the other kind
-    // of comment, the one addressed to whoever is writing, and whoever writes
-    // notes here knows it on sight.
+    // opens the way the comment under it opens, with `<!--`, and trails off:
+    // it says what it stands for in the note's own syntax rather than in
+    // English, and there is nothing to learn about what `<!--` means that
+    // whoever wrote the comment does not already know.
     //
-    // The count comes between the marker and the ellipsis where there is more
-    // than one line under the fold, that being the only thing the fold cannot
-    // say by standing where it stands; a count of one would say nothing more.
-    mark.textContent = `%% ${this.lines > 1 ? `${this.lines} lines` : ''}...`;
+    // The count is said whether it is one line or four. A fold that spoke up
+    // only above one line would leave the reader working out which kind of
+    // fold they were looking at before they could read it.
+    const lines = this.lines === 1 ? '1 line' : `${this.lines} lines`;
+    mark.textContent = `<!-- ${lines}...`;
     return mark;
   }
 
