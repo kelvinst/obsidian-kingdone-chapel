@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   chapterFileName,
   chapterKey,
+  blockIdLine,
   hasBlockId,
   verseEmbeds,
   quotePlacement,
@@ -314,6 +315,31 @@ describe('quotePlacement', () => {
     expect(quotePlacement('', headings, quote).text).toBe(
       `## Citações\n\n${quote}\n`,
     );
+  });
+});
+
+describe('blockIdLine', () => {
+  it('answers the line the id closes', () => {
+    expect(
+      blockIdLine(
+        'texto\n> ![[NVI-43-JHN-001]] ^nvi-jhn-1-1-3\n',
+        'nvi-jhn-1-1-3',
+      ),
+    ).toBe(1);
+  });
+
+  it('answers with nothing where the note carries no such id', () => {
+    expect(blockIdLine('texto\n', 'nvi-jhn-1-1-3')).toBeNull();
+  });
+
+  it('passes over an id a fenced example is only showing', () => {
+    const note = [
+      '```markdown',
+      'texto ^nvi-jhn-1-1-3',
+      '```',
+      'texto ^nvi-jhn-1-1-3',
+    ].join('\n');
+    expect(blockIdLine(note, 'nvi-jhn-1-1-3')).toBe(3);
   });
 });
 

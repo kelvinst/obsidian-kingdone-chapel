@@ -224,11 +224,21 @@ export function parseVerseLine(line: string): VerseLine | null {
  * a note that does not carry it.
  */
 export function hasBlockId(text: string, id: string): boolean {
+  return blockIdLine(text, id) !== null;
+}
+
+/**
+ * The line of `text` the block id `id` closes, or null where no line does —
+ * the same reading `hasBlockId` does, for a caller that has to write on that
+ * line rather than only know it is there.
+ */
+export function blockIdLine(text: string, id: string): number | null {
   const lines = text.split('\n');
   const outside = outsideFences(lines);
-  return lines.some(
+  const at = lines.findIndex(
     (line, i) => outside[i] && line.trimEnd().endsWith(`^${id}`),
   );
+  return at === -1 ? null : at;
 }
 
 /** Where a quote goes in a note, and what has to be written there. */

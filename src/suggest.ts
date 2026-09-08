@@ -10,7 +10,7 @@ import type {
 
 import { quoteHeadings } from './books';
 import { ReferenceRows } from './suggest-rows';
-import { hasBlockId, quotePlacement } from './utils';
+import { blockIdLine, hasBlockId, quotePlacement } from './utils';
 import type { BookMatch } from './books';
 import type { ParsedRef } from './reference';
 import type { Passage, Row } from './suggest-rows';
@@ -272,6 +272,25 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
    */
   appendPassage(editor: Editor, passage: Passage): QuoteWrite | null {
     if (hasBlockId(editor.getValue(), passage.id)) return null;
+
+    // The quotes written before the ids carried the `quote-` prefix name the
+    // same passage under the id it went by then. That is the quote this
+    // reference points at, so it is renamed where it stands — the link about to
+    // be written names the prefixed id, and would point at nothing otherwise.
+    const legacy = passage.id.replace(/^quote-/, '');
+    const named = blockIdLine(editor.getValue(), legacy);
+    if (named !== null) {
+      // The id closes the line, so what it names is what stands in front of it:
+      // read off rather than matched, an id being made of whatever a version
+      // folder is named.
+      const line = editor.getLine(named).trimEnd();
+      editor.replaceRange(
+        line.slice(0, line.length - legacy.length) + passage.id,
+        { line: named, ch: 0 },
+        { line: named, ch: editor.getLine(named).length },
+      );
+      return null;
+    }
 
     const at = quotePlacement(
       editor.getValue(),
