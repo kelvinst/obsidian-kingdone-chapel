@@ -456,7 +456,15 @@ describe('verseInId', () => {
 
   it('answers with nothing for the id of a quote', () => {
     expect(verseInId('quote-shedd-jhn-14-12-17')).toBeNull();
-    expect(verseInId('quote-ara-lev-1-2')).toBeNull();
+    expect(verseInId('quote-ara-lev-1-2-3')).toBeNull();
+  });
+
+  it('reads the verse of a version the prefix would otherwise swallow', () => {
+    // A version coded QUOTE writes `quote-gen-1-1` for Gênesis 1.1, which
+    // opens like a quote id and is a verse anchor all the same: a quote closes
+    // on the chapter and the verses it runs over, one number group more.
+    expect(verseInId('quote-gen-1-1')).toBe(1);
+    expect(verseInId('quote-quote-gen-1-1-2')).toBeNull();
   });
 
   it('answers with nothing for a note anchor', () => {

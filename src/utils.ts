@@ -105,8 +105,13 @@ const VERSE_HEADING = /^#{1,6}\s/;
 const VERSE_MARKER = /^\s*(?:\*\*(\d+)\*\*|(\d+)\.)\s*/;
 /** The verse a block id names, in the number it ends on. */
 const VERSE_ID = /-(\d+)$/;
-/** What the id of a quote opens with, and no verse anchor ever carries. */
-const QUOTE_ID = /^quote-/;
+/**
+ * The id of a quote: the prefix, then the passage — the chapter and the verses
+ * it runs over, which is one number group more than a verse anchor carries. A
+ * version may be coded `QUOTE` itself, and `quote-gen-1-1` is that version's
+ * Gênesis 1.1 rather than a quote of anything.
+ */
+const QUOTE_ID = /^quote-.+(?:-\d+){3,}$/;
 
 /**
  * Read a verse line, taking its number from the block id that closes it.
