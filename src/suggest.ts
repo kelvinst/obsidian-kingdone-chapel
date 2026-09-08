@@ -10,7 +10,12 @@ import type {
 
 import { quoteHeadings } from './books';
 import { ReferenceRows } from './suggest-rows';
-import { blockIdLine, hasBlockId, quotePlacement } from './utils';
+import {
+  blockIdLine,
+  hasBlockId,
+  outsideFences,
+  quotePlacement,
+} from './utils';
 import type { BookMatch } from './books';
 import type { ParsedRef } from './reference';
 import type { Passage, Row } from './suggest-rows';
@@ -280,15 +285,27 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
     const legacy = passage.id.replace(/^quote-/, '');
     const named = blockIdLine(editor.getValue(), legacy);
     if (named !== null) {
-      // The id closes the line, so what it names is what stands in front of it:
-      // read off rather than matched, an id being made of whatever a version
-      // folder is named.
-      const line = editor.getLine(named).trimEnd();
-      editor.replaceRange(
-        line.slice(0, line.length - legacy.length) + passage.id,
-        { line: named, ch: 0 },
-        { line: named, ch: editor.getLine(named).length },
-      );
+      const lines = editor.getValue().split('\n');
+      const outside = outsideFences(lines);
+      lines.forEach((line, at) => {
+        if (!outside[at]) return; // a fence shows an id, and names none
+        // The id closes the line it belongs to, so what it names is what
+        // stands in front of it — read off rather than matched, an id being
+        // made of whatever a version folder is named. The links naming it are
+        // renamed with it, or every reference already written to this quote
+        // would be left pointing at nothing.
+        const ended = line.trimEnd();
+        const renamed =
+          at === named
+            ? ended.slice(0, ended.length - legacy.length) + passage.id
+            : renamedLinks(line, legacy, passage.id);
+        if (renamed === line) return;
+        editor.replaceRange(
+          renamed,
+          { line: at, ch: 0 },
+          { line: at, ch: line.length },
+        );
+      });
       return null;
     }
 
@@ -299,5 +316,28 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
     );
     editor.replaceRange(at.text, { line: at.line, ch: at.ch });
     return { line: at.line, lines: at.text.split('\n').length - 1 };
+  }
+}
+
+/**
+ * `line` with the links naming the block id `from` naming `to` instead.
+ *
+ * An id is made of whatever a version folder is named, so it is read off the
+ * line rather than matched as a pattern — and only where it ends there: an id
+ * a longer one opens with, `nvi-gen-1-1-2` inside `nvi-gen-1-1-20`, names some
+ * other quote and is left as it is.
+ */
+function renamedLinks(line: string, from: string, to: string): string {
+  const mark = `#^${from}`;
+  let out = '';
+  let rest = line;
+  for (;;) {
+    const at = rest.indexOf(mark);
+    if (at === -1) return out + rest;
+    const after = rest[at + mark.length];
+    out +=
+      rest.slice(0, at) +
+      (after && /[A-Za-z0-9-]/.test(after) ? mark : `#^${to}`);
+    rest = rest.slice(at + mark.length);
   }
 }

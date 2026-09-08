@@ -1206,7 +1206,38 @@ describe('appendPassage', () => {
       null,
     );
     expect(editor.text).toBe(
-      `Veja [[#^nvi-gen-1-1-2|Gn 1.1,2]]\n\n## Citações\n\n${passage.callout}\n`,
+      `Veja [[#^quote-nvi-gen-1-1-2|Gn 1.1,2]]\n\n## Citações\n\n${passage.callout}\n`,
+    );
+  });
+
+  it('takes the links naming that quote along with it', () => {
+    // The links are what the rename is for: an id renamed under them would
+    // leave every reference already written pointing at nothing. A link inside
+    // a fence is an example being shown and points at nothing either way.
+    const old = passage.callout.replace(/\^quote-/g, '^');
+    const editor = new FakeEditor(
+      `Veja [[#^nvi-gen-1-1-2|Gn 1.1,2]] e [[#^nvi-gen-1-1-2|de novo]]\n\n` +
+        '```markdown\n[[#^nvi-gen-1-1-2|um exemplo]]\n```\n\n' +
+        `## Citações\n\n${old}\n`,
+    );
+    suggest.appendPassage(editor as unknown as Editor, passage);
+
+    expect(editor.text).toBe(
+      `Veja [[#^quote-nvi-gen-1-1-2|Gn 1.1,2]] e [[#^quote-nvi-gen-1-1-2|de novo]]\n\n` +
+        '```markdown\n[[#^nvi-gen-1-1-2|um exemplo]]\n```\n\n' +
+        `## Citações\n\n${passage.callout}\n`,
+    );
+  });
+
+  it('leaves alone a link naming a quote whose id only opens the same way', () => {
+    const old = passage.callout.replace(/\^quote-/g, '^');
+    const editor = new FakeEditor(
+      `Veja [[#^nvi-gen-1-1-20|Gn 1.1-20]]\n\n## Citações\n\n${old}\n`,
+    );
+    suggest.appendPassage(editor as unknown as Editor, passage);
+
+    expect(editor.text).toBe(
+      `Veja [[#^nvi-gen-1-1-20|Gn 1.1-20]]\n\n## Citações\n\n${passage.callout}\n`,
     );
   });
 
