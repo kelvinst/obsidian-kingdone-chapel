@@ -226,29 +226,25 @@ function blocks(state: EditorState): Run[] {
 }
 
 /**
- * The runs the note has, or none of them where the editor is in source mode.
- *
- * Source mode is the note as it is written, markup and all — the same stand
- * `live.ts` takes on a delimiter. Absent, as in a state built by hand, take it
- * for live preview.
- */
-function read(state: EditorState): Run[] {
-  return (state.field(editorLivePreviewField, false) ?? true)
-    ? blocks(state)
-    : [];
-}
-
-/**
  * What `runs` are drawn by: the size on every line of them, and a fold over
  * each the cursor is not in.
+ *
+ * Source mode is the note as it is written, markup and all — the same stand
+ * `live.ts` takes on a delimiter, and taken here in the same place: it decides
+ * what comes off the page, never what size the lines are drawn at. An aside
+ * written `,,so,,` is small in both views and shows its commas in one, and a
+ * comment is an aside in both views too — a note that reflowed around its
+ * comments on every toggle would be a note moving under whoever toggled.
+ * Absent, as in a state built by hand, take it for live preview.
  */
 function drawn(state: EditorState, runs: readonly Run[]): DecorationSet {
+  const hiding = state.field(editorLivePreviewField, false) ?? true;
   const into: Range<Decoration>[] = [];
 
   for (const block of runs) {
     for (const from of block.lines) into.push(SMALL.range(from));
     // Inside the comment, the comment is what is being edited.
-    if (touched(state, block.from, block.to)) continue;
+    if (!hiding || touched(state, block.from, block.to)) continue;
     // One replacement over the whole run: a comment written over several lines
     // is one comment and folds to one ellipsis. Not a block one — the line the
     // comment was written on is the editor's own, and stays a row of its own
@@ -274,7 +270,7 @@ function drawn(state: EditorState, runs: readonly Run[]): DecorationSet {
  * of it.
  */
 export function build(state: EditorState): DecorationSet {
-  return drawn(state, read(state));
+  return drawn(state, blocks(state));
 }
 
 /** The runs the note holds, and the folds standing over them. */
@@ -298,30 +294,32 @@ interface Folds {
  * the commonest transaction there is — every arrow key is one — and it can
  * only change which run the cursor is in, never where the runs are, so it
  * redraws the folds over the runs already read rather than reading the note
- * again to find them unchanged.
+ * again to find them unchanged. Switching between the two views is the same:
+ * it changes what is drawn over the runs, never the runs.
  */
 export const liveComments = StateField.define<Folds>({
   create(state) {
-    const runs = read(state);
+    const runs = blocks(state);
     return { runs, over: drawn(state, runs) };
   },
 
   update(folds, tr) {
-    // The note under them, and the view the editor is drawing it in —
-    // switching to source mode moves neither the note nor the cursor, and the
-    // comments would otherwise stay as live preview left them. Either one can
-    // move a run, so either one is read for afresh.
-    if (
-      tr.docChanged ||
-      tr.startState.field(editorLivePreviewField, false) !==
-        tr.state.field(editorLivePreviewField, false)
-    ) {
-      const runs = read(tr.state);
+    // The note under them is the one thing that can move a run.
+    if (tr.docChanged) {
+      const runs = blocks(tr.state);
       return { runs, over: drawn(tr.state, runs) };
     }
-    // And the selection among them: a comment comes back when the cursor
-    // arrives and goes again when it leaves.
-    if (tr.startState.selection.eq(tr.state.selection)) return folds;
+    // The selection among them: a comment comes back when the cursor arrives
+    // and goes again when it leaves. And the view the editor is drawing —
+    // switching to source mode moves neither the note nor the cursor, and the
+    // comments would otherwise stay as live preview left them.
+    if (
+      tr.startState.selection.eq(tr.state.selection) &&
+      tr.startState.field(editorLivePreviewField, false) ===
+        tr.state.field(editorLivePreviewField, false)
+    ) {
+      return folds;
+    }
     return { runs: folds.runs, over: drawn(tr.state, folds.runs) };
   },
 
