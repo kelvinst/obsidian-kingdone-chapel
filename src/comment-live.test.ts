@@ -254,6 +254,32 @@ describe('the fold', () => {
     expect(focused).toBe(true);
   });
 
+  it('is opened by the primary button alone', () => {
+    // A right press is on its way to a context menu, not to the comment.
+    const doc = below('<!-- a -->');
+    const state = EditorState.create({ doc, selection: { anchor: 0 } });
+    const set = build(state);
+    let widget: CommentFold | null = null;
+    set.between(0, doc.length, (from, to, value) => {
+      widget = value.spec.widget as CommentFold;
+    });
+    const sent: unknown[] = [];
+    const el = widget!.toDOM({
+      dom: document.body,
+      dispatch: (spec: unknown) => sent.push(spec),
+      posAtDOM: () => 0,
+      focus: () => {},
+    } as never);
+    const press = new MouseEvent('mousedown', {
+      bubbles: true,
+      cancelable: true,
+      button: 2,
+    });
+    el.dispatchEvent(press);
+    expect(sent).toEqual([]);
+    expect(press.defaultPrevented).toBe(false);
+  });
+
   it('asks the editor where it is rather than remembering', () => {
     // A row the editor keeps and moves is a row whose remembered position
     // would be the one it was drawn at, not the one it now stands at.
@@ -323,7 +349,7 @@ describe('liveComments', () => {
 
   it('folds the note it is given as it is built', () => {
     const view = editing(below('<!-- prettier-ignore -->'), true);
-    expect(view.state.field(liveComments).size).toBe(1);
+    expect(view.state.field(liveComments).over.size).toBe(1);
     view.destroy();
   });
 
@@ -341,17 +367,36 @@ describe('liveComments', () => {
     view.destroy();
   });
 
+  it('keeps the runs it read when only the cursor moved', () => {
+    // Reading them costs a regex over every line of the note, and an arrow key
+    // cannot move a comment — only which one the cursor is in.
+    const doc = below('<!-- a -->');
+    const view = editing(doc, true);
+    const before = view.state.field(liveComments).runs;
+    view.dispatch({ selection: { anchor: doc.length } });
+    expect(view.state.field(liveComments).runs).toBe(before);
+    view.destroy();
+  });
+
+  it('reads the note again when it is edited', () => {
+    const view = editing(below('<!-- a -->'), true);
+    const before = view.state.field(liveComments).runs;
+    view.dispatch({ changes: { from: 0, insert: 'Outro. ' } });
+    expect(view.state.field(liveComments).runs).not.toBe(before);
+    view.destroy();
+  });
+
   it('reads the note again when the cursor moves onto a comment', () => {
     const doc = below('<!-- a -->');
     const view = editing(doc, true);
     view.dispatch({ selection: { anchor: doc.length } });
-    expect(view.state.field(liveComments).size).toBe(0);
+    expect(view.state.field(liveComments).over.size).toBe(0);
     view.destroy();
   });
 
   it('reads the note again when it is edited', () => {
     const view = editing(below('Verso.'), true);
-    expect(view.state.field(liveComments).size).toBe(0);
+    expect(view.state.field(liveComments).over.size).toBe(0);
     view.dispatch({
       changes: {
         from: view.state.doc.length,
@@ -359,13 +404,13 @@ describe('liveComments', () => {
       },
       selection: { anchor: 0 },
     });
-    expect(view.state.field(liveComments).size).toBe(1);
+    expect(view.state.field(liveComments).over.size).toBe(1);
     view.destroy();
   });
 
   it('draws nothing in an editor set to source mode', () => {
     const view = editing(below('<!-- a -->'), false);
-    expect(view.state.field(liveComments).size).toBe(0);
+    expect(view.state.field(liveComments).over.size).toBe(0);
     view.destroy();
   });
 });
