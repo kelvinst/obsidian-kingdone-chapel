@@ -183,6 +183,17 @@ describe('parseVerseLine', () => {
     expect(
       parseVerseLine('15.20)),((Shedd-13-1CH-015#^shedd-1ch-15-21|21));'),
     ).toBeNull();
+    // The wrap can fall a character earlier, leaving the dot ending the line.
+    expect(parseVerseLine('16.')).toBeNull();
+  });
+
+  it('reads a number written without the space as the end of what is above', () => {
+    // Markdown opens no list item without the space, so `16.Texto` never was a
+    // marker. The line carries an id and writes no number of its own, which
+    // makes it the end of what stands above it, id and all.
+    expect(
+      parseVerses(['Prosa acima', '16.Texto ^nvi-gen-1-16'].join('\n')),
+    ).toEqual([{ verse: 16, text: 'Prosa acima\n16.Texto' }]);
   });
 
   it('reads a verse whose text opens on a digit', () => {
