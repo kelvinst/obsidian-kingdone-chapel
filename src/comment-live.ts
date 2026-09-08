@@ -75,8 +75,6 @@ const CLOSE = /-->(.*)$/;
  */
 export class CommentFold extends WidgetType {
   constructor(
-    /** Where the comment starts, so a click can put the cursor in it. */
-    readonly from: number,
     /** How many lines are folded, which the row says when it is more than one. */
     readonly lines: number,
   ) {
@@ -84,12 +82,15 @@ export class CommentFold extends WidgetType {
   }
 
   /**
-   * Two folds are the same where they stand over the same comment. Without
-   * this the editor rebuilds every fold on every keystroke elsewhere in the
-   * note.
+   * Two folds are the same where they draw the same row. Where the comment
+   * stands is deliberately no part of that: a fold that carried its position
+   * would differ from itself after every keystroke above it, and the editor
+   * would rebuild every row below the caret on each one. Nothing here needs
+   * the position anyway — the row asks the editor where it ended up when it
+   * is clicked.
    */
   eq(other: CommentFold): boolean {
-    return other.from === this.from && other.lines === this.lines;
+    return other.lines === this.lines;
   }
 
   toDOM(view: EditorView): HTMLElement {
@@ -111,10 +112,13 @@ export class CommentFold extends WidgetType {
     // replacing decoration, which is what `WidgetType`'s default
     // `ignoreEvent` is for — the row is the fold's business, not the editor's.
     // On `mousedown` rather than `click`, so no drag-select starts on a row
-    // that has no text to select.
+    // that has no text to select. Where the comment is is asked of the editor
+    // at the moment of the click rather than held here, because a row whose
+    // fold is `eq` to the one before it is a row the editor keeps and moves
+    // rather than draws again.
     row.addEventListener('mousedown', (event) => {
       event.preventDefault();
-      view.dispatch({ selection: { anchor: this.from } });
+      view.dispatch({ selection: { anchor: view.posAtDOM(row) } });
       view.focus();
     });
 
@@ -206,7 +210,7 @@ export function build(state: EditorState): DecorationSet {
     into.push(
       Decoration.replace({
         block: true,
-        widget: new CommentFold(block.from, block.lines.length),
+        widget: new CommentFold(block.lines.length),
       }).range(block.from, block.to),
     );
   }
