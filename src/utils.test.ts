@@ -183,8 +183,11 @@ describe('parseVerseLine', () => {
     expect(
       parseVerseLine('15.20)),((Shedd-13-1CH-015#^shedd-1ch-15-21|21));'),
     ).toBeNull();
-    // The wrap can fall a character earlier, leaving the dot ending the line.
+    // The wrap can fall a character earlier, leaving the dot ending the line,
+    // which a file written with CRLF ends on a carriage return rather than on
+    // nothing at all.
     expect(parseVerseLine('16.')).toBeNull();
+    expect(parseVerseLine('16.\r')).toBeNull();
   });
 
   it('reads a number written without the space as the end of what is above', () => {
