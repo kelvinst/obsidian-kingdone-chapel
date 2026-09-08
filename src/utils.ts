@@ -101,8 +101,17 @@ export interface VerseLine {
 const BLOCK_ID = /\s*\^([A-Za-z0-9-]+)\s*$/;
 /** A Markdown heading, which names a section rather than writing a verse. */
 const VERSE_HEADING = /^#{1,6}\s/;
-/** How a verse line opens: an ordered list item now, a bolded number in older chapters. */
-const VERSE_MARKER = /^\s*(?:\*\*(\d+)\*\*|(\d+)\.)\s*/;
+/**
+ * How a verse line opens: an ordered list item now, a bolded number in older
+ * chapters.
+ *
+ * A list item puts a space between the dot and what it writes; a prose
+ * reference — '1 Cr 16.4' — puts a digit there. That is the whole difference,
+ * and a formatter that wraps such a reference leaves its tail opening a line
+ * on a number and a dot, so the marker has to ask for the space. A dot ending
+ * the line writes a verse with nothing in it, and still opens one.
+ */
+const VERSE_MARKER = /^\s*(?:\*\*(\d+)\*\*|(\d+)\.(?=\s|$))\s*/;
 /** The verse a block id names, in the number it ends on. */
 const VERSE_ID = /-(\d+)$/;
 /**
