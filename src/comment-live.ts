@@ -117,6 +117,12 @@ export class CommentFold extends WidgetType {
     // fold is `eq` to the one before it is a row the editor keeps and moves
     // rather than draws again.
     row.addEventListener('mousedown', (event) => {
+      // The primary button alone. A right press is on its way to a context
+      // menu, which is opened from `mousedown` on some platforms and would be
+      // swallowed by the `preventDefault` below, and a comment that unfolds
+      // under the pointer before the menu is even up is a comment answering a
+      // question nobody asked.
+      if (event.button !== 0) return;
       event.preventDefault();
       view.dispatch({ selection: { anchor: view.posAtDOM(row) } });
       view.focus();
@@ -124,6 +130,13 @@ export class CommentFold extends WidgetType {
 
     return row;
   }
+}
+
+/** A run of lines that is a comment and nothing else, by where it lies. */
+interface Run {
+  from: number;
+  to: number;
+  lines: number[];
 }
 
 /**
@@ -138,8 +151,8 @@ export class CommentFold extends WidgetType {
  * being shown rather than one being addressed to anybody, and a note
  * explaining the note format would otherwise lose the lines it is explaining.
  */
-function blocks(state: EditorState) {
-  const found: { from: number; to: number; lines: number[] }[] = [];
+function blocks(state: EditorState): Run[] {
+  const found: Run[] = [];
   let code = false;
   let codeDepth = 0;
   let open: { from: number; lines: number[] } | null = null;
@@ -181,26 +194,23 @@ function blocks(state: EditorState) {
 }
 
 /**
- * A fold over every comment in the note that the cursor is not in.
+ * The runs the note has, or none of them where the editor is in source mode.
  *
- * The whole note is read, not the screenful of it on show. A block decoration
- * may only reach the editor from the state, never from a view plugin, and the
- * state is not told where the viewport is — so the viewport bound the hiding
- * carried while it was a line decoration goes with it. What is left is a
- * regex over each line of the note per keystroke, which is what the bound was
- * already costing whenever the note was scrolled to its foot.
+ * Source mode is the note as it is written, markup and all — the same stand
+ * `live.ts` takes on a delimiter. Absent, as in a state built by hand, take it
+ * for live preview.
  */
-export function build(state: EditorState): DecorationSet {
-  // Source mode is the note as it is written, markup and all — the same stand
-  // `live.ts` takes on a delimiter. Absent, as in a state built by hand, take
-  // it for live preview.
-  if (!(state.field(editorLivePreviewField, false) ?? true)) {
-    return Decoration.set([]);
-  }
+function read(state: EditorState): Run[] {
+  return (state.field(editorLivePreviewField, false) ?? true)
+    ? blocks(state)
+    : [];
+}
 
+/** A fold over each of `runs` that the cursor is not in. */
+function drawn(state: EditorState, runs: readonly Run[]): DecorationSet {
   const into: Range<Decoration>[] = [];
 
-  for (const block of blocks(state)) {
+  for (const block of runs) {
     // Inside the comment, the comment is what is being edited.
     if (touched(state, block.from, block.to)) continue;
     // One decoration over the whole run, block and all: a comment written over
@@ -219,31 +229,63 @@ export function build(state: EditorState): DecorationSet {
 }
 
 /**
+ * A fold over every comment in the note that the cursor is not in.
+ *
+ * The whole note is read, not the screenful of it on show. A block decoration
+ * may only reach the editor from the state, never from a view plugin, and the
+ * state is not told where the viewport is — so the viewport bound the hiding
+ * carried while it was a line decoration goes with it, and what is left to
+ * bound is how often the reading is done rather than how much of it.
+ */
+export function build(state: EditorState): DecorationSet {
+  return drawn(state, read(state));
+}
+
+/** The runs the note holds, and the folds standing over them. */
+interface Folds {
+  runs: Run[];
+  over: DecorationSet;
+}
+
+/**
  * What the editor is given: the folds, kept up with the note under them.
  *
  * A state field rather than the view plugin the other live extensions are —
  * CodeMirror refuses a block decoration handed to it by a plugin, since a
  * plugin is rebuilt from what is on screen and a block changes what "on
  * screen" means. `codeFolding()` is a state field for the same reason.
+ *
+ * The runs are kept beside the folds because reading them costs a regex over
+ * every line of the note and only the note can change them. A cursor moved is
+ * the commonest transaction there is — every arrow key is one — and it can
+ * only change which run the cursor is in, never where the runs are, so it
+ * redraws the folds over the runs already read rather than reading the note
+ * again to find them unchanged.
  */
-export const liveComments = StateField.define<DecorationSet>({
-  create: (state) => build(state),
+export const liveComments = StateField.define<Folds>({
+  create(state) {
+    const runs = read(state);
+    return { runs, over: drawn(state, runs) };
+  },
 
   update(folds, tr) {
-    // The selection among them: a comment comes back when the cursor arrives
-    // and goes again when it leaves. And the view the editor is drawing —
+    // The note under them, and the view the editor is drawing it in —
     // switching to source mode moves neither the note nor the cursor, and the
-    // comments would otherwise stay as live preview left them.
+    // comments would otherwise stay as live preview left them. Either one can
+    // move a run, so either one is read for afresh.
     if (
       tr.docChanged ||
-      !tr.startState.selection.eq(tr.state.selection) ||
       tr.startState.field(editorLivePreviewField, false) !==
         tr.state.field(editorLivePreviewField, false)
     ) {
-      return build(tr.state);
+      const runs = read(tr.state);
+      return { runs, over: drawn(tr.state, runs) };
     }
-    return folds;
+    // And the selection among them: a comment comes back when the cursor
+    // arrives and goes again when it leaves.
+    if (tr.startState.selection.eq(tr.state.selection)) return folds;
+    return { runs: folds.runs, over: drawn(tr.state, folds.runs) };
   },
 
-  provide: (field) => EditorView.decorations.from(field),
+  provide: (field) => EditorView.decorations.from(field, (folds) => folds.over),
 });

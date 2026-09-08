@@ -55,13 +55,6 @@ export default defineConfig({
         // now, so this is close to the ceiling: what the branches still fall
         // short of are the fallbacks guarding states a stubbed Obsidian cannot
         // be put into.
-        //
-        // The branch figure is a ratio, so deleting a covered branch moves it
-        // down without anything having stopped being covered: taking the
-        // position out of `CommentFold.eq` dropped two covered branches and
-        // left the same fourteen uncovered, which read as 99.11% out of 1575
-        // and reads as 99.1% out of 1573. The number below follows the count,
-        // not the other way about.
         statements: 100,
         branches: 99.16,
         functions: 100,
