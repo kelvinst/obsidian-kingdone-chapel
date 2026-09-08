@@ -117,12 +117,13 @@ export class CommentFold extends WidgetType {
     // fold is `eq` to the one before it is a row the editor keeps and moves
     // rather than draws again.
     row.addEventListener('mousedown', (event) => {
-      // The primary button alone. A right press is on its way to a context
-      // menu, which is opened from `mousedown` on some platforms and would be
-      // swallowed by the `preventDefault` below, and a comment that unfolds
-      // under the pointer before the menu is even up is a comment answering a
-      // question nobody asked.
-      if (event.button !== 0) return;
+      // The primary button alone, and unmodified. A right press is on its way
+      // to a context menu, which is opened from `mousedown` on some platforms
+      // and would be swallowed by the `preventDefault` below, and a comment
+      // that unfolds under the pointer before the menu is even up is a comment
+      // answering a question nobody asked. A macOS ctrl-click is that same
+      // press wearing the primary button, so it goes the same way.
+      if (event.button !== 0 || event.ctrlKey) return;
       event.preventDefault();
       view.dispatch({ selection: { anchor: view.posAtDOM(row) } });
       view.focus();
