@@ -288,7 +288,9 @@ describe('the fold', () => {
   });
 
   it('says what it stands for, where the comment was', () => {
-    expect(drawn(below('<!-- prettier-ignore -->')).textContent).toBe('%% ...');
+    expect(drawn(below('<!-- prettier-ignore -->')).textContent).toBe(
+      '<!-- 1 line...',
+    );
   });
 
   it("wears the editor's own fold class, so the theme draws it", () => {
@@ -320,14 +322,15 @@ describe('the fold', () => {
 
   it('says how much is folded when it is more than a line', () => {
     expect(drawn(below('<!--', 'por quê', '-->')).textContent).toBe(
-      '%% 3 lines...',
+      '<!-- 3 lines...',
     );
   });
 
-  it('counts no lines for a comment written on one', () => {
-    // The fold stands on the line it stands for; a count of one says nothing
-    // that the fold sitting there does not already say.
-    expect(drawn(below('<!-- a -->')).textContent).toBe('%% ...');
+  it('counts the one line of a comment written on one', () => {
+    // Every fold says how much is under it, the singular included: a fold
+    // that counted only when there was more than one to count would leave
+    // the reader working out which kind of fold they were looking at.
+    expect(drawn(below('<!-- a -->')).textContent).toBe('<!-- 1 line...');
   });
 
   it('is the same fold as another drawing the same row', () => {
