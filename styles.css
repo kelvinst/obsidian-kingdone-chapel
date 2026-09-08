@@ -489,9 +489,19 @@
    nothing here draws a row either: the comment is replaced the way the `**`
    around bold text is, so the line under the ellipsis is the editor's own and
    comes with the editor's own metrics. The size those lines are drawn at is
-   `.kcp-small-line` above, an aside's size, which is what a comment is. What
-   is left is to say the ellipsis is asking to be clicked. */
+   `.kcp-small-line` above, an aside's size, which is what a comment is.
 
-.kcp-comment-fold {
+   What is left is to say the fold is asking to be clicked, and to take back
+   the inset Obsidian gives a fold placeholder of its own. That inset is there
+   because such a fold sits at the end of the line it was folded from, with
+   text before it; this one stands where the comment stood, at the head of its
+   own line, and a few pixels of padding there leave the `%%` hanging off the
+   margin every other line is flush to. Written through `.cm-line` for the
+   weight: the rule being taken back is a bare class, so a bare class of ours
+   would only outrank it by whichever stylesheet the vault loaded last. */
+
+.cm-line .kcp-comment-fold {
   cursor: pointer;
+  margin-left: 0;
+  padding-left: 0;
 }
