@@ -482,37 +482,47 @@ describe('passageLabel', () => {
 });
 
 describe('passageId', () => {
+  it('opens with `quote-`, so a quote is never read as a verse anchor', () => {
+    expect(passageId('NVI', 'JHN', 14, [12, 13, 14, 15, 16, 17])).toBe(
+      'quote-nvi-jhn-14-12-17',
+    );
+  });
+
   it('is written in the shape the verse anchors already use', () => {
-    expect(passageId('NVI', 'MAT', 26, [47, 48, 49])).toBe('nvi-mat-26-47-49');
+    expect(passageId('NVI', 'MAT', 26, [47, 48, 49])).toBe(
+      'quote-nvi-mat-26-47-49',
+    );
   });
 
   it('writes a list of verses with dashes, since a block id carries no commas', () => {
-    expect(passageId('NVI', 'JHN', 1, [1, 3, 4, 5])).toBe('nvi-jhn-1-1-3-5');
+    expect(passageId('NVI', 'JHN', 1, [1, 3, 4, 5])).toBe(
+      'quote-nvi-jhn-1-1-3-5',
+    );
   });
 
   it('writes a version named by a folder as something a block id can hold', () => {
     expect(passageId('King James', 'JHN', 1, [1, 2, 3])).toBe(
-      'king-james-jhn-1-1-3',
+      'quote-king-james-jhn-1-1-3',
     );
     expect(passageId('NVI.2011', 'JHN', 1, [1, 2, 3])).toBe(
-      'nvi-2011-jhn-1-1-3',
+      'quote-nvi-2011-jhn-1-1-3',
     );
   });
 
   it('folds the accents of a version into the letters they sit on', () => {
-    expect(passageId('ARÁ', 'JHN', 1, [1, 2, 3])).toBe('ara-jhn-1-1-3');
+    expect(passageId('ARÁ', 'JHN', 1, [1, 2, 3])).toBe('quote-ara-jhn-1-1-3');
   });
 
   it('tells apart versions whose names a block id cannot carry at all', () => {
     const first = passageId('和合本', 'JHN', 1, [1, 2, 3]);
     const second = passageId('新譯本', 'JHN', 1, [1, 2, 3]);
     expect(first).not.toBe(second);
-    expect(first).toMatch(/^[a-z0-9]+-jhn-1-1-3$/);
-    expect(second).toMatch(/^[a-z0-9]+-jhn-1-1-3$/);
+    expect(first).toMatch(/^quote-[a-z0-9]+-jhn-1-1-3$/);
+    expect(second).toMatch(/^quote-[a-z0-9]+-jhn-1-1-3$/);
   });
 
   it('leaves no dash hanging off either end of the id', () => {
-    expect(passageId('(ARA)', 'JHN', 1, [1, 2, 3])).toBe('ara-jhn-1-1-3');
+    expect(passageId('(ARA)', 'JHN', 1, [1, 2, 3])).toBe('quote-ara-jhn-1-1-3');
   });
 
   it('answers the same passage with the same id, however it was asked for', () => {

@@ -2850,6 +2850,26 @@ describe('writing the refs on a verse', () => {
     expect(notices[notices.length - 1].message).toContain('one verse');
   });
 
+  it('says so where the cursor is in a quote the chapter keeps', () => {
+    // A quote closes on an id of its own — `quote-` in front of the passage —
+    // so nothing in the Citações section reads as a verse of the chapter.
+    const quoted =
+      CHAPTER +
+      '\n## Citações\n\n' +
+      '> [!quote]+ João 14.12,13 - NVI\n' +
+      '> ![[NVI-43-JHN-014#^nvi-jhn-14-12]]\n' +
+      '> ![[NVI-43-JHN-014#^nvi-jhn-14-13]] ^quote-nvi-jhn-14-12-13\n';
+    const { view, editor } = editing(quoted);
+    // The line the quote's id closes, which is what a verse would be read off.
+    editor.at(14);
+    world.plugin.writeRefs(world.plugin.chapterPane(view)!);
+
+    expect(editor.text).toBe(quoted);
+    expect(notices[notices.length - 1].message).toBe(
+      'This line is no verse of the chapter.',
+    );
+  });
+
   it('says so where the cursor is on no verse of the chapter', () => {
     const { view, editor } = editing();
     editor.at(0);

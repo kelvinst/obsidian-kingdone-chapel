@@ -341,15 +341,15 @@ describe('getSuggestions', () => {
   it('writes a run of verses as one link, to a quote of the passage', async () => {
     const [row] = await offered(context('Gn 1.1-2'));
     expect(row.ref).toBe('Gn 1.1,2');
-    expect(row.markdown).toBe('[[#^nvi-gen-1-1-2|Gn 1.1,2]]');
+    expect(row.markdown).toBe('[[#^quote-nvi-gen-1-1-2|Gn 1.1,2]]');
     // The verse-by-verse references are not lost: they are the embeds the
     // quote the link points at is made of.
     expect(row.passage).toEqual({
-      id: 'nvi-gen-1-1-2',
+      id: 'quote-nvi-gen-1-1-2',
       callout: [
         '> [!quote]+ Gênesis 1.1,2 - NVI',
         '> ![[NVI-01-GEN-001#^nvi-gen-1-1]]',
-        '> ![[NVI-01-GEN-001#^nvi-gen-1-2]] ^nvi-gen-1-1-2',
+        '> ![[NVI-01-GEN-001#^nvi-gen-1-2]] ^quote-nvi-gen-1-1-2',
       ].join('\n'),
     });
   });
@@ -364,7 +364,7 @@ describe('getSuggestions', () => {
   it('names the version in a passage label too, when it was asked for', async () => {
     const [row] = await offered(context('NVI Gn 1.1-2'));
     expect(row.ref).toBe('Gn 1.1,2 - NVI');
-    expect(row.markdown).toBe('[[#^nvi-gen-1-1-2|Gn 1.1,2 - NVI]]');
+    expect(row.markdown).toBe('[[#^quote-nvi-gen-1-1-2|Gn 1.1,2 - NVI]]');
   });
 
   it('splits the popup between the versions a half-written one reaches', async () => {
@@ -804,8 +804,8 @@ describe('a reference carried on after a semicolon', () => {
     expect(rows[0].ref).toBe('1,2');
     // The same id the spelled-out reference writes, so a carried run finds the
     // quote that is already there rather than writing a second one.
-    expect(rows[0].markdown).toBe('[[#^nvi-gen-1-1-2|1,2]]');
-    expect(rows[0].passage?.id).toBe('nvi-gen-1-1-2');
+    expect(rows[0].markdown).toBe('[[#^quote-nvi-gen-1-1-2|1,2]]');
+    expect(rows[0].passage?.id).toBe('quote-nvi-gen-1-1-2');
   });
 
   it('names the chapter alone where the reference gave no verse', async () => {
@@ -1173,19 +1173,21 @@ describe('a number read against the passage the note is about', () => {
 describe('appendPassage', () => {
   /** The quote a passage row carries, as `getSuggestions` builds it. */
   const passage = {
-    id: 'nvi-gen-1-1-2',
+    id: 'quote-nvi-gen-1-1-2',
     callout: [
       '> [!quote]+ Gênesis 1.1,2 - NVI',
       '> ![[NVI-01-GEN-001#^nvi-gen-1-1]]',
-      '> ![[NVI-01-GEN-001#^nvi-gen-1-2]] ^nvi-gen-1-1-2',
+      '> ![[NVI-01-GEN-001#^nvi-gen-1-2]] ^quote-nvi-gen-1-1-2',
     ].join('\n'),
   };
 
   it('files the quote under a heading of its own, at the foot of the note', () => {
-    const editor = new FakeEditor('Veja [[#^nvi-gen-1-1-2|Gn 1.1,2]] aqui');
+    const editor = new FakeEditor(
+      'Veja [[#^quote-nvi-gen-1-1-2|Gn 1.1,2]] aqui',
+    );
     const wrote = suggest.appendPassage(editor as unknown as Editor, passage);
     expect(editor.text).toBe(
-      `Veja [[#^nvi-gen-1-1-2|Gn 1.1,2]] aqui\n\n## Citações\n\n${passage.callout}\n`,
+      `Veja [[#^quote-nvi-gen-1-1-2|Gn 1.1,2]] aqui\n\n## Citações\n\n${passage.callout}\n`,
     );
     // The line it was written at, and the lines it added there, which is what
     // moves the reference when the quote lands above it.
@@ -1194,7 +1196,7 @@ describe('appendPassage', () => {
 
   it('leaves a passage already quoted as it is', () => {
     const editor = new FakeEditor(
-      `Veja [[#^nvi-gen-1-1-2|Gn 1.1,2]]\n\n## Citações\n\n${passage.callout}\n`,
+      `Veja [[#^quote-nvi-gen-1-1-2|Gn 1.1,2]]\n\n## Citações\n\n${passage.callout}\n`,
     );
     const before = editor.text;
     expect(suggest.appendPassage(editor as unknown as Editor, passage)).toBe(
@@ -1225,7 +1227,7 @@ describe('appendPassage', () => {
         ref: 'Gn 1.1,2',
         book: 'Gênesis',
         preview: '',
-        markdown: '[[#^nvi-gen-1-1-2|Gn 1.1,2]]',
+        markdown: '[[#^quote-nvi-gen-1-1-2|Gn 1.1,2]]',
         passage,
       },
       press('Enter'),
@@ -1238,6 +1240,6 @@ describe('appendPassage', () => {
       ...passage.callout.split('\n'),
     ]);
     // So the cursor is read off where that line ended up, not where it was.
-    expect(editor.cursor).toEqual({ line: 10, ch: 33 });
+    expect(editor.cursor).toEqual({ line: 10, ch: 39 });
   });
 });

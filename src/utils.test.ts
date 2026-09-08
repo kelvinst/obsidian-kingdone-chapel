@@ -421,6 +421,21 @@ describe('parseVerses', () => {
     ).toEqual([{ verse: 1, text: 'Feliz o homem.' }]);
   });
 
+  it('reads no verse out of the quotes a chapter keeps under its heading', () => {
+    expect(
+      parseVerses(
+        '![[ARA-19-PSA-001#^ara-psa-1-1|flat]]\n^shedd-psa-1-1\n\n' +
+          '![[ARA-19-PSA-001#^ara-psa-1-2|flat]]\n^shedd-psa-1-2\n\n' +
+          '## Citações\n\n' +
+          '> [!quote]+ Salmos 1.2 - ARA\n' +
+          '> ![[ARA-19-PSA-001#^ara-psa-1-2]] ^quote-shedd-psa-1-2-2\n',
+      ),
+    ).toEqual([
+      { verse: 1, text: '![[ARA-19-PSA-001#^ara-psa-1-1|flat]]' },
+      { verse: 2, text: '![[ARA-19-PSA-001#^ara-psa-1-2|flat]]' },
+    ]);
+  });
+
   it('leaves a verse that writes itself out alone', () => {
     expect(
       parseVerses('## Uma seção\n1. Falou o SENHOR. ^ara-lev-1-1\n'),
@@ -437,6 +452,15 @@ describe('verseInId', () => {
   it('answers with nothing for an id naming something else', () => {
     expect(verseInId('a500c4')).toBeNull();
     expect(verseInId('ara-lev-1-')).toBeNull();
+  });
+
+  it('answers with nothing for the id of a quote', () => {
+    expect(verseInId('quote-shedd-jhn-14-12-17')).toBeNull();
+    expect(verseInId('quote-ara-lev-1-2')).toBeNull();
+  });
+
+  it('answers with nothing for a note anchor', () => {
+    expect(verseInId('shedd-psa-4-n3')).toBeNull();
   });
 });
 
