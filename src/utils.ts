@@ -111,8 +111,11 @@ const VERSE_HEADING = /^#{1,6}\s/;
  * on a number and a dot, so the marker has to ask for the space. A dot ending
  * the line writes no verse either: nothing here writes one with nothing in it,
  * and a wrap falling a character earlier leaves the same reference behind.
+ * The space asked for is a space or a tab, which is what Markdown accepts
+ * after the dot — a file written with CRLF ends its lines on a carriage
+ * return, and a return is not what a list item puts there.
  */
-const VERSE_MARKER = /^\s*(?:\*\*(\d+)\*\*|(\d+)\.(?=\s))\s*/;
+const VERSE_MARKER = /^\s*(?:\*\*(\d+)\*\*|(\d+)\.(?=[ \t]))\s*/;
 /** The verse a block id names, in the number it ends on. */
 const VERSE_ID = /-(\d+)$/;
 /**
