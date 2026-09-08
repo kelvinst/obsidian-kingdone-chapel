@@ -2193,6 +2193,48 @@ describe('onload', () => {
     );
   });
 
+  it('claims no count for a sweep it never finished', async () => {
+    world.vault.write(chapterPath('NVI', 1, 'GEN', 1), '1. Um\n2. Dois');
+    await world.plugin.onload();
+    clearNotices();
+
+    world.metadataCache.trigger('resolved');
+    world.plugin.unload();
+    await world.plugin.swept;
+
+    // Only what it said on starting, which is taken down with it: a count
+    // read off half a vault would name fewer problems than the vault has.
+    expect(notices.map((notice) => notice.message)).toEqual([
+      'Checking the Bible versions…',
+    ]);
+  });
+
+  it('takes its notice down when the sweep cannot be finished at all', async () => {
+    await world.plugin.onload();
+    clearNotices();
+    vi.spyOn(world.plugin.diagnostics, 'all').mockImplementation(() => {
+      throw new Error('unreadable');
+    });
+
+    world.metadataCache.trigger('resolved');
+
+    // Answered rather than left hanging: nothing waits on a sweep that threw,
+    // and the notice that opened it was given no timeout to go away on.
+    await expect(world.plugin.swept).resolves.toEqual([]);
+    expect(notices.at(-1)?.message).toBe('Could not check the Bible versions.');
+  });
+
+  it('calls off the sweep under way before starting another', async () => {
+    await world.plugin.onload();
+    world.metadataCache.trigger('resolved');
+    const first = world.plugin.sweep;
+
+    world.plugin.startSweep();
+
+    expect(first?.stopped).toBe(true);
+    await world.plugin.swept;
+  });
+
   it('stops the sweep where it stands when it is unloaded', async () => {
     await world.plugin.onload();
     const read = vi.spyOn(world.plugin.diagnostics, 'ofChapter');

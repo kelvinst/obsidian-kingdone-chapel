@@ -76,6 +76,18 @@ export class Sweep {
   }
 
   /**
+   * Whether it was called off, which is what its answer is worth knowing by.
+   *
+   * A cancelled sweep answers like any other, with what the model holds, and
+   * nothing in the rows says how much of the vault they were read from. This
+   * is what says it: a count named over half a vault names fewer problems
+   * than the vault has, which is worse than naming none.
+   */
+  get stopped(): boolean {
+    return this.cancelled;
+  }
+
+  /**
    * Every chapter to read, the version in front of the reader first.
    *
    * Which version that is decides what is answered first and nothing else:

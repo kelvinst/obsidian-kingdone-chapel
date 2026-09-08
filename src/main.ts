@@ -174,16 +174,16 @@ interface VerseElement {
 }
 
 /** How far below the top of a reading pane a verse still counts as the one being read. */
+const PREVIEW_TOP_OFFSET = 48;
+/** Scroll movement (px) that releases a verse clicked in reading mode. */
+const SCROLL_SLACK = 4;
+
 /** What a finished sweep is worth saying: a count, or that there is none. */
 function countedProblems(found: Diagnostic[]): string {
   if (!found.length) return 'Nothing wrong with the versions here.';
   const one = found.length === 1;
   return `${found.length} problem${one ? '' : 's'} found in the Bible versions.`;
 }
-
-const PREVIEW_TOP_OFFSET = 48;
-/** Scroll movement (px) that releases a verse clicked in reading mode. */
-const SCROLL_SLACK = 4;
 
 /**
  * File `key` in `into`, unless another file already claims it.
@@ -488,18 +488,38 @@ export default class KingdoneChapelPlugin extends Plugin {
    * the seconds a notice is allowed, and one that faded half way through
    * would be a promise made and then quietly dropped. It waits to be clicked,
    * and clicking it opens the sidebar the findings are read in.
+   *
+   * That notice is taken down however the sweep ends, and only one of the
+   * three endings is worth a second: a pass that read the whole vault can say
+   * what is in it. One called off says nothing, because the count it could
+   * give is of the part it reached and would name fewer problems than there
+   * are; one that failed says so, rather than leaving the first notice
+   * standing over a sweep that stopped.
    */
   startSweep() {
+    // Whatever is still reading, called off before this takes its place: two
+    // sweeps at once would answer twice, and only the second could be
+    // cancelled by the unload that is meant to stop them.
+    this.sweep?.cancel();
+
     const started = new Notice('Checking the Bible versions…', 0);
     started.containerEl.addEventListener('click', () => this.activateView());
 
     const sweep = (this.sweep = new Sweep(this));
-    this.swept = sweep.run().then((found) => {
-      started.hide();
-      new Notice(countedProblems(found));
-      this.sweep = null;
-      return found;
-    });
+    this.swept = sweep
+      .run()
+      .then((found) => {
+        if (!sweep.stopped) new Notice(countedProblems(found));
+        return found;
+      })
+      .catch(() => {
+        new Notice('Could not check the Bible versions.');
+        return [] as Diagnostic[];
+      })
+      .finally(() => {
+        started.hide();
+        if (this.sweep === sweep) this.sweep = null;
+      });
   }
 
   async saveSettings() {
