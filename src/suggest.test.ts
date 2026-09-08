@@ -1229,6 +1229,20 @@ describe('appendPassage', () => {
     );
   });
 
+  it('leaves alone a link naming the quote of some other note', () => {
+    // Only this note's quote is renamed, so a link naming another note's block
+    // goes on naming the id that note still carries.
+    const old = passage.callout.replace(/\^quote-/g, '^');
+    const editor = new FakeEditor(
+      `Veja [[Salmos 23#^nvi-gen-1-1-2|Gn 1.1,2]]\n\n## Citações\n\n${old}\n`,
+    );
+    suggest.appendPassage(editor as unknown as Editor, passage);
+
+    expect(editor.text).toBe(
+      `Veja [[Salmos 23#^nvi-gen-1-1-2|Gn 1.1,2]]\n\n## Citações\n\n${passage.callout}\n`,
+    );
+  });
+
   it('leaves alone a link naming a quote whose id only opens the same way', () => {
     const old = passage.callout.replace(/\^quote-/g, '^');
     const editor = new FakeEditor(

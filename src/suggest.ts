@@ -326,9 +326,13 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
  * line rather than matched as a pattern — and only where it ends there: an id
  * a longer one opens with, `nvi-gen-1-1-2` inside `nvi-gen-1-1-20`, names some
  * other quote and is left as it is.
+ *
+ * A link naming a file names a block of that file, and this note's quote is the
+ * only one being renamed, so only the links that name no file — `[[#^id]]` —
+ * are renamed with it.
  */
 function renamedLinks(line: string, from: string, to: string): string {
-  const mark = `#^${from}`;
+  const mark = `[[#^${from}`;
   let out = '';
   let rest = line;
   for (;;) {
@@ -337,7 +341,7 @@ function renamedLinks(line: string, from: string, to: string): string {
     const after = rest[at + mark.length];
     out +=
       rest.slice(0, at) +
-      (after && /[A-Za-z0-9-]/.test(after) ? mark : `#^${to}`);
+      (after && /[A-Za-z0-9-]/.test(after) ? mark : `[[#^${to}`);
     rest = rest.slice(at + mark.length);
   }
 }
