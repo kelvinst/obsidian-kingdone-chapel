@@ -244,6 +244,7 @@ describe('the fold', () => {
     const el = widget!.toDOM({
       dom: document.body,
       dispatch: (spec: unknown) => sent.push(spec),
+      posAtDOM: () => at,
       focus: () => {
         focused = true;
       },
@@ -253,17 +254,37 @@ describe('the fold', () => {
     expect(focused).toBe(true);
   });
 
-  it('is the same fold as another standing over the same comment', () => {
+  it('asks the editor where it is rather than remembering', () => {
+    // A row the editor keeps and moves is a row whose remembered position
+    // would be the one it was drawn at, not the one it now stands at.
+    const doc = below('<!-- a -->');
+    const state = EditorState.create({ doc, selection: { anchor: 0 } });
+    const set = build(state);
+    let widget: CommentFold | null = null;
+    set.between(0, doc.length, (from, to, value) => {
+      widget = value.spec.widget as CommentFold;
+    });
+    let asked: unknown = null;
+    const el = widget!.toDOM({
+      dom: document.body,
+      dispatch: () => {},
+      posAtDOM: (node: unknown) => {
+        asked = node;
+        return 0;
+      },
+      focus: () => {},
+    } as never);
+    el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    expect(asked).toBe(el);
+  });
+
+  it('is the same fold as another drawing the same row', () => {
     // Without this the editor rebuilds the row on every keystroke elsewhere.
-    expect(new CommentFold(4, 1).eq(new CommentFold(4, 1))).toBe(true);
+    expect(new CommentFold(1).eq(new CommentFold(1))).toBe(true);
   });
 
   it('is a different fold from one over a comment of another size', () => {
-    expect(new CommentFold(4, 1).eq(new CommentFold(4, 3))).toBe(false);
-  });
-
-  it('is a different fold from one standing somewhere else', () => {
-    expect(new CommentFold(4, 1).eq(new CommentFold(9, 1))).toBe(false);
+    expect(new CommentFold(1).eq(new CommentFold(3))).toBe(false);
   });
 });
 
