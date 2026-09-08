@@ -1906,6 +1906,9 @@ describe('onload', () => {
   });
 
   it('reads the vault again once the cache has settled, and only once', async () => {
+    // A cold start: the layout comes up after the cache settles, so the
+    // plugin waits for `resolved` rather than sweeping as it loads.
+    world.workspace.layoutReady = false;
     await world.plugin.onload();
     world.plugin.index();
     // The commands are registered again with it, which reads the vault back
@@ -1977,7 +1980,7 @@ describe('onload', () => {
     await world.plugin.onload();
     world.plugin.chapterCache.set('Bibles/NVI/x.md', { mtime: 1, verses: [] });
     world.vault.trigger('modify', { path: 'Bibles/NVI/x.md' });
-    expect(world.plugin.chapterCache.size).toBe(0);
+    expect(world.plugin.chapterCache.has('Bibles/NVI/x.md')).toBe(false);
   });
 
   it('reads the vault again once it has stopped moving', async () => {
@@ -2125,6 +2128,9 @@ describe('onload', () => {
   });
 
   it('reads the whole vault by itself once the cache has settled', async () => {
+    // A cold start: the layout comes up after the cache settles, so the
+    // plugin waits for `resolved` rather than sweeping as it loads.
+    world.workspace.layoutReady = false;
     await world.plugin.onload();
     const read = vi.spyOn(world.plugin.diagnostics, 'ofChapter');
 
@@ -2141,8 +2147,21 @@ describe('onload', () => {
     ]);
   });
 
+  it('sweeps a vault the app was already showing when it was loaded', async () => {
+    // `resolved` says the parse queue ran dry, and it is fired only as files
+    // are read: a plugin turned on, or reloaded, in an app that settled long
+    // ago is never told, and would wait for it until the reader typed.
+    const read = vi.spyOn(world.plugin.diagnostics, 'ofChapter');
+    await world.plugin.onload();
+    await world.plugin.swept;
+    expect(read).toHaveBeenCalled();
+  });
+
   it('says it has started, and waits to be clicked rather than going away', async () => {
     world.workspace.rightLeaf = world.workspace.addLeaf('empty');
+    // A cold start: the layout comes up after the cache settles, so the
+    // plugin waits for `resolved` rather than sweeping as it loads.
+    world.workspace.layoutReady = false;
     await world.plugin.onload();
     clearNotices();
 
@@ -2159,6 +2178,9 @@ describe('onload', () => {
 
   it('names what it found once it has read everything', async () => {
     world.vault.write(chapterPath('NVI', 1, 'GEN', 1), '1. Um\n2. Dois');
+    // A cold start: the layout comes up after the cache settles, so the
+    // plugin waits for `resolved` rather than sweeping as it loads.
+    world.workspace.layoutReady = false;
     await world.plugin.onload();
     clearNotices();
 
@@ -2170,6 +2192,9 @@ describe('onload', () => {
 
   it('counts the one problem a vault has as one, not as many', async () => {
     world.vault.write(chapterPath('NVI', 1, 'GEN', 1), '1. Um');
+    // A cold start: the layout comes up after the cache settles, so the
+    // plugin waits for `resolved` rather than sweeping as it loads.
+    world.workspace.layoutReady = false;
     await world.plugin.onload();
     clearNotices();
 
@@ -2182,6 +2207,9 @@ describe('onload', () => {
   });
 
   it('says as much when there is nothing wrong with the vault', async () => {
+    // A cold start: the layout comes up after the cache settles, so the
+    // plugin waits for `resolved` rather than sweeping as it loads.
+    world.workspace.layoutReady = false;
     await world.plugin.onload();
     clearNotices();
 
@@ -2195,6 +2223,9 @@ describe('onload', () => {
 
   it('claims no count for a sweep it never finished', async () => {
     world.vault.write(chapterPath('NVI', 1, 'GEN', 1), '1. Um\n2. Dois');
+    // A cold start: the layout comes up after the cache settles, so the
+    // plugin waits for `resolved` rather than sweeping as it loads.
+    world.workspace.layoutReady = false;
     await world.plugin.onload();
     clearNotices();
 
@@ -2210,6 +2241,9 @@ describe('onload', () => {
   });
 
   it('takes its notice down when the sweep cannot be finished at all', async () => {
+    // A cold start: the layout comes up after the cache settles, so the
+    // plugin waits for `resolved` rather than sweeping as it loads.
+    world.workspace.layoutReady = false;
     await world.plugin.onload();
     clearNotices();
     vi.spyOn(world.plugin.diagnostics, 'all').mockImplementation(() => {
@@ -2225,6 +2259,9 @@ describe('onload', () => {
   });
 
   it('calls off the sweep under way before starting another', async () => {
+    // A cold start: the layout comes up after the cache settles, so the
+    // plugin waits for `resolved` rather than sweeping as it loads.
+    world.workspace.layoutReady = false;
     await world.plugin.onload();
     world.metadataCache.trigger('resolved');
     const first = world.plugin.sweep;
@@ -2236,6 +2273,9 @@ describe('onload', () => {
   });
 
   it('stops the sweep where it stands when it is unloaded', async () => {
+    // A cold start: the layout comes up after the cache settles, so the
+    // plugin waits for `resolved` rather than sweeping as it loads.
+    world.workspace.layoutReady = false;
     await world.plugin.onload();
     const read = vi.spyOn(world.plugin.diagnostics, 'ofChapter');
 

@@ -365,6 +365,9 @@ describe('topping the results up', () => {
       ...vault,
       [chapterPath('NVI', 1, 'GEN', 1)]: '1. Um',
     });
+    // Loaded the way a cold start loads it, so the sweep that reads the whole
+    // vault waits on `resolved` and this is `refresh` on its own.
+    world.workspace.layoutReady = false;
     await world.plugin.onload();
     const file = fileAt(world, chapterPath('NVI', 1, 'GEN', 1));
     world.metadataCache.trigger('changed', file, '', {});
