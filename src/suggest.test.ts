@@ -1194,6 +1194,22 @@ describe('appendPassage', () => {
     expect(wrote).toEqual({ line: 0, lines: 7 });
   });
 
+  it('names the quote a note wrote before the ids carried the prefix', () => {
+    // The prefix was added to the id after these were written; the quote is
+    // the same quote, so it is renamed where it stands rather than written a
+    // second time — the link about to be typed names the id it now carries.
+    const old = passage.callout.replace(/\^quote-/g, '^');
+    const editor = new FakeEditor(
+      `Veja [[#^nvi-gen-1-1-2|Gn 1.1,2]]\n\n## Citações\n\n${old}\n`,
+    );
+    expect(suggest.appendPassage(editor as unknown as Editor, passage)).toBe(
+      null,
+    );
+    expect(editor.text).toBe(
+      `Veja [[#^nvi-gen-1-1-2|Gn 1.1,2]]\n\n## Citações\n\n${passage.callout}\n`,
+    );
+  });
+
   it('leaves a passage already quoted as it is', () => {
     const editor = new FakeEditor(
       `Veja [[#^quote-nvi-gen-1-1-2|Gn 1.1,2]]\n\n## Citações\n\n${passage.callout}\n`,
