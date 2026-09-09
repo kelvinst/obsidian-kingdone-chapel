@@ -17,6 +17,8 @@ import type { Location } from './types';
 import { VersionSuggestModal } from './modal';
 import { CreateVersionModal } from './create-modal';
 import { WriteNoteModal } from './note-modal';
+import { WriteRefsModal } from './refs-modal';
+import type { RefSuggestion } from './suggest-rows';
 import { KingdoneChapelView } from './view';
 
 const GEN_1 = [
@@ -2839,15 +2841,23 @@ describe('writing the refs on a verse', () => {
     );
   });
 
-  it('refuses a selection covering more than one verse', () => {
+  it('asks in a modal where the selection covers more than one verse', () => {
     const { view, editor } = editing();
     editor.anchor = { line: 5, ch: 0 };
     editor.cursor = { line: 8, ch: 0 };
     editor.selected = true;
+    // The modal is what a selection is answered with, so what the command did
+    // is read off the modal it opened rather than off the chapter, which it
+    // leaves alone until the reference comes back.
+    const opened = vi
+      .spyOn(WriteRefsModal.prototype, 'onOpen')
+      .mockImplementation(() => {});
     world.plugin.writeRefs(world.plugin.chapterPane(view)!);
 
     expect(editor.text).toBe(CHAPTER);
-    expect(notices[notices.length - 1].message).toContain('one verse');
+    const modal = opened.mock.instances[0] as WriteRefsModal;
+    expect(modal.verses).toEqual([1, 2]);
+    expect(modal.opened).toBe(true);
   });
 
   it('says so where the cursor is in a quote the chapter keeps', () => {
@@ -2960,6 +2970,120 @@ describe('writing the refs on a verse', () => {
 
     command?.checkCallback?.(false);
     expect(editor.text).toContain(',,**Refs**: @.,,');
+  });
+});
+
+describe('writing the same refs on a selection of verses', () => {
+  const CHAPTER =
+    '# Gênesis 1 - NVI\n\n## [[ARA-01-GEN-001|ARA]]\n\n' +
+    '![[ARA-01-GEN-001#^ara-gen-1-1|flat]]\n^nvi-gen-1-1\n\n' +
+    '![[ARA-01-GEN-001#^ara-gen-1-2|flat]]\n^nvi-gen-1-2\n\n' +
+    '![[ARA-01-GEN-001#^ara-gen-1-3|flat]]\n^nvi-gen-1-3\n';
+
+  const LINK = '[[NVI-43-JHN-014#^nvi-jhn-14-12|João 14.12]]';
+
+  /** A row as the popup hands one over, writing `markdown` and nothing else. */
+  function row(extra: Partial<RefSuggestion> = {}): RefSuggestion {
+    return {
+      ref: 'João 14.12 - NVI',
+      book: 'João',
+      preview: 'Digo-lhes a verdade.',
+      markdown: LINK,
+      ...extra,
+    };
+  }
+
+  function editing(text = CHAPTER) {
+    const view = pane(world.app, {
+      file: world.vault.getAbstractFileByPath(
+        chapterPath('NVI', 1, 'GEN', 1),
+      ) as TFile,
+      editor: new FakeEditor(text),
+    });
+    return { view, editor: editorOf(view) };
+  }
+
+  it('writes the reference into the aside of every verse asked for', () => {
+    const { view, editor } = editing();
+    world.plugin.writeRefsOn(world.plugin.chapterPane(view)!, [1, 2, 3], row());
+
+    expect(editor.text.match(/,,\*\*Refs\*\*: /g)).toHaveLength(3);
+    for (const verse of [1, 2, 3]) {
+      expect(editor.text).toContain(
+        `![[ARA-01-GEN-001#^ara-gen-1-${verse}|flat]]\n` +
+          `,,**Refs**: ${LINK}.,,\n` +
+          `^nvi-gen-1-${verse}`,
+      );
+    }
+  });
+
+  it('joins the refs a verse already carries', () => {
+    const { view, editor } = editing(
+      '# Gênesis 1 - NVI\n\n![[ARA-01-GEN-001#^ara-gen-1-1|flat]]\n' +
+        ',,**Refs**: [[#^x|Mt 1.1]]. **Notas**: [[#^nvi-gen-1-n1|n1]].,,\n' +
+        '^nvi-gen-1-1\n\n' +
+        '![[ARA-01-GEN-001#^ara-gen-1-2|flat]]\n^nvi-gen-1-2\n',
+    );
+    world.plugin.writeRefsOn(world.plugin.chapterPane(view)!, [1, 2], row());
+
+    expect(editor.text).toContain(
+      `,,**Refs**: [[#^x|Mt 1.1]]; ${LINK}. **Notas**: [[#^nvi-gen-1-n1|n1]].,,`,
+    );
+    expect(editor.text).toContain(`,,**Refs**: ${LINK}.,,\n^nvi-gen-1-2`);
+  });
+
+  it('leaves out the verses the chapter carries no id for, and says which', () => {
+    const { view, editor } = editing();
+    world.plugin.writeRefsOn(
+      world.plugin.chapterPane(view)!,
+      [2, 3, 4, 5],
+      row(),
+    );
+
+    expect(editor.text.match(/,,\*\*Refs\*\*: /g)).toHaveLength(2);
+    expect(notices[notices.length - 1].message).toBe(
+      'Written without verses 4, 5: this chapter has none.',
+    );
+  });
+
+  it('writes nothing where the chapter carries none of them', () => {
+    const { view, editor } = editing();
+    world.plugin.writeRefsOn(world.plugin.chapterPane(view)!, [7, 8], row());
+
+    expect(editor.text).toBe(CHAPTER);
+    expect(notices[notices.length - 1].message).toBe(
+      'This chapter writes no verse of verses 7, 8.',
+    );
+  });
+
+  it('writes the quote a passage row points at, once', () => {
+    const { view, editor } = editing();
+    world.plugin.writeRefsOn(
+      world.plugin.chapterPane(view)!,
+      [1, 2],
+      row({
+        markdown: '[[#^quote-nvi-jhn-14-12-13|João 14.12,13]]',
+        passage: {
+          id: 'quote-nvi-jhn-14-12-13',
+          callout:
+            '> [!quote]+ João 14.12,13 - NVI\n' +
+            '> ![[NVI-43-JHN-014#^nvi-jhn-14-12]]\n' +
+            '> ![[NVI-43-JHN-014#^nvi-jhn-14-13]] ^quote-nvi-jhn-14-12-13',
+        },
+      }),
+    );
+
+    expect(
+      editor.text.match(/> \[!quote\]\+ João 14\.12,13 - NVI/g),
+    ).toHaveLength(1);
+    expect(
+      editor.text.match(/\[\[#\^quote-nvi-jhn-14-12-13\|João 14\.12,13\]\]/g),
+    ).toHaveLength(2);
+    // The quote sits at the foot of the chapter, under the heading a quote is
+    // filed beneath — below every aside the same write put in.
+    expect(editor.text.indexOf('[!quote]')).toBeGreaterThan(
+      editor.text.lastIndexOf('**Refs**'),
+    );
   });
 });
 

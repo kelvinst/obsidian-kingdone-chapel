@@ -733,4 +733,42 @@ describe('refsWrite', () => {
   it('reads a verse the chapter does not carry as nothing to write on', () => {
     expect(refs(chapter(verse(2)))).toBeNull();
   });
+
+  describe('with the reference already chosen', () => {
+    const LINK = '[[Shedd-43-JHN-014#^shedd-jhn-14-12|João 14.12]]';
+    const chose = (text: string) =>
+      refsWrite(text, 'shedd-psa-1-1', ['Refs'], ['Notas', 'Notes'], LINK);
+
+    it('writes it where the `@` would have gone', () => {
+      const text = chapter(verse(1), verse(2));
+      expect(applied(text, [chose(text)!.write])).toContain(
+        '![[ARA-19-PSA-001#^ara-psa-1-1|flat]]\n' +
+          `,,**Refs**: ${LINK}.,,\n` +
+          '^shedd-psa-1-1',
+      );
+    });
+
+    it('joins the refs a verse already carries', () => {
+      const text = chapter(
+        verse(1, ',,**Refs**: [[Sl 26.4]]. **Notas**: x.,,'),
+      );
+      expect(applied(text, [chose(text)!.write])).toContain(
+        `,,**Refs**: [[Sl 26.4]]; ${LINK}. **Notas**: x.,,`,
+      );
+    });
+
+    it('leaves the cursor past what it wrote', () => {
+      const text = chapter(verse(1));
+      const written = chose(text)!;
+      const lines = applied(text, [written.write]).split('\n');
+      expect(lines[written.cursor.line].slice(0, written.cursor.ch)).toBe(
+        `,,**Refs**: ${LINK}`,
+      );
+    });
+
+    it('leaves a verse already naming it as it stands', () => {
+      const text = chapter(verse(1, `,,**Refs**: ${LINK}.,,`));
+      expect(applied(text, [chose(text)!.write])).toBe(text);
+    });
+  });
 });

@@ -645,8 +645,8 @@ function escape(raw: string): string {
  */
 const CURSOR = '\u0000';
 
-/** What a reference is written from: the `@`, with the cursor just past it. */
-const TYPED = `@${CURSOR}`;
+/** What a reference is written from where none was chosen: the `@` it is typed from. */
+const TYPED = '@';
 
 /** The refs aside as it goes in: the one edit, and where the typing goes on from. */
 export interface WrittenRefs {
@@ -663,12 +663,18 @@ export interface WrittenRefs {
  * order to write a reference in it and `@` is how one is written: the popup
  * opens on the first letter typed after it, exactly as it does for an `@` typed
  * by hand.
+ *
+ * `written` is what goes into the list instead, for a reference chosen before
+ * the aside was opened: asked once in a modal and written on every verse of a
+ * selection, there is no `@` left to type after. The cursor is left past it
+ * either way, which is where the typing would go on.
  */
 export function refsWrite(
   text: string,
   verse: string,
   refs: string[],
   notes: string[],
+  written: string = TYPED,
 ): WrittenRefs | null {
   const lines = text.split('\n');
   const outside = outsideFences(lines);
@@ -678,16 +684,20 @@ export function refsWrite(
   if (at < 0) return null;
 
   const held = lines[at].trimEnd();
-  const written = held.slice(0, held.length - verse.length - 1).trimEnd();
+  const says = held.slice(0, held.length - verse.length - 1).trimEnd();
+  // The cursor rides along with the text, so that whatever the aside is
+  // assembled out of, the piece that wrote the reference is the one that knows
+  // where the typing goes on from.
+  const link = `${written}${CURSOR}`;
 
   // The same three shapes a marker is written into, read the same way: the
   // verse written all on the one line, the aside on the lines above the id,
   // and the verse carrying no aside at all.
-  if (written) {
-    const from = asideFrom(lines, at, written);
-    const said = [...lines.slice(from, at), written].join('\n');
+  if (says) {
+    const from = asideFrom(lines, at, says);
+    const said = [...lines.slice(from, at), says].join('\n');
     return placed(
-      span(from, at, lines, `${marked(said, TYPED, refs, notes)} ^${verse}`),
+      span(from, at, lines, `${marked(said, link, refs, notes)} ^${verse}`),
     );
   }
 
@@ -695,13 +705,11 @@ export function refsWrite(
     const from = asideFrom(lines, at - 1, lines[at - 1]);
     const said = lines.slice(from, at).join('\n');
     if (ASIDE.test(said)) {
-      return placed(
-        span(from, at - 1, lines, marked(said, TYPED, refs, notes)),
-      );
+      return placed(span(from, at - 1, lines, marked(said, link, refs, notes)));
     }
   }
 
-  return placed(line(at, lines, `,,${opened(TYPED, refs[0])},,\n${lines[at]}`));
+  return placed(line(at, lines, `,,${opened(link, refs[0])},,\n${lines[at]}`));
 }
 
 /** A write carrying the cursor mark, as the edit and the point the mark stood at. */
