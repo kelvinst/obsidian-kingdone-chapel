@@ -352,6 +352,41 @@ export class EditorSuggest<T> extends Component {
   selectSuggestion(_value: T, _evt: MouseEvent | KeyboardEvent) {}
 }
 
+/**
+ * The reference popup hosted on an input rather than on an editor.
+ *
+ * Obsidian owns the field's keyboard and draws the popup itself; none of that
+ * is the plugin's code. What is left is what the plugin says: the field the
+ * popup was put on, which it reads and writes, and the showing and hiding a
+ * test watches for.
+ */
+export abstract class AbstractInputSuggest<T> {
+  limit = 100;
+
+  constructor(
+    public app: unknown,
+    protected textInputEl: HTMLInputElement | HTMLDivElement,
+  ) {}
+
+  setValue(value: string) {
+    (this.textInputEl as HTMLInputElement).value = value;
+  }
+
+  getValue(): string {
+    return (this.textInputEl as HTMLInputElement).value;
+  }
+
+  open() {}
+
+  close() {}
+
+  protected abstract getSuggestions(query: string): T[] | Promise<T[]>;
+
+  renderSuggestion(_value: T, _el: HTMLElement) {}
+
+  selectSuggestion(_value: T, _evt: MouseEvent | KeyboardEvent) {}
+}
+
 export class PluginSettingTab {
   containerEl: HTMLElement;
 

@@ -45,11 +45,14 @@ import {
   noteWrites,
   refsWrite,
 } from './notes';
-import type { NoteKind } from './notes';
+import type { NoteKind, Write } from './notes';
 import { WriteNoteModal } from './note-modal';
+import { WriteRefsModal } from './refs-modal';
 import { VersionSuggestModal } from './modal';
 import { CreateVersionModal } from './create-modal';
+import { appendPassage } from './quotes';
 import { ReferenceSuggest } from './suggest';
+import type { RefSuggestion } from './suggest-rows';
 import { KingdoneChapelSettingTab } from './settings';
 import { KingdoneChapelView } from './view';
 import { Breadcrumbs } from './breadcrumbs';
@@ -1094,10 +1097,12 @@ export default class KingdoneChapelPlugin extends Plugin {
    * Open the refs aside of the verse the cursor is in, with the `@` a reference
    * is written from already in it.
    *
-   * One verse: a refs aside belongs to the verse it is about, and a selection
-   * covering several asked for several asides carrying the one reference, which
-   * is a question the popup cannot be asked from inside the chapter. It is said
-   * rather than silently narrowed to the first.
+   * One verse: a refs aside belongs to the verse it is about, and the `@` is
+   * left in the chapter for the popup to open on, exactly where the reference
+   * goes. A selection covering several asks for several asides carrying the one
+   * reference, and there is no one line in the chapter to type that reference
+   * on — so it is asked in a modal instead, and written on every verse of the
+   * selection at once.
    */
   writeRefs(target: ChapterPane) {
     // The pane was read as a chapter being written, which is what says there is
@@ -1106,7 +1111,7 @@ export default class KingdoneChapelPlugin extends Plugin {
 
     const verses = this.noteVerses(target.view);
     if (verses && verses.length > 1) {
-      new Notice('Refs are written on one verse at a time.');
+      new WriteRefsModal(this.app, this, target, verses).open();
       return;
     }
 
@@ -1131,6 +1136,54 @@ export default class KingdoneChapelPlugin extends Plugin {
     editor.replaceRange(write.text, write.from, write.to);
     editor.setCursor(cursor);
     this.startTyping(editor, 'i');
+  }
+
+  /**
+   * Write one reference into the refs aside of every verse a selection covered.
+   *
+   * Every aside is measured against the chapter as it stands and the writes go
+   * in last first, so that each still lands where it was measured — the same
+   * ordering a note's markers go in under. The quote a passage row points at is
+   * written afterwards, once: it sits at the foot of the chapter, below every
+   * aside, and reads the chapter back with the asides already in it.
+   *
+   * The cursor is left where the reader put it. They have already said what
+   * they wanted and there is nothing further to type.
+   */
+  writeRefsOn(target: ChapterPane, verses: number[], item: RefSuggestion) {
+    const editor = target.view.editor;
+    const text = editor.getValue();
+    const headings = noteHeadings(this.settings.language);
+
+    const writes: Write[] = [];
+    const missing: number[] = [];
+    for (const verse of verses) {
+      const written = refsWrite(
+        text,
+        `${target.prefix}-${verse}`,
+        [REFS],
+        headings,
+        item.markdown,
+      );
+      // A version that merges verses writes one id for the run, so a selection
+      // may cover verses the chapter carries no aside to write on. They are
+      // left out and said, the way a note says the ones it was not written on.
+      if (!written) missing.push(verse);
+      else writes.push(written.write);
+    }
+
+    if (!writes.length) {
+      new Notice(`This chapter writes no verse of ${said(verses)}.`);
+      return;
+    }
+    if (missing.length) {
+      new Notice(`Written without ${said(missing)}: this chapter has none.`);
+    }
+
+    for (const write of writes.sort((a, b) => b.from.line - a.from.line)) {
+      editor.replaceRange(write.text, write.from, write.to);
+    }
+    if (item.passage) appendPassage(this, editor, item.passage);
   }
 
   /**

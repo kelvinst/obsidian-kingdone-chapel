@@ -8,15 +8,10 @@ import type {
   TFile,
 } from 'obsidian';
 
-import { quoteHeadings } from './books';
-import { ReferenceRows } from './suggest-rows';
-import {
-  blockIdLine,
-  hasBlockId,
-  outsideFences,
-  quotePlacement,
-} from './utils';
+import { appendPassage } from './quotes';
+import { ReferenceRows, renderRow } from './suggest-rows';
 import type { BookMatch } from './books';
+import type { QuoteWrite } from './quotes';
 import type { ParsedRef } from './reference';
 import type { Passage, Row } from './suggest-rows';
 import type { ChapterTarget, Location } from './types';
@@ -51,14 +46,6 @@ const INSTRUCTIONS: Instruction[] = [
   { command: '↵', purpose: 'to insert' },
   { command: '⇥', purpose: 'to insert and rename' },
 ];
-
-/** Where a quote was written, for the cursor to be read back against. */
-interface QuoteWrite {
-  /** Line the quote was written at the end of. */
-  line: number;
-  /** Lines it added there. */
-  lines: number;
-}
 
 /**
  * The popup's own list of rows, which holds which of them is highlighted.
@@ -182,26 +169,7 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
   }
 
   renderSuggestion(item: Row, el: HTMLElement) {
-    if ('hint' in item) {
-      el.createSpan({ cls: 'kcp-suggest-hint', text: item.hint });
-      return;
-    }
-
-    const head = el.createDiv({ cls: 'kcp-suggest-head' });
-    // The row is the finished line, so it is dressed as one: what it says and
-    // how it will look are both answered by reading it.
-    head.createSpan({ cls: 'kcp-suggest-ref', text: item.ref });
-    // The row reads as the reference it will write. An abbreviation does not
-    // say which book that is — `Jn` is Jonas in Portuguese and John in English —
-    // so name the book behind it, and leave it off when the row already says it.
-    if (!item.ref.startsWith(item.book)) {
-      head.createSpan({ cls: 'kcp-suggest-book', text: item.book });
-    }
-    // Two rows writing the same chapter differently are told apart by this.
-    if (item.note)
-      head.createSpan({ cls: 'kcp-suggest-note', text: item.note });
-    if (item.preview)
-      el.createEl('small', { text: item.preview, cls: 'kcp-preview' });
+    renderRow(item, el);
   }
 
   selectSuggestion(item: Row, evt: MouseEvent | KeyboardEvent) {
@@ -264,84 +232,8 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
     };
   }
 
-  /**
-   * Put the quote at the end of the note, out of the way of the line being
-   * written: a reference in the middle of a sentence is there to be read as a
-   * reference, and the passage it stands for belongs at the foot of the page.
-   *
-   * A passage already quoted is left as it is, so referring to it a second
-   * time writes a second link to the one quote rather than a second copy of it.
-   * The quote is found by reading the lines rather than by a pattern built
-   * from the id: the id is only ever asked whether it closes a line, and a
-   * pattern would have to be written around whatever a version is named.
-   */
+  /** The quote a passage row points at, written into the note it links from. */
   appendPassage(editor: Editor, passage: Passage): QuoteWrite | null {
-    if (hasBlockId(editor.getValue(), passage.id)) return null;
-
-    // The quotes written before the ids carried the `quote-` prefix name the
-    // same passage under the id it went by then. That is the quote this
-    // reference points at, so it is renamed where it stands — the link about to
-    // be written names the prefixed id, and would point at nothing otherwise.
-    const legacy = passage.id.replace(/^quote-/, '');
-    const named = blockIdLine(editor.getValue(), legacy);
-    if (named !== null) {
-      const lines = editor.getValue().split('\n');
-      const outside = outsideFences(lines);
-      lines.forEach((line, at) => {
-        if (!outside[at]) return; // a fence shows an id, and names none
-        // The id closes the line it belongs to, so what it names is what
-        // stands in front of it — read off rather than matched, an id being
-        // made of whatever a version folder is named. The links naming it are
-        // renamed with it, or every reference already written to this quote
-        // would be left pointing at nothing.
-        const ended = line.trimEnd();
-        const renamed =
-          at === named
-            ? ended.slice(0, ended.length - legacy.length) + passage.id
-            : renamedLinks(line, legacy, passage.id);
-        if (renamed === line) return;
-        editor.replaceRange(
-          renamed,
-          { line: at, ch: 0 },
-          { line: at, ch: line.length },
-        );
-      });
-      return null;
-    }
-
-    const at = quotePlacement(
-      editor.getValue(),
-      quoteHeadings(this.plugin.settings.language),
-      passage.callout,
-    );
-    editor.replaceRange(at.text, { line: at.line, ch: at.ch });
-    return { line: at.line, lines: at.text.split('\n').length - 1 };
-  }
-}
-
-/**
- * `line` with the links naming the block id `from` naming `to` instead.
- *
- * An id is made of whatever a version folder is named, so it is read off the
- * line rather than matched as a pattern — and only where it ends there: an id
- * a longer one opens with, `nvi-gen-1-1-2` inside `nvi-gen-1-1-20`, names some
- * other quote and is left as it is.
- *
- * A link naming a file names a block of that file, and this note's quote is the
- * only one being renamed, so only the links that name no file — `[[#^id]]` —
- * are renamed with it.
- */
-function renamedLinks(line: string, from: string, to: string): string {
-  const mark = `[[#^${from}`;
-  let out = '';
-  let rest = line;
-  for (;;) {
-    const at = rest.indexOf(mark);
-    if (at === -1) return out + rest;
-    const after = rest[at + mark.length];
-    out +=
-      rest.slice(0, at) +
-      (after && /[A-Za-z0-9-]/.test(after) ? mark : `[[#^${to}`);
-    rest = rest.slice(at + mark.length);
+    return appendPassage(this.plugin, editor, passage);
   }
 }

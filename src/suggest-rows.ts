@@ -161,6 +161,35 @@ export interface RowContext {
 }
 
 /**
+ * One row drawn: what it will write, and what a reader needs in order to tell
+ * it from the row above.
+ *
+ * The drawing belongs with the rows rather than with the popup showing them: a
+ * modal field offering the same rows offers them looking the same.
+ */
+export function renderRow(item: Row, el: HTMLElement) {
+  if ('hint' in item) {
+    el.createSpan({ cls: 'kcp-suggest-hint', text: item.hint });
+    return;
+  }
+
+  const head = el.createDiv({ cls: 'kcp-suggest-head' });
+  // The row is the finished line, so it is dressed as one: what it says and
+  // how it will look are both answered by reading it.
+  head.createSpan({ cls: 'kcp-suggest-ref', text: item.ref });
+  // The row reads as the reference it will write. An abbreviation does not
+  // say which book that is — `Jn` is Jonas in Portuguese and John in English —
+  // so name the book behind it, and leave it off when the row already says it.
+  if (!item.ref.startsWith(item.book)) {
+    head.createSpan({ cls: 'kcp-suggest-book', text: item.book });
+  }
+  // Two rows writing the same chapter differently are told apart by this.
+  if (item.note) head.createSpan({ cls: 'kcp-suggest-note', text: item.note });
+  if (item.preview)
+    el.createEl('small', { text: item.preview, cls: 'kcp-preview' });
+}
+
+/**
  * The popup's rows, read out of a query and the note it is written in. The
  * suggester is one way to ask for them; anything holding a reference the
  * reader types can ask the same way.
