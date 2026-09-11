@@ -466,18 +466,15 @@ function joined(
   const said = inside.slice(from, to);
   const found = said.lastIndexOf(']]');
 
-  // A list already ending in what this write would add — a refs aside opened
-  // and then left unwritten, and the command run on it a second time — is left
+  // A list already naming what this write would add — a refs aside opened and
+  // then left unwritten, or a reference the verse was already given — is left
   // as it stands rather than given a second one. The cursor mark alone goes
-  // back into it, which is what the reader pressed the key for.
-  //
-  // Whatever else the list names: the `@` waiting to be written into is the
-  // one closing it, and a list that already carries a reference or two is the
-  // usual case for a second press rather than the odd one.
+  // back into it, which is what the reader asked for.
   const bare = said.replace(/\.\s*$/, '').trimEnd();
   const alone = link.replace(CURSOR, '');
-  if (alone && bare.endsWith(alone)) {
-    const at = from + bare.length;
+  const already = namedAt(said, bare, alone);
+  if (already >= 0) {
+    const at = from + already;
     return `${inside.slice(0, at)}${CURSOR}${inside.slice(at)}`;
   }
 
@@ -486,6 +483,21 @@ function joined(
   // what it does say, in front of the full stop that closes it.
   const end = from + (found < 0 ? closing(said) : found + 2);
   return `${inside.slice(0, end)}; ${link}${inside.slice(end)}`;
+}
+
+/**
+ * Where the cursor goes in a list that already names `link` — just past it —
+ * or -1 where the list does not name it.
+ *
+ * The `@` counts only where it closes the list: whatever else the list names,
+ * the one waiting to be written into is the last of them. A reference chosen
+ * before the write counts wherever it was written, a verse given it once and
+ * then given something else not being a verse asking for it twice.
+ */
+function namedAt(said: string, bare: string, link: string): number {
+  if (link === TYPED) return bare.endsWith(link) ? bare.length : -1;
+  const at = said.indexOf(link);
+  return at < 0 ? -1 : at + link.length;
 }
 
 /**
