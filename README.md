@@ -24,7 +24,8 @@ in your vault, keeping chapter _and_ verse alignment.
 - **Notes on a verse** (`Write a note on this verse`) written into a version's chapter: the
   callout at the foot of the chapter and the marker in the verse, both in one step.
 - **Refs on a verse** (`Write the refs on this verse`) opening the verse's own aside with the
-  `@` a reference is written from already in it.
+  `@` a reference is written from already in it — or, over a selection of verses, asking for the
+  one reference in a modal and writing it into every one of them.
 - Jumps land on the verse's block anchor (`#^...`), not just the top of the chapter.
 - Handles versions that merge verses — if MENS puts verses 1–2 under `**1**`, asking for verse 2
   finds it and labels the card `v.1`.
@@ -177,9 +178,12 @@ as commands. A verse whose aside already says something has the refs joined to i
 second aside opened beside it: in front of the notes where it carries any, since that is the
 order the vault writes them in, and onto the end of the list where it already carries refs.
 
-The refs of one verse, rather than of a passage: a selection covering more than one verse is
-refused and said to be, since a single reference written into several asides is a question the
-popup cannot be asked from inside the chapter.
+A selection covering more than one verse is asked in a modal instead, since a single reference
+written into several asides has no one line in the chapter to be typed on. The modal carries one
+field, and that field offers the same rows an `@` in the editor offers — the same reference, the
+same versions, the same embeds and quotes. The row you pick is written into the refs aside of
+every verse the selection covered, joining an aside that already says something the same way.
+Verses the chapter carries no id for are left out, and it says which.
 
 ### Chapter breadcrumbs
 
