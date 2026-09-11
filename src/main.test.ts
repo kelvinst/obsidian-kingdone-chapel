@@ -3056,6 +3056,23 @@ describe('writing the same refs on a selection of verses', () => {
     );
   });
 
+  it("runs an embed written a verse at a time onto the aside's one line", () => {
+    const { view, editor } = editing();
+    world.plugin.writeRefsOn(
+      world.plugin.chapterPane(view)!,
+      [1],
+      row({
+        markdown:
+          '![[NVI-43-JHN-014#^nvi-jhn-14-12]]\n![[NVI-43-JHN-014#^nvi-jhn-14-13]]',
+      }),
+    );
+
+    expect(editor.text).toContain(
+      ',,**Refs**: ![[NVI-43-JHN-014#^nvi-jhn-14-12]] ' +
+        '![[NVI-43-JHN-014#^nvi-jhn-14-13]].,,\n^nvi-gen-1-1',
+    );
+  });
+
   it('writes the quote a passage row points at, once', () => {
     const { view, editor } = editing();
     world.plugin.writeRefsOn(

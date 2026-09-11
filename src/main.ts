@@ -1155,6 +1155,11 @@ export default class KingdoneChapelPlugin extends Plugin {
     const text = editor.getValue();
     const headings = noteHeadings(this.settings.language);
 
+    // An aside is one line, and a passage embedded verse by verse is written
+    // as a line each: run onto the one line here, or the aside would be broken
+    // across as many lines as the passage has verses.
+    const link = item.markdown.split('\n').join(' ');
+
     const writes: Write[] = [];
     const missing: number[] = [];
     for (const verse of verses) {
@@ -1163,7 +1168,7 @@ export default class KingdoneChapelPlugin extends Plugin {
         `${target.prefix}-${verse}`,
         [REFS],
         headings,
-        item.markdown,
+        link,
       );
       // A version that merges verses writes one id for the run, so a selection
       // may cover verses the chapter carries no aside to write on. They are
