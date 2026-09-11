@@ -19,7 +19,7 @@ import {
   shortReference,
 } from './reference';
 import { parseChapterName, verseWords } from './utils';
-import type { App, TFile } from 'obsidian';
+import type { App, EditorPosition, TFile } from 'obsidian';
 import type { BookMatch } from './books';
 import type { BooklessRef, ParsedContextRef, ParsedRef } from './reference';
 import type { ChapterTarget, Location } from './types';
@@ -43,6 +43,21 @@ const CARRIED =
 /** Rows a whole popup may hold, so a query naming no version and matching
  * every book cannot read the vault for a page nobody will scroll to. */
 const MAX_ROWS = 12;
+
+/**
+ * Passages a bare number is offered against: the note's own, and the one
+ * linked nearest the reference. Each is worth up to four rows — a verse and a
+ * chapter, each bare and spelled — so a third would leave the books nothing.
+ */
+const MAX_CONTEXTS = 2;
+
+/**
+ * Rows kept back for the books, which answer a bare number as much as a
+ * passage does: `@1` is a chapter of the passage at hand and the start of
+ * `1 Samuel`. Only the passages read off nearer links give way to it — the
+ * note's own has always been allowed the whole popup.
+ */
+const BOOK_ROOM = 4;
 
 /** Books one version is offered under. A query reaching for several versions
  * splits this between them rather than growing the popup. */
@@ -158,6 +173,12 @@ export interface RowContext {
    * its own — leaves it empty, and the numbers fall to the books.
    */
   before: string;
+  /**
+   * Where the reference is being written, for the passages linked before it to
+   * be read nearest first. Somewhere with no note under it — a modal field —
+   * leaves it unset, and the whole note stands before the reference.
+   */
+  at?: EditorPosition | null;
 }
 
 /**
@@ -208,50 +229,67 @@ export class ReferenceRows {
         // Numbers, and nothing wrong with them but how many they came to.
         hints.push(TOO_MANY);
       } else if (asked) {
-        const here = this.plugin.linkContext(ctx.file);
-        if (!here) hints.push(NO_CONTEXT);
+        // The note's own passage leads, and the ones linked nearer the
+        // reference follow it: a note that walks through several passages is
+        // very often writing about the one linked a line or two above, and
+        // each row already says which passage it was counted against.
+        const contexts = this.plugin.linkContexts(
+          ctx.file,
+          ctx.at || null,
+          MAX_CONTEXTS,
+        );
+        if (!contexts.length) hints.push(NO_CONTEXT);
         else {
-          // A version nobody named is the note's own, which the labels leave
+          // A version nobody named is the passage's own, which the labels leave
           // unsaid; one that was asked for is offered in every version it could
-          // still be finished as, and said in what the row writes.
-          //
-          // The note's own only stands while a link may point at it. A note
-          // about a partial version is read for the passage it is about all
-          // the same — that is what `linkContext` answered — but the link goes
-          // where it can be followed, which is what the reference with no
-          // context of its own falls back on. Falling back that far is said in
-          // the row: a version left unsaid reads as the note's own, and this
-          // one is not it.
+          // still be finished as, and said in what the row writes. What was
+          // asked for reads the same against every passage, so it is read once.
           const named = asked.versionPrefix || asked.version !== null;
-          const versions = named
-            ? this.versionsFor(asked, ctx.file)
-            : [
-                this.plugin.findCompleteVersion(here.version) ??
-                  this.plugin.defaultVersion(ctx.file),
-              ].filter((v): v is string => v !== null);
+          const askedFor = named ? this.versionsFor(asked, ctx.file) : null;
           // A half-written version stands for every version starting with it,
           // and a lone dash for every version there is — each of them reading
           // the vault for rows the popup has no room to show. Stop at the room
           // there is, rather than filling it several times over.
           const room = MAX_ROWS - hints.length;
-          for (const version of versions) {
-            if (out.length >= room) break;
-            out.push(
-              ...(await this.contextSuggestions(
-                { ...here, version },
-                asked,
-                embed,
-                ctx.file,
-                named || version !== here.version ? version : null,
-              )),
-            );
+          // The note's own passage may take the whole popup, the way it always
+          // could. A passage read off a nearer link is the lesser guess, so it
+          // takes only what the books can spare.
+          const shared = room - BOOK_ROOM;
+          for (const [at, here] of contexts.entries()) {
+            const limit = at === 0 ? room : shared;
+            if (out.length >= limit) break;
+            // A passage's own version only stands while a link may point at
+            // it. A note about a partial version is read for the passage it is
+            // about all the same — that is what `linkContexts` answered — but
+            // the link goes where it can be followed, which is what the
+            // reference with no version of its own falls back on. Falling back
+            // that far is said in the row: a version left unsaid reads as the
+            // passage's own, and this one is not it.
+            const versions =
+              askedFor ??
+              [
+                this.plugin.findCompleteVersion(here.version) ??
+                  this.plugin.defaultVersion(ctx.file),
+              ].filter((v): v is string => v !== null);
+            for (const version of versions) {
+              if (out.length >= limit) break;
+              out.push(
+                ...(await this.contextSuggestions(
+                  { ...here, version },
+                  asked,
+                  embed,
+                  ctx.file,
+                  named || version !== here.version ? version : null,
+                )),
+              );
+            }
           }
           // The numbers were read as verses alone, the run being longer than
           // a run of chapters may be. A chapter of 0 numbers no verses, so
           // there was no verse reading either and nothing to say they were
-          // read as.
+          // read as. Said of the note's own passage, which leads the rows.
           if (
-            here.chapter !== 0 &&
+            contexts[0].chapter !== 0 &&
             asked.chapter === null &&
             asked.numbers &&
             !fitsChapters(asked.numbers)

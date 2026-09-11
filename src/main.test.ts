@@ -11,7 +11,7 @@ import {
   harness,
   pane,
 } from '../test/harness';
-import type { Harness } from '../test/harness';
+import type { Harness, LinkAt } from '../test/harness';
 import { VIEW_TYPE } from './types';
 import type { Location } from './types';
 import { VersionSuggestModal } from './modal';
@@ -932,52 +932,140 @@ describe('locationOf', () => {
   });
 });
 
-describe('linkContext', () => {
+describe('linkContexts', () => {
   /** A note whose links are `targets`, in the order it writes them. */
-  function note(...targets: string[]): TFile {
+  function note(...targets: (string | LinkAt)[]): TFile {
     const file = world.vault.write('Estudos/Salmo.md', 'Um estudo.');
     world.metadataCache.links.set(file.path, targets);
     return file;
   }
 
+  /** The passages a note offers, read from a cursor far below every link. */
+  function contexts(from: TFile | null, max = 3, at = { line: 20, ch: 0 }) {
+    return world.plugin.linkContexts(from, at, max);
+  }
+
+  const GEN_ONE = () => locationFor(world, chapterPath('NVI', 1, 'GEN', 1));
+  const GEN_TWO = () => locationFor(world, chapterPath('NVI', 1, 'GEN', 2));
+  const JHN_ONE = () => locationFor(world, chapterPath('NVI', 43, 'JHN', 1));
+
   it('reads the passage off the first link that lands in the Bible', () => {
-    expect(world.plugin.linkContext(note('NVI-43-JHN-001'))).toEqual(
-      locationFor(world, chapterPath('NVI', 43, 'JHN', 1)),
-    );
+    expect(contexts(note('NVI-43-JHN-001'))).toEqual([JHN_ONE()]);
   });
 
   it('walks past everything the note links that is not a chapter', () => {
     const here = note('Estudos/Romanos', 'Bibles/Notas', 'NVI-01-GEN-002');
-    expect(world.plugin.linkContext(here)).toEqual(
-      locationFor(world, chapterPath('NVI', 1, 'GEN', 2)),
-    );
+    expect(contexts(here)).toEqual([GEN_TWO()]);
   });
 
-  it('takes the first chapter linked, not the last', () => {
-    const here = note('NVI-01-GEN-001', 'NVI-43-JHN-001');
-    expect(world.plugin.linkContext(here)).toEqual(
-      locationFor(world, chapterPath('NVI', 1, 'GEN', 1)),
+  it('keeps the first chapter linked at the head, nearer ones behind it', () => {
+    const here = note(
+      { link: 'NVI-01-GEN-001', line: 0 },
+      { link: 'NVI-43-JHN-001', line: 6 },
     );
+    expect(contexts(here)).toEqual([GEN_ONE(), JHN_ONE()]);
   });
 
-  it('reads the chapter a link names past the verse it points into', () => {
-    const here = note('NVI-43-JHN-001#^nvi-jhn-1-1');
-    expect(world.plugin.linkContext(here)).toEqual(
-      locationFor(world, chapterPath('NVI', 43, 'JHN', 1)),
+  it('offers the links before the cursor nearest first', () => {
+    const here = note(
+      { link: 'NVI-01-GEN-001', line: 0 },
+      { link: 'NVI-01-GEN-002', line: 3 },
+      { link: 'NVI-43-JHN-001', line: 6 },
     );
+    expect(contexts(here)).toEqual([GEN_ONE(), JHN_ONE(), GEN_TWO()]);
+  });
+
+  it('leaves out a link written past the cursor', () => {
+    const here = note(
+      { link: 'NVI-01-GEN-001', line: 0 },
+      { link: 'NVI-43-JHN-001', line: 8 },
+    );
+    expect(contexts(here, 3, { line: 4, ch: 0 })).toEqual([GEN_ONE()]);
+  });
+
+  it('counts a link written earlier on the line being typed', () => {
+    const here = note(
+      { link: 'NVI-01-GEN-001', line: 0 },
+      { link: 'NVI-43-JHN-001', line: 4, col: 2 },
+    );
+    expect(contexts(here, 3, { line: 4, ch: 20 })).toEqual([
+      GEN_ONE(),
+      JHN_ONE(),
+    ]);
+  });
+
+  it('leaves out a link written further along the line being typed', () => {
+    const here = note(
+      { link: 'NVI-01-GEN-001', line: 0 },
+      { link: 'NVI-43-JHN-001', line: 4, col: 30 },
+    );
+    expect(contexts(here, 3, { line: 4, ch: 20 })).toEqual([GEN_ONE()]);
+  });
+
+  it('counts a chapter linked over and over as the one passage', () => {
+    const here = note(
+      { link: 'NVI-01-GEN-001', line: 0 },
+      { link: 'NVI-43-JHN-001', line: 2 },
+      { link: 'NVI-01-GEN-001', line: 5 },
+    );
+    expect(contexts(here)).toEqual([GEN_ONE(), JHN_ONE()]);
+  });
+
+  it('stops at the passages it was asked for', () => {
+    const here = note(
+      { link: 'NVI-01-GEN-001', line: 0 },
+      { link: 'NVI-01-GEN-002', line: 3 },
+      { link: 'NVI-43-JHN-001', line: 6 },
+    );
+    expect(contexts(here, 2)).toEqual([GEN_ONE(), JHN_ONE()]);
+  });
+
+  it('reads the whole note where there is no cursor to count back from', () => {
+    const here = note(
+      { link: 'NVI-01-GEN-001', line: 0 },
+      { link: 'NVI-43-JHN-001', line: 6 },
+    );
+    expect(world.plugin.linkContexts(here, null, 3)).toEqual([
+      GEN_ONE(),
+      JHN_ONE(),
+    ]);
+  });
+
+  it('gives up walking back long before a whole note has been read', () => {
+    const far: LinkAt[] = [
+      { link: 'NVI-01-GEN-001', line: 0 },
+      { link: 'NVI-43-JHN-001', line: 1 },
+    ];
+    for (let line = 2; line < 60; line += 1) {
+      far.push({ link: 'Estudos/Romanos', line });
+    }
+
+    // Every link between the cursor and João is a link to nothing, and the
+    // walk back stops before reaching it: a passage that far up is not what
+    // the paragraph is about, and this runs on every keystroke.
+    expect(contexts(note(...far), 3, { line: 60, ch: 0 })).toEqual([GEN_ONE()]);
   });
 
   it('carries nothing from a link to nothing the vault holds', () => {
-    expect(world.plugin.linkContext(note('Salmos 151'))).toBeNull();
+    expect(contexts(note('Salmos 151'))).toEqual([]);
   });
 
   it('carries nothing from a note that links nothing at all', () => {
     const file = world.vault.write('Estudos/Vazio.md', 'Sem links.');
-    expect(world.plugin.linkContext(file)).toBeNull();
+    expect(contexts(file)).toEqual([]);
   });
 
   it('carries nothing where there is no note to read', () => {
-    expect(world.plugin.linkContext(null)).toBeNull();
+    expect(contexts(null)).toEqual([]);
+  });
+
+  it('carries nothing where no passage was asked for', () => {
+    expect(contexts(note('NVI-01-GEN-001'), 0)).toEqual([]);
+  });
+
+  it('reads the chapter a link names past the verse it points into', () => {
+    const here = note('NVI-43-JHN-001#^nvi-jhn-1-1');
+    expect(contexts(here)).toEqual([JHN_ONE()]);
   });
 });
 describe('cursorVerse', () => {
