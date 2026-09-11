@@ -770,5 +770,19 @@ describe('refsWrite', () => {
       const text = chapter(verse(1, `,,**Refs**: ${LINK}.,,`));
       expect(applied(text, [chose(text)!.write])).toBe(text);
     });
+
+    it('leaves it alone where the list names it before anything else', () => {
+      // The `@` is only ever the last thing a list says, and a reference is
+      // named wherever it was written: a verse given this one and then given
+      // another is not a verse asking for it twice.
+      const text = chapter(verse(1, `,,**Refs**: ${LINK}; [[Mt 1.1]].,,`));
+      const written = chose(text)!;
+      expect(applied(text, [written.write])).toBe(text);
+      const lines = text.split('\n');
+      expect(written.cursor).toEqual({
+        line: written.write.from.line,
+        ch: lines[written.write.from.line].indexOf(LINK) + LINK.length,
+      });
+    });
   });
 });
