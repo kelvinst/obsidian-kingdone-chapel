@@ -188,6 +188,8 @@ describe('parseVerseLine', () => {
     // nothing at all.
     expect(parseVerseLine('16.')).toBeNull();
     expect(parseVerseLine('16.\r')).toBeNull();
+    // Prose bolds numbers of its own, and a wrap can land on one of those too.
+    expect(parseVerseLine('**2002**, e a edição brasileira')).toBeNull();
   });
 
   it('reads a number written without the space as the end of what is above', () => {
