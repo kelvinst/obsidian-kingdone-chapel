@@ -114,8 +114,12 @@ const VERSE_HEADING = /^#{1,6}\s/;
  * The space asked for is a space or a tab, which is what Markdown accepts
  * after the dot — a file written with CRLF ends its lines on a carriage
  * return, and a return is not what a list item puts there.
+ *
+ * A bolded number is asked the same. Prose bolds numbers of its own — a year,
+ * a count — and a wrap landing on one leaves it opening a line exactly as the
+ * reference did; a marker written that way puts a space after the bold.
  */
-const VERSE_MARKER = /^\s*(?:\*\*(\d+)\*\*|(\d+)\.(?=[ \t]))\s*/;
+const VERSE_MARKER = /^\s*(?:\*\*(\d+)\*\*(?=[ \t])|(\d+)\.(?=[ \t]))\s*/;
 /** The verse a block id names, in the number it ends on. */
 const VERSE_ID = /-(\d+)$/;
 /**
