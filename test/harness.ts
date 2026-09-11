@@ -34,6 +34,29 @@ interface BlockLines {
   end: { line: number };
 }
 
+/** Where a link starts and ends, which is how Obsidian reports a link. */
+interface LinkPos {
+  start: { line: number; col: number };
+  end: { line: number; col: number };
+}
+
+/** A position covering nothing, at the one spot a link was said to start. */
+function lineAt(line: number, col: number): LinkPos {
+  return { start: { line, col }, end: { line, col } };
+}
+
+/**
+ * Where a link stands in the note, for the reading that goes by how far back
+ * from the cursor it was written. A link given as a bare target stands on a
+ * line of its own, in the order it was given, which is how a note that names
+ * a passage a paragraph reads.
+ */
+export interface LinkAt {
+  link: string;
+  line: number;
+  col?: number;
+}
+
 /** Handlers by event name, for the vault and the workspace alike. */
 class Emitter {
   handlers = new Map<string, ((...args: never[]) => void)[]>();
@@ -164,7 +187,7 @@ export class FakeMetadataCache extends Emitter {
   /** path -> block ids the cache knows, for the files where it knows any. */
   blocks = new Map<string, string[]>();
   /** path -> the links the file writes, in the order it writes them. */
-  links = new Map<string, string[]>();
+  links = new Map<string, (string | LinkAt)[]>();
   /** path -> the frontmatter the cache read off it. */
   frontmatter = new Map<string, Record<string, unknown>>();
 
@@ -188,7 +211,7 @@ export class FakeMetadataCache extends Emitter {
    */
   getFileCache(file: TFile): {
     blocks?: Record<string, { position: BlockLines }>;
-    links?: { link: string }[];
+    links?: { link: string; position: LinkPos }[];
     frontmatter?: Record<string, unknown>;
   } | null {
     const ids = this.blocks.get(file.path);
@@ -206,7 +229,18 @@ export class FakeMetadataCache extends Emitter {
     }
     return {
       ...(ids ? { blocks } : {}),
-      ...(links ? { links: links.map((link) => ({ link })) } : {}),
+      ...(links
+        ? {
+            links: links.map((link, at) =>
+              typeof link === 'string'
+                ? { link, position: lineAt(at, 0) }
+                : {
+                    link: link.link,
+                    position: lineAt(link.line, link.col || 0),
+                  },
+            ),
+          }
+        : {}),
       ...(front ? { frontmatter: front } : {}),
     };
   }

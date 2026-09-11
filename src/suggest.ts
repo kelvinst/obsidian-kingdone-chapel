@@ -111,6 +111,7 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
       query: ctx.query,
       file: ctx.file,
       before: ctx.editor.getLine(ctx.start.line).slice(0, ctx.start.ch),
+      at: ctx.start,
     });
   }
 
