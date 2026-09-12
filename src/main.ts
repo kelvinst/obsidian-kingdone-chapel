@@ -6,7 +6,7 @@ import {
   WorkspaceLeaf,
   getLinkpath,
 } from 'obsidian';
-import type { Editor, PaneType, TAbstractFile } from 'obsidian';
+import type { Editor, EditorPosition, PaneType, TAbstractFile } from 'obsidian';
 
 import { DEFAULT_SETTINGS, VIEW_TYPE } from './types';
 import type {
@@ -883,24 +883,67 @@ export default class KingdoneChapelPlugin extends Plugin {
   }
 
   /**
-   * The passage a note is already about, read from the first link in it that
-   * lands in the Bible. A note names its passage once and then goes on writing
-   * about it, so that first link is what a reference written as a bare number
-   * is written against. Links are always to a chapter, so it is one.
+   * The passages a note is already about, read off the links written in it,
+   * best first.
+   *
+   * A note names its passage once and goes on writing about it, so the first
+   * link that lands in the Bible leads: it is what the note as a whole is
+   * about. A note that moves through several passages is a different matter —
+   * the paragraph being written is very often about the chapter linked a line
+   * or two above — so the links standing before `at` follow it, the closest
+   * one first. A chapter linked over and over is the one passage, kept at its
+   * best place.
+   *
+   * `at` is where the reference is being written; with none — a modal field,
+   * a note read rather than typed in — the whole note stands before it.
+   *
+   * Links are always to a chapter, so every passage here is one. Reading
+   * stops at `max`, since this runs on every keystroke and the popup has room
+   * for only so many.
    */
-  linkContext(from: TFile | null): Location | null {
-    if (!from) return null;
+  linkContexts(
+    from: TFile | null,
+    at: EditorPosition | null,
+    max: number,
+  ): Location[] {
+    if (!from || max <= 0) return [];
     const cache = this.app.metadataCache.getFileCache(from);
-    for (const link of (cache && cache.links) || []) {
-      const dest = this.app.metadataCache.getFirstLinkpathDest(
-        getLinkpath(link.link),
-        from.path,
-      );
-      // Only a chapter file answers; everything else the note links is skipped.
-      const loc = dest ? this.locationOf(dest, null) : null;
-      if (loc) return loc;
+    const links = (cache && cache.links) || [];
+
+    const out: Location[] = [];
+    const seen = new Set<string>();
+    const take = (loc: Location | null): boolean => {
+      if (!loc || seen.has(loc.file.path)) return false;
+      seen.add(loc.file.path);
+      out.push(loc);
+      return true;
+    };
+
+    // The note's own passage, which leads however far back it was written.
+    for (const link of links) {
+      if (take(this.linkLocation(link.link, from))) break;
     }
-    return null;
+
+    // Back from the cursor, so the passage being written about is reached
+    // first and a long note is never walked further than the popup can show.
+    const before = at
+      ? links.filter((link) => startsBefore(link.position.start, at))
+      : links;
+    const stop = Math.max(0, before.length - SCAN_BACK);
+    for (let i = before.length - 1; i >= stop && out.length < max; i -= 1) {
+      take(this.linkLocation(before[i].link, from));
+    }
+    return out.slice(0, max);
+  }
+
+  /** Where a link written in `from` lands, for the links that land in a
+   * chapter of a version the vault holds. Everything else answers nothing. */
+  linkLocation(link: string, from: TFile): Location | null {
+    const dest = this.app.metadataCache.getFirstLinkpathDest(
+      getLinkpath(link),
+      from.path,
+    );
+    return dest ? this.locationOf(dest, null) : null;
   }
 
   /** Verse being read: the cursor while editing, the rendered page while reading. */
@@ -2067,4 +2110,25 @@ export default class KingdoneChapelPlugin extends Plugin {
     }
     new VersionSuggestModal(this.app, this, loc, items).open();
   }
+}
+
+/**
+ * Links walked back from the cursor before the reading gives up. A note that
+ * writes nothing but links to other notes would otherwise be resolved end to
+ * end on every keystroke, and a passage that far up the page is not what the
+ * paragraph being written is about.
+ */
+const SCAN_BACK = 24;
+
+/**
+ * Whether a link starting at `start` was written before the cursor at `at`.
+ * A link on the line being typed counts only where it stands in front of the
+ * reference — the one a semicolon carries a book on from is written right
+ * there, and what follows the cursor has not been read yet.
+ */
+function startsBefore(
+  start: { line: number; col: number },
+  at: EditorPosition,
+): boolean {
+  return start.line < at.line || (start.line === at.line && start.col < at.ch);
 }

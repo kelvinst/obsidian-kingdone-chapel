@@ -8,7 +8,7 @@ import type {
 } from 'obsidian';
 
 import { FakeEditor, chapter, chapterPath, harness } from '../test/harness';
-import type { Harness } from '../test/harness';
+import type { Harness, LinkAt } from '../test/harness';
 import { ReferenceSuggest } from './suggest';
 import type { RefSuggestion } from './suggest';
 import type { ChapterTarget, KingdoneChapelSettings } from './types';
@@ -1167,6 +1167,270 @@ describe('a number read against the passage the note is about', () => {
       new MouseEvent('click'),
     );
     expect(editor.getLine(0)).toBe('@2');
+  });
+});
+
+describe('a number read against the passages linked before it', () => {
+  /**
+   * A note that walks through several passages, one link a paragraph, and the
+   * popup for a query typed below the last of them. The links stand where
+   * `targets` puts them, which is what "how far back" is counted from.
+   */
+  function walking(
+    targets: LinkAt[],
+    files: Record<string, string> = vault,
+    settings: Partial<KingdoneChapelSettings> = {},
+  ) {
+    const world = harness(files, {
+      language: 'pt',
+      defaultVersion: 'NVI',
+      ...settings,
+    });
+    const from = world.vault.write('Estudos/Nota.md', 'Um estudo.');
+    world.metadataCache.links.set(from.path, targets);
+    return { world, from, suggest: new ReferenceSuggest(world.plugin) };
+  }
+
+  /** A query typed on `line`, below the links the note already wrote. */
+  function below(query: string, file: TFile, line: number) {
+    return {
+      query,
+      file,
+      editor: new FakeEditor('') as unknown as Editor,
+      start: { line, ch: 0 },
+      end: { line, ch: query.length },
+    } as unknown as EditorSuggestContext;
+  }
+
+  it("offers the passage linked nearest after the note's own", async () => {
+    const { from, suggest } = walking([
+      { link: 'NVI-01-GEN-001', line: 0 },
+      { link: 'NVI-43-JHN-001', line: 5 },
+    ]);
+
+    const rows = await offered(below('2', from, 9), suggest);
+
+    expect(rows.map((r) => r.book)).toEqual([
+      'Gênesis 1.2',
+      'Gênesis 2',
+      'Gênesis 1.2',
+      'Gênesis 2',
+      'João 1.2',
+      'João 2',
+      'João 1.2',
+      'João 2',
+    ]);
+  });
+
+  it('leaves out a passage linked below the reference being written', async () => {
+    const { from, suggest } = walking([
+      { link: 'NVI-01-GEN-001', line: 0 },
+      { link: 'NVI-43-JHN-001', line: 12 },
+    ]);
+
+    const rows = await offered(below('2', from, 9), suggest);
+
+    expect(rows.every((r) => r.book.startsWith('Gênesis'))).toBe(true);
+  });
+
+  it('counts a chapter linked twice as the one passage', async () => {
+    const { from, suggest } = walking([
+      { link: 'NVI-01-GEN-001', line: 0 },
+      { link: 'NVI-01-GEN-001', line: 5 },
+    ]);
+
+    const rows = await offered(below('2', from, 9), suggest);
+
+    expect(rows.map((r) => r.ref)).toEqual([
+      '2',
+      '2',
+      'Gênesis 1.2',
+      'Gênesis 2',
+    ]);
+  });
+
+  it('leaves the books room under the passages it offers', async () => {
+    const { from, suggest } = walking(
+      [
+        { link: 'NVI-01-GEN-001', line: 0 },
+        { link: 'NVI-43-JHN-001', line: 5 },
+      ],
+      { ...vault, ...chapter('NVI', 9, '1SA', 1, ['Havia um homem.']) },
+    );
+
+    // `1` is a chapter of either passage and the start of `1 Samuel`, and the
+    // popup has to say so: the passages never take the whole of it.
+    const rows = await offered(below('1', from, 9), suggest);
+
+    expect(rows.length).toBeLessThanOrEqual(12);
+    expect(rows.some((r) => r.book.startsWith('1 '))).toBe(true);
+  });
+
+  it('keeps the books their room where two versions answer the first', async () => {
+    const crowded: Record<string, string> = {};
+    for (const version of ['NVA', 'NVB']) {
+      Object.assign(crowded, chapter(version, 1, 'GEN', 1, ['No princípio']));
+      Object.assign(crowded, chapter(version, 43, 'JHN', 1, ['O Verbo']));
+      Object.assign(crowded, chapter(version, 9, '1SA', 1, ['Havia um homem']));
+    }
+    const { from, suggest } = walking(
+      [
+        { link: 'NVA-01-GEN-001', line: 0 },
+        { link: 'NVA-43-JHN-001', line: 5 },
+      ],
+      crowded,
+      { defaultVersion: 'NVA' },
+    );
+
+    // Two versions of the note's own passage come to eight rows, and the four
+    // left are the books'. The nearer passage would take them, so it is not
+    // asked — the guess the reader typed outranks the one read off a link.
+    const rows = await offered(below('1 -nv', from, 9), suggest);
+
+    expect(rows.some((r) => r.book.startsWith('1 Samuel'))).toBe(true);
+    expect(rows.some((r) => r.book.startsWith('João'))).toBe(false);
+  });
+
+  it('writes each reading once where both passages are the one book', async () => {
+    const { from, suggest } = walking(
+      [
+        { link: 'NVI-01-GEN-001', line: 0 },
+        { link: 'NVI-01-GEN-002', line: 5 },
+      ],
+      { ...vault, ...chapter('NVI', 1, 'GEN', 2, ['Assim foram concluídos.']) },
+    );
+
+    // The verse is counted in each chapter and differs; the chapter is the
+    // book's either way, and saying `Gênesis 2` twice is a row thrown away.
+    const rows = await offered(below('5', from, 9), suggest);
+
+    expect(rows.map((r) => r.markdown)).toEqual([
+      ...new Set(rows.map((r) => r.markdown)),
+    ]);
+    expect(rows.map((r) => r.book)).toEqual([
+      'Gênesis 1.5',
+      'Gênesis 5',
+      'Gênesis 1.5',
+      'Gênesis 5',
+      'Gênesis 2.5',
+      'Gênesis 2.5',
+    ]);
+  });
+
+  it('keeps both readings where a chapter with no ids links them alike', async () => {
+    const { from, suggest } = walking([{ link: 'NVI-01-GEN-005', line: 0 }], {
+      'Bibles/NVI/NVI.md': '',
+      'Bibles/NVI/NVI-01-GEN-005.md': 'Texto sem nenhum id de bloco.',
+    });
+
+    // Nothing in the file to point a verse at, so the verse reading writes the
+    // chapter link the chapter reading writes. They are still two readings of
+    // the number, and the one that says what it is has to stay.
+    const rows = await offered(below('5', from, 9), suggest);
+
+    expect(rows.map((r) => r.book)).toEqual([
+      'Gênesis 5.5',
+      'Gênesis 5',
+      'Gênesis 5.5',
+      'Gênesis 5',
+    ]);
+  });
+
+  it('writes a reference naming its own chapter once, not once a passage', async () => {
+    const { from, suggest } = walking(
+      [
+        { link: 'NVI-01-GEN-001', line: 0 },
+        { link: 'NVI-01-GEN-002', line: 5 },
+      ],
+      { ...vault, ...chapter('NVI', 1, 'GEN', 2, ['Assim foram concluídos.']) },
+    );
+
+    // `2.1` names the chapter itself, so every passage in the book reads it
+    // the same way and there is only the one reference to offer.
+    const rows = await offered(below('2.1', from, 9), suggest);
+
+    expect(rows.map((r) => r.ref)).toEqual(['2.1', 'Gênesis 2.1']);
+  });
+
+  it('says the numbers were read as verses whatever passage leads', async () => {
+    const { from, suggest } = walking(
+      [
+        { link: 'MENS-01-GEN-000', line: 0 },
+        { link: 'MENS-01-GEN-001', line: 5 },
+      ],
+      {
+        'Bibles/MENS/MENS-01-GEN-000.md': '1. Todo o livro ^mens-gen-0-1',
+        ...chapter(
+          'MENS',
+          1,
+          'GEN',
+          1,
+          Array.from({ length: 30 }, (_, i) => `Versículo ${i + 1}`),
+        ),
+      },
+      { defaultVersion: 'MENS' },
+    );
+
+    // The book note leads and numbers nothing, but the chapter behind it read
+    // the run as verses and dropped the chapter reading — which is the hint.
+    expect(await hinted(below('1-30', from, 9), suggest)).toEqual([
+      'More chapters than one reference can carry — read as verses',
+    ]);
+  });
+
+  it("leaves the nearer passage out where the note's own filled the popup", async () => {
+    const crowded: Record<string, string> = {};
+    for (const version of ['NVA', 'NVB', 'NVC', 'NVD']) {
+      Object.assign(crowded, chapter(version, 1, 'GEN', 1, ['No princípio']));
+      Object.assign(crowded, chapter(version, 43, 'JHN', 1, ['O Verbo']));
+    }
+    const { from, suggest } = walking(
+      [
+        { link: 'NVA-01-GEN-001', line: 0 },
+        { link: 'NVA-43-JHN-001', line: 5 },
+      ],
+      crowded,
+      { defaultVersion: 'NVA' },
+    );
+
+    const rows = await offered(below('1 -nv', from, 9), suggest);
+
+    expect(rows).toHaveLength(12);
+    expect(rows.every((r) => r.book.startsWith('Gênesis'))).toBe(true);
+  });
+
+  it('still carries the book on from the link before a semicolon', async () => {
+    const { from, suggest } = walking([
+      { link: 'NVI-01-GEN-001', line: 0 },
+      { link: 'NVI-43-JHN-001', line: 9, col: 5 },
+    ]);
+    const line = 'Veja [[NVI-43-JHN-001]]; @1.1';
+
+    const rows = await offered(
+      {
+        query: '1.1',
+        file: from,
+        editor: new FakeEditor('\n'.repeat(9) + line) as unknown as Editor,
+        start: { line: 9, ch: line.lastIndexOf('@') },
+        end: { line: 9, ch: line.length },
+      } as unknown as EditorSuggestContext,
+      suggest,
+    );
+
+    // The semicolon says which book outright, so no passage read off the
+    // note's links gets a say — least of all Gênesis, its first.
+    expect(rows.every((r) => r.book.startsWith('João'))).toBe(true);
+  });
+
+  it('says there is no passage where nothing the note links is one', async () => {
+    const { from, suggest } = walking([
+      { link: 'Estudos/Romanos', line: 0 },
+      { link: 'Estudos/Efésios', line: 5 },
+    ]);
+
+    expect(await hinted(below('2', from, 9), suggest)).toEqual([
+      'No link in this note to read a book from — write one',
+    ]);
   });
 });
 
