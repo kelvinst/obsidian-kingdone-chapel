@@ -25,19 +25,27 @@ describe('the plugin', () => {
   });
 
   it('formats a link inside a list item without losing its text', async () => {
+    // The prose before the link is long enough that base prettier, run
+    // without this plugin, wraps right inside the alias (between "Sl" and
+    // "103.10") — so this assertion only passes because the plugin joins
+    // the link back up, not because the break never happened to land there.
     const text =
-      '- lista com ((y|Sl 103.10)) dentro e mais texto para chegar ate a ' +
-      'margem de setenta e nove\n';
+      '- lista com bastante texto ainda mais longo antes para empurrar o ' +
+      'link ((y|Sl 103.10)) ate a margem\n';
     const once = await format(text);
     expect(await format(once)).toBe(once);
     expect(once).toContain('((y|Sl 103.10))');
-    expect(once.replace(/\s+/g, ' ')).toContain('setenta e nove');
+    expect(once.replace(/\s+/g, ' ')).toContain('ate a margem');
   });
 
   it('formats a link inside a blockquote without gaining a marker', async () => {
+    // Same reasoning as the list-item case above: this prefix is long
+    // enough that base prettier wraps inside "((w|Sl 2.2))" on its own, so
+    // an intact link here is evidence the plugin did something.
     const text =
-      '> citacao com ((w|Sl 2.2)) e um asterisco escapado \\* aqui no meio ' +
-      'do texto todo\n';
+      '> citacao razoavelmente mais longa antes para empurrar de vez o ' +
+      'link ((w|Sl 2.2)) e um asterisco escapado \\* aqui no meio do texto ' +
+      'todo\n';
     const once = await format(text);
     expect(await format(once)).toBe(once);
     expect(once).toContain('((w|Sl 2.2))');
