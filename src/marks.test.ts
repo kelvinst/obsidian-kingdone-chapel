@@ -150,6 +150,40 @@ describe('renderMarks', () => {
     expect(marks(el)).toEqual([]);
   });
 
+  it("leaves the caret of a soft link's anchor alone", () => {
+    const el = rendered(
+      '<p>Veja ((Shedd-19-PSA-045#^shedd-psa-45-6|Sl 45.6)) e o salmo 110, ' +
+        'e ((Shedd-19-PSA-016#^shedd-psa-16-10|16.10)) também.</p>',
+    );
+    expect(marks(el)).toEqual([]);
+    expect(el.innerHTML).toBe(
+      '<p>Veja ((Shedd-19-PSA-045#^shedd-psa-45-6|Sl 45.6)) e o salmo 110, ' +
+        'e ((Shedd-19-PSA-016#^shedd-psa-16-10|16.10)) também.</p>',
+    );
+  });
+
+  it('leaves the caret of a soft link written without an alias alone', () => {
+    const el = rendered('<p>Veja ((A#^x)) e depois ((B#^y)) também.</p>');
+    expect(marks(el)).toEqual([]);
+    expect(el.innerHTML).toBe('<p>Veja ((A#^x)) e depois ((B#^y)) também.</p>');
+  });
+
+  it('marks a run written beside a soft link', () => {
+    const el = rendered('<p>2^10^ e ((A#^x|A)) fim.</p>');
+    expect(marks(el)).toEqual(['sup:10']);
+    expect(el.textContent).toBe('210 e ((A#^x|A)) fim.');
+  });
+
+  it('marks a run holding a soft link', () => {
+    const el = rendered('<p>,,Refs: ((A#^x|Sl 26.4)).,,</p>');
+    expect(marks(el)).toEqual(['span:Refs: ((A#^x|Sl 26.4)).']);
+  });
+
+  it('leaves the caret of an unaliased link label alone', () => {
+    const el = rendered('<p>Refs: <a>A#^x</a> e <a>B#^y</a>.</p>');
+    expect(marks(el)).toEqual([]);
+  });
+
   it('marks a run holding a link', () => {
     const el = rendered('<p>,,Refs: <a>Sl 26.4</a>.,,</p>');
     expect(marks(el)).toEqual(['span:Refs: ', 'span:Sl 26.4', 'span:.']);
