@@ -39,9 +39,30 @@ const context = await esbuild.context({
   minify: prod,
 });
 
+// The Prettier plugin is a second thing built out of this source: a module a
+// vault's formatter loads, not something Obsidian ever sees. ESM because that is
+// what a `.prettierrc` plugin entry is loaded as, and `prettier` external
+// because the plugin extends the very copy that is running it — bundling a
+// second one would hand back a printer the running Prettier does not use.
+const pluginContext = await esbuild.context({
+  banner: { js: banner },
+  entryPoints: ['src/prettier-plugin.ts'],
+  bundle: true,
+  external: ['prettier', ...builtins],
+  format: 'esm',
+  target: 'es2020',
+  logLevel: 'info',
+  sourcemap: prod ? false : 'inline',
+  treeShaking: true,
+  outfile: 'prettier-plugin.mjs',
+  minify: false,
+});
+
 if (prod) {
   await context.rebuild();
+  await pluginContext.rebuild();
   process.exit(0);
 } else {
   await context.watch();
+  await pluginContext.watch();
 }
