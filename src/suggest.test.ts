@@ -1291,6 +1291,74 @@ describe('a number read against the passages linked before it', () => {
     expect(rows.some((r) => r.book.startsWith('João'))).toBe(false);
   });
 
+  it('writes each reading once where both passages are the one book', async () => {
+    const { from, suggest } = walking(
+      [
+        { link: 'NVI-01-GEN-001', line: 0 },
+        { link: 'NVI-01-GEN-002', line: 5 },
+      ],
+      { ...vault, ...chapter('NVI', 1, 'GEN', 2, ['Assim foram concluídos.']) },
+    );
+
+    // The verse is counted in each chapter and differs; the chapter is the
+    // book's either way, and saying `Gênesis 2` twice is a row thrown away.
+    const rows = await offered(below('5', from, 9), suggest);
+
+    expect(rows.map((r) => r.markdown)).toEqual([
+      ...new Set(rows.map((r) => r.markdown)),
+    ]);
+    expect(rows.map((r) => r.book)).toEqual([
+      'Gênesis 1.5',
+      'Gênesis 5',
+      'Gênesis 1.5',
+      'Gênesis 5',
+      'Gênesis 2.5',
+      'Gênesis 2.5',
+    ]);
+  });
+
+  it('writes a reference naming its own chapter once, not once a passage', async () => {
+    const { from, suggest } = walking(
+      [
+        { link: 'NVI-01-GEN-001', line: 0 },
+        { link: 'NVI-01-GEN-002', line: 5 },
+      ],
+      { ...vault, ...chapter('NVI', 1, 'GEN', 2, ['Assim foram concluídos.']) },
+    );
+
+    // `2.1` names the chapter itself, so every passage in the book reads it
+    // the same way and there is only the one reference to offer.
+    const rows = await offered(below('2.1', from, 9), suggest);
+
+    expect(rows.map((r) => r.ref)).toEqual(['2.1', 'Gênesis 2.1']);
+  });
+
+  it('says the numbers were read as verses whatever passage leads', async () => {
+    const { from, suggest } = walking(
+      [
+        { link: 'MENS-01-GEN-000', line: 0 },
+        { link: 'MENS-01-GEN-001', line: 5 },
+      ],
+      {
+        'Bibles/MENS/MENS-01-GEN-000.md': '1. Todo o livro ^mens-gen-0-1',
+        ...chapter(
+          'MENS',
+          1,
+          'GEN',
+          1,
+          Array.from({ length: 30 }, (_, i) => `Versículo ${i + 1}`),
+        ),
+      },
+      { defaultVersion: 'MENS' },
+    );
+
+    // The book note leads and numbers nothing, but the chapter behind it read
+    // the run as verses and dropped the chapter reading — which is the hint.
+    expect(await hinted(below('1-30', from, 9), suggest)).toEqual([
+      'More chapters than one reference can carry — read as verses',
+    ]);
+  });
+
   it("leaves the nearer passage out where the note's own filled the popup", async () => {
     const crowded: Record<string, string> = {};
     for (const version of ['NVA', 'NVB', 'NVC', 'NVD']) {

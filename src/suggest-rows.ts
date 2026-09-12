@@ -255,6 +255,13 @@ export class ReferenceRows {
           // could. A passage read off a nearer link is the lesser guess, so it
           // takes only what the books can spare.
           const shared = room - BOOK_ROOM;
+          // What each passage has already put in the popup. A reading that
+          // names the chapter itself — `2.1`, or the chapter a bare number is
+          // read as — is the book's rather than the passage's, so every
+          // passage in the one book writes it the same way. Saying it twice
+          // spends a row on nothing: each reading is offered once, by the
+          // passage that reached it first.
+          const written = new Set<string>();
           for (const [at, here] of contexts.entries()) {
             const limit = at === 0 ? room : shared;
             if (out.length >= limit) break;
@@ -273,23 +280,27 @@ export class ReferenceRows {
               ].filter((v): v is string => v !== null);
             for (const version of versions) {
               if (out.length >= limit) break;
-              out.push(
-                ...(await this.contextSuggestions(
-                  { ...here, version },
-                  asked,
-                  embed,
-                  ctx.file,
-                  named || version !== here.version ? version : null,
-                )),
+              const rows = await this.contextSuggestions(
+                { ...here, version },
+                asked,
+                embed,
+                ctx.file,
+                named || version !== here.version ? version : null,
               );
+              for (const row of rows) {
+                if (written.has(row.markdown)) continue;
+                written.add(row.markdown);
+                out.push(row);
+              }
             }
           }
           // The numbers were read as verses alone, the run being longer than
           // a run of chapters may be. A chapter of 0 numbers no verses, so
           // there was no verse reading either and nothing to say they were
-          // read as. Said of the note's own passage, which leads the rows.
+          // read as. Said of any passage that could have numbered chapters,
+          // since the rows come from all of them and not only the first.
           if (
-            contexts[0].chapter !== 0 &&
+            contexts.some((here) => here.chapter !== 0) &&
             asked.chapter === null &&
             asked.numbers &&
             !fitsChapters(asked.numbers)
