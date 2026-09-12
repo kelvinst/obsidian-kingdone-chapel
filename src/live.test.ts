@@ -307,6 +307,40 @@ describe('build', () => {
     ).toEqual([]);
   });
 
+  it("leaves the caret of a soft link's anchor alone", () => {
+    expect(
+      read(
+        'Veja ((Shedd-19-PSA-045#^shedd-psa-45-6|Sl 45.6)) e o salmo 110, ' +
+          'e ((Shedd-19-PSA-016#^shedd-psa-16-10|16.10)) também.',
+      ),
+    ).toEqual([]);
+  });
+
+  it('leaves the caret of a soft link written without an alias alone', () => {
+    expect(read('Veja ((A#^x)) e depois ((B#^y)) também.')).toEqual([]);
+  });
+
+  it('marks a run written beside a soft link', () => {
+    expect(read('x^2^ e ((A#^x|A)) fim.')).toEqual([
+      'hidden:^',
+      'kcp-sup:2',
+      'hidden:^',
+    ]);
+  });
+
+  it('reads a run holding a soft link', () => {
+    expect(read(below(',,Refs: ((A#^x|Sl 26.4)).,,'))).toEqual([
+      'kcp-small-line@L3',
+      'hidden:,,',
+      'kcp-small:Refs: ((A#^x|Sl 26.4)).',
+      'hidden:,,',
+    ]);
+  });
+
+  it('leaves the caret of a link written without an alias alone', () => {
+    expect(read('Refs: [[A#^x]] e [[B#^y]].')).toEqual([]);
+  });
+
   it('leaves the block ids of two verse lines alone', () => {
     expect(
       read(
