@@ -9,6 +9,7 @@ import type { EditorState, Range } from '@codemirror/state';
 import { editorLivePreviewField } from 'obsidian';
 
 import { runsIn } from './syntax';
+import { SOFT_LINK_SOURCE } from './softlink';
 import { CODE_BLOCK, NOT_PROSE_SOURCE, touched, unquoted } from './source';
 
 /**
@@ -49,9 +50,15 @@ const LABEL = '\uFFFD';
  * this file's runs need masked: a caret — `[[NVI-43-JHN-001#^nvi-jhn-1-1|Jo
  * 1.1]]` — so a line naming two of them would otherwise read as one long
  * superscript, and so would a verse between two lines ending in block ids.
+ *
+ * A soft link is added for the same reason and masked whole, target and label
+ * alike: `((Shedd-19-PSA-045#^shedd-psa-45-6|Sl 45.6))` carries a caret the
+ * plugin wrote, and two of them in a paragraph paired off into one superscript
+ * reaching from the first anchor to the second. It stands where a rendered
+ * link stands and is masked the way one is.
  */
 const NOT_PROSE = new RegExp(
-  `${NOT_PROSE_SOURCE}|\\^[\\w-]+(?=[ \\t]*$)`,
+  `${NOT_PROSE_SOURCE}|${SOFT_LINK_SOURCE}|\\^[\\w-]+(?=[ \\t]*$)`,
   'gm',
 );
 

@@ -64,8 +64,14 @@ export interface SoftLink {
  *
  * Nothing is written as `.`, which would match the newline between two lines and
  * let a token reach out of the one it opened in.
+ *
+ * The pattern is shared rather than kept here: `live.ts` masks a token before
+ * reading its runs, the anchor a target carries being the plugin's own syntax
+ * and never the author's `^sup^`.
  */
-const LINK = /\(\(([^\s()[\]|\n]+)(?:\|([^()[\]|\n]*))?\)\)/g;
+export const SOFT_LINK_SOURCE = String.raw`\(\(([^\s()[\]|\n]+)(?:\|([^()[\]|\n]*))?\)\)`;
+
+const LINK = new RegExp(SOFT_LINK_SOURCE, 'g');
 
 /**
  * Every link in `text`, in the order they were written, counted from `offset`.
