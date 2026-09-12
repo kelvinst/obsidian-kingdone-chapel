@@ -49,11 +49,12 @@ describe('the reference popup on a field', () => {
     );
   });
 
-  it('embeds the passage where the query opens with a `!`', async () => {
+  it('refuses a passage asked for embedded, and says why', async () => {
     const { suggest } = field();
-    expect(written(await suggest.getSuggestions('!Jo 14.1'))).toContain(
-      '![[NVI-43-JHN-014#^nvi-jhn-14-1]]',
-    );
+    const rows = await suggest.getSuggestions('!Jo 14.1');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveProperty('hint');
+    expect(written(rows)).toEqual([]);
   });
 
   it('offers nothing at all until something is typed', async () => {

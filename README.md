@@ -181,9 +181,12 @@ order the vault writes them in, and onto the end of the list where it already ca
 A selection covering more than one verse is asked in a modal instead, since a single reference
 written into several asides has no one line in the chapter to be typed on. The modal carries one
 field, and that field offers the same rows an `@` in the editor offers — the same reference, the
-same versions, the same embeds and quotes. The row you pick is written into the refs aside of
-every verse the selection covered, joining an aside that already says something the same way.
-Verses the chapter carries no id for are left out, and it says which.
+same versions, the same quotes. The row you pick is written into the refs aside of every verse
+the selection covered, joining an aside that already says something the same way. Verses the
+chapter carries no id for are left out, and it says which.
+
+An embed is the one row it will not write. A refs aside names a passage rather than saying it
+again, so a reference asked for with `!` is refused and told so.
 
 ### Chapter breadcrumbs
 
