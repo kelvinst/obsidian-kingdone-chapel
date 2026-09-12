@@ -1317,6 +1317,25 @@ describe('a number read against the passages linked before it', () => {
     ]);
   });
 
+  it('keeps both readings where a chapter with no ids links them alike', async () => {
+    const { from, suggest } = walking([{ link: 'NVI-01-GEN-005', line: 0 }], {
+      'Bibles/NVI/NVI.md': '',
+      'Bibles/NVI/NVI-01-GEN-005.md': 'Texto sem nenhum id de bloco.',
+    });
+
+    // Nothing in the file to point a verse at, so the verse reading writes the
+    // chapter link the chapter reading writes. They are still two readings of
+    // the number, and the one that says what it is has to stay.
+    const rows = await offered(below('5', from, 9), suggest);
+
+    expect(rows.map((r) => r.book)).toEqual([
+      'Gênesis 5.5',
+      'Gênesis 5',
+      'Gênesis 5.5',
+      'Gênesis 5',
+    ]);
+  });
+
   it('writes a reference naming its own chapter once, not once a passage', async () => {
     const { from, suggest } = walking(
       [
