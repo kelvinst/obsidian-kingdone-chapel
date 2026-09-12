@@ -195,5 +195,20 @@ if [ "$DO_BUILD" = 1 ]; then
   fi
   echo "building in $TARGET"
   (cd "$TARGET" && npm run --silent build)
+
+  # The vault's formatter loads this by path, so it needs a copy of its own: the
+  # plugin folder is a symlink into a checkout, and a .prettierrc pointing into
+  # it would break the day that checkout is removed. The config is left to the
+  # reader — unlike community-plugins.json, which Obsidian rewrites anyway, a
+  # .prettierrc is a file a person maintains.
+  PLUGIN_MJS="$VAULT/.prettier-plugins/obsidian-kingdone-chapel.mjs"
+  mkdir -p "$(dirname "$PLUGIN_MJS")"
+  cp -f "$TARGET/prettier-plugin.mjs" "$PLUGIN_MJS"
+  echo "prettier: copied the plugin to $PLUGIN_MJS"
+  if ! grep -q 'prettier-plugins/obsidian-kingdone-chapel.mjs' "$VAULT/.prettierrc.json" 2>/dev/null; then
+    echo "prettier: add it to the vault's .prettierrc.json:"
+    echo '            "plugins": [".prettier-plugins/obsidian-kingdone-chapel.mjs"]'
+  fi
+
   echo "done - Hot Reload picks up the new main.js"
 fi
