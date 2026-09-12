@@ -1,3 +1,4 @@
+import { softLinksIn } from './softlink';
 import { runsIn } from './syntax';
 import type { Mark } from './syntax';
 
@@ -54,6 +55,27 @@ const INLINE = new Set([
   'WBR',
 ]);
 
+/**
+ * `text` with every soft link blanked out, as long as what it replaces.
+ *
+ * A post-processor is handed a block whose `((target#^anchor|label))` tokens
+ * are still plain text — `softlink-read.ts` draws them after this pass runs —
+ * so the masking a rendered link's label gets by being a link has nothing to
+ * catch them by. The caret of the anchor is the plugin's own syntax and never
+ * the author's `^sup^`: two tokens in a paragraph paired off into one long
+ * superscript reaching from the first anchor to the second, and took both
+ * links off the page with them.
+ */
+function unlinked(text: string): string {
+  let out = '';
+  let at = 0;
+  for (const link of softLinksIn(text)) {
+    out += text.slice(at, link.from) + OPAQUE.repeat(link.to - link.from);
+    at = link.to;
+  }
+  return out + text.slice(at);
+}
+
 /** Where one text node's text sits in the block gathered around it. */
 interface Piece {
   node: Text;
@@ -64,8 +86,8 @@ interface Piece {
 interface Block {
   text: string;
   /**
-   * The same text with a link's label blanked out, which is what the runs are
-   * read from.
+   * The same text with a link's label — and a soft link whole — blanked out,
+   * which is what the runs are read from.
    *
    * A link's label is not always only a label: one written without an alias
    * shows its target, and a target carries the caret of a block anchor. A row
@@ -114,7 +136,9 @@ function gather(el: HTMLElement, block: Block, linked = false) {
       const text = node as Text;
       block.pieces.push({ node: text, at: block.text.length });
       block.text += text.data;
-      block.masked += linked ? OPAQUE.repeat(text.data.length) : text.data;
+      block.masked += linked
+        ? OPAQUE.repeat(text.data.length)
+        : unlinked(text.data);
       continue;
     }
     if (node.nodeType !== Node.ELEMENT_NODE) continue;
