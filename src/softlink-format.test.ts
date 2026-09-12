@@ -76,6 +76,41 @@ describe('gluedSentence', () => {
     });
   });
 
+  it('merges a link split by a soft line break', () => {
+    const children = [
+      { type: 'word', value: '((a#^b|1' },
+      { type: 'whitespace', value: ' ' },
+      { type: 'word', value: 'Cr' },
+      { type: 'whitespace', value: '\n' },
+      { type: 'word', value: '16.4))' },
+    ];
+    expect(shape(gluedSentence(children))).toEqual(['word:((a#^b|1 Cr 16.4))']);
+  });
+
+  it('merges two links when only the first crosses a newline', () => {
+    const children = [
+      { type: 'word', value: '((a|1' },
+      { type: 'whitespace', value: '\n' },
+      { type: 'word', value: 'Cr)),' },
+      { type: 'whitespace', value: ' ' },
+      { type: 'word', value: '((b|5));' },
+    ];
+    expect(shape(gluedSentence(children))).toEqual([
+      'word:((a|1 Cr)),',
+      'whitespace: ',
+      'word:((b|5));',
+    ]);
+  });
+
+  it('leaves a sentence holding a newline but no link unchanged', () => {
+    const children = [
+      { type: 'word', value: 'nada' },
+      { type: 'whitespace', value: '\n' },
+      { type: 'word', value: 'aqui' },
+    ];
+    expect(gluedSentence(children)).toBe(children);
+  });
+
   it('counts a child that is not a word as no text of its own', () => {
     const children = [
       { type: 'word', value: '((a|1' },

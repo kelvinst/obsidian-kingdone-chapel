@@ -49,7 +49,13 @@ function textOf(node: InlineNode): string {
  */
 export function gluedSentence(children: InlineNode[]): InlineNode[] {
   const text = children.map(textOf).join('');
-  const links = softLinksIn(text);
+  // A link already broken by an earlier format run has a `\n` where a space
+  // used to be — `softLinksIn` bars `\n` from a token on purpose, so it would
+  // never find that link again. Searching the text with every newline stood
+  // in for by a space finds it once more, and since the two are both one
+  // character the swap costs nothing: every offset below still lands on the
+  // same child it would have without it.
+  const links = softLinksIn(text.replace(/\n/g, ' '));
   if (links.length === 0) return children;
 
   const out: InlineNode[] = [];
@@ -79,7 +85,10 @@ export function gluedSentence(children: InlineNode[]): InlineNode[] {
     out.push({
       ...merged[0],
       type: 'word',
-      value: merged.map(textOf).join(''),
+      // A `\n` a merged child still carries is the same soft break, rejoined
+      // as the space markdown already reads it as — nothing about the
+      // rendered prose changes, only the link's text becomes matchable again.
+      value: merged.map(textOf).join('').replace(/\n/g, ' '),
       hasTrailingPunctuation:
         merged[merged.length - 1].hasTrailingPunctuation ?? false,
     });

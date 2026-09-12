@@ -51,6 +51,18 @@ describe('the plugin', () => {
     expect(await format(twice)).toBe(once);
   });
 
+  it('rejoins a link an earlier format already broke across two lines', async () => {
+    const broken =
+      'os mesmos ((Shedd-13-1CH-016#^shedd-1ch-16-4|1 Cr\n' +
+      '16.4)),((Shedd-13-1CH-016#^shedd-1ch-16-5|5)); e mais prosa depois do fim deles.\n';
+    const once = await format(broken);
+    for (const line of once.split('\n')) {
+      expect(line.split('((').length).toBe(line.split('))').length);
+    }
+    expect(once).toContain('((Shedd-13-1CH-016#^shedd-1ch-16-4|1 Cr 16.4))');
+    expect(await format(once)).toBe(once);
+  });
+
   it('formats a note holding no link as prettier does on its own', async () => {
     const text = 'uma frase comum, sem link nenhum, escrita para conferir.\n';
     expect(await format(text)).toBe(
