@@ -632,6 +632,32 @@ an API Obsidian does not have. A test file that needs a DOM opens with
 Formatting is [Prettier](https://prettier.io) at 80 columns, over everything
 but the bundle and the lock file.
 
+### Formatting a vault that holds soft links
+
+Prettier knows a `[[wikilink]]` and prints it whole, letting a line run past
+the width rather than breaking inside it. A `((soft link))` is this plugin's
+own syntax, which Prettier has never heard of, so it is plain prose to it: the
+space inside an alias is a break opportunity like any other, and a link broken
+across two lines is a link that no longer resolves.
+
+The plugin ships a Prettier plugin that teaches it the token. `make vault`
+copies it into the vault it links, at
+`.prettier-plugins/obsidian-kingdone-chapel.mjs`; for a vault that is not
+linked to a checkout, build it with `npm run build` and copy
+`prettier-plugin.mjs` there by hand. Either way the vault's own
+`.prettierrc.json` has to name it:
+
+```json
+{
+  "printWidth": 79,
+  "proseWrap": "always",
+  "plugins": [".prettier-plugins/obsidian-kingdone-chapel.mjs"]
+}
+```
+
+The copy is a copy: it is whatever the last build left there, and a vault
+whose copy is old formats by the old rules.
+
 ### Coverage
 
 `npm run test:coverage` prints a table and writes a browsable report to
