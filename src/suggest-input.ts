@@ -5,6 +5,11 @@ import { ReferenceRows, renderRow } from './suggest-rows';
 import type { RefSuggestion, Row } from './suggest-rows';
 import type KingdoneChapelPlugin from './main';
 
+/** Said when a reference is asked for embedded, which a refs aside never is. */
+const NO_EMBEDS: Row = {
+  hint: 'A refs aside names a passage rather than embedding it — drop the `!`',
+};
+
 /** What picking a row does, for whoever put the field on the page. */
 export type Chose = (
   item: RefSuggestion,
@@ -45,6 +50,12 @@ export class ReferenceInputSuggest extends AbstractInputSuggest<Row> {
     // editor's popup opens on the first letter after the `@` and this opens on
     // the first letter typed at all.
     if (!query.trim()) return Promise.resolve([]);
+    // The one row the editor offers that a refs aside has no use for. A refs
+    // list names what a verse refers to; the passage itself belongs where it
+    // was written, and a verse embedded into the aside of another is the
+    // chapter saying itself twice. Said rather than silently read as a link:
+    // the `!` was typed on purpose.
+    if (query.trimStart().startsWith('!')) return Promise.resolve([NO_EMBEDS]);
     return this.rows.getSuggestions({ query, file: this.file, before: '' });
   }
 
