@@ -27,8 +27,8 @@ describe('the plugin', () => {
   it('formats a link inside a list item without losing its text', async () => {
     // The prose before the link is long enough that base prettier, run
     // without this plugin, wraps right inside the alias (between "Sl" and
-    // "103.10") — so this assertion only passes because the plugin joins
-    // the link back up, not because the break never happened to land there.
+    // "103.10") — so this assertion only passes because the plugin keeps
+    // the link whole, not because the break never happened to land there.
     const text =
       '- lista com bastante texto ainda mais longo antes para empurrar o ' +
       'link ((y|Sl 103.10)) ate a margem\n';
@@ -59,16 +59,60 @@ describe('the plugin', () => {
     expect(await format(twice)).toBe(once);
   });
 
-  it('rejoins a link an earlier format already broke across two lines', async () => {
+  /** Formats `text` three times, each pass fed the one before it. */
+  async function thrice(text: string): Promise<string[]> {
+    const once = await format(text);
+    const twice = await format(once);
+    return [once, twice, await format(twice)];
+  }
+
+  it('leaves a link already spanning two lines as written', async () => {
     const broken =
       'os mesmos ((Shedd-13-1CH-016#^shedd-1ch-16-4|1 Cr\n' +
-      '16.4)),((Shedd-13-1CH-016#^shedd-1ch-16-5|5)); e mais prosa depois do fim deles.\n';
-    const once = await format(broken);
-    for (const line of once.split('\n')) {
-      expect(line.split('((').length).toBe(line.split('))').length);
-    }
-    expect(once).toContain('((Shedd-13-1CH-016#^shedd-1ch-16-4|1 Cr 16.4))');
-    expect(await format(once)).toBe(once);
+      '16.4)),((Shedd-13-1CH-016#^shedd-1ch-16-5|5)); e mais prosa.\n';
+    expect(await thrice(broken)).toEqual([broken, broken, broken]);
+  });
+
+  it('leaves a link spanning lines in a paragraph as written', async () => {
+    const text = 'Veja ((a#^b|Sl\n103.10)) e siga.\n';
+    expect(await thrice(text)).toEqual([text, text, text]);
+  });
+
+  it('leaves a link spanning lines in a list item as written', async () => {
+    // The continuation line's indent is not in the word: the printer's split
+    // took it out, and only the list item can put it back.
+    const text = '- item com ((a#^b|Sl\n  103.10)) e segue\n';
+    expect(await thrice(text)).toEqual([text, text, text]);
+  });
+
+  it('leaves a link spanning lines in a blockquote as written', async () => {
+    const text = '> quote com ((a#^b|Sl\n> 103.10)) e segue\n';
+    expect(await thrice(text)).toEqual([text, text, text]);
+  });
+
+  it('leaves a link spanning lines in a quote in a list as written', async () => {
+    const text =
+      '- item\n\n  > quote aninhada ((a#^b|Sl\n  > 103.10)) e segue\n';
+    expect(await thrice(text)).toEqual([text, text, text]);
+  });
+
+  it('leaves a link closed lines after it opened as written', async () => {
+    const text =
+      'antes ((x|abre aqui\nsegunda linha de prosa\nterceira linha e agora )) fecha\n';
+    expect(await thrice(text)).toEqual([text, text, text]);
+  });
+
+  it('reflows a `((` never closed as prettier does on its own', async () => {
+    const text =
+      'antes ((x|abre aqui\nsegunda linha de prosa que nunca fecha o que abriu e\n' +
+      'segue\nmais curta.\n';
+    expect(await format(text)).toBe(
+      await prettier.format(text, {
+        parser: 'markdown',
+        printWidth: 79,
+        proseWrap: 'always',
+      }),
+    );
   });
 
   it('formats a note holding no link as prettier does on its own', async () => {
