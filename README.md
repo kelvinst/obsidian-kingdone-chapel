@@ -655,6 +655,17 @@ linked to a checkout, build it with `npm run build` and copy
 }
 ```
 
+The file carries its own copy of Prettier's markdown printer, so it loads in a
+vault that has no `node_modules` of its own.
+
+It is generated, and large: a formatter run over the whole vault rewrites a
+file nobody edits, and a check straight after each copy fails on it. The
+vault's `.prettierignore` should leave it out:
+
+```gitignore
+.prettier-plugins/
+```
+
 The copy is a copy: it is whatever the last build left there, and a vault
 whose copy is old formats by the old rules.
 
