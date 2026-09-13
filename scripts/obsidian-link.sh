@@ -209,6 +209,13 @@ if [ "$DO_BUILD" = 1 ]; then
     echo "prettier: add it to the vault's .prettierrc.json:"
     echo '            "plugins": [".prettier-plugins/obsidian-kingdone-chapel.mjs"]'
   fi
+  # The copy is generated, and a vault formatting everything would rewrite a
+  # large file nobody edits on every run — and fail its check straight after
+  # each copy. Left to the reader for the same reason as the config.
+  if ! grep -qE '^/?\.prettier-plugins/?$' "$VAULT/.prettierignore" 2>/dev/null; then
+    echo "prettier: add the plugin folder to the vault's .prettierignore:"
+    echo '            .prettier-plugins/'
+  fi
 
   echo "done - Hot Reload picks up the new main.js"
 fi
