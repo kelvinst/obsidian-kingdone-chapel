@@ -14,7 +14,7 @@ I hesitate. And I take what is on the tray: a wooden clipboard with a sheet clam
 
 He wakes mid-sentence, like a man who never stopped.
 
-> — Your roll of tasks, my lord.
+> — Your day's roll, my lord.
 
 Natural, courteous, the way he does it every day.
 
