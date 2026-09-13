@@ -5,7 +5,7 @@
 | Character      | Office            | Object                | Function                                                   |
 | -------------- | ----------------- | --------------------- | ---------------------------------------------------------- |
 | —              | you               | **The chronicle**     | records everything that happens in the kingdom, on its own |
-| Steward        | runs the errands  | **The roll of tasks** | what to do, with no hour set                               |
+| Steward        | runs the errands  | **The day's roll**    | what to do, with no hour set                               |
 | Herald of Time | runs the hours    | **The book of hours** | what has an hour: start, duration, end                     |
 | Gatekeeper     | runs what arrives | parcels and notes     | what comes from outside and waits                          |
 
