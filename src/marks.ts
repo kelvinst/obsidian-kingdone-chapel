@@ -1,4 +1,4 @@
-import { softLinksIn } from './softlink';
+import { SOFT_LINK_SOURCE } from './softlink';
 import { runsIn } from './syntax';
 import type { Mark } from './syntax';
 
@@ -55,6 +55,9 @@ const INLINE = new Set([
   'WBR',
 ]);
 
+/** A soft link token, drawn or not. */
+const TOKEN = new RegExp(SOFT_LINK_SOURCE, 'g');
+
 /**
  * `text` with every soft link blanked out, as long as what it replaces.
  *
@@ -65,15 +68,13 @@ const INLINE = new Set([
  * the author's `^sup^`: two tokens in a paragraph paired off into one long
  * superscript reaching from the first anchor to the second, and took both
  * links off the page with them.
+ *
+ * Every token is blanked, not only the ones drawn as links: `((a#^x|))` asks
+ * for a label and gives none, so it is left as written, caret and all — and
+ * `live.ts` masks it the same way.
  */
 function unlinked(text: string): string {
-  let out = '';
-  let at = 0;
-  for (const link of softLinksIn(text)) {
-    out += text.slice(at, link.from) + OPAQUE.repeat(link.to - link.from);
-    at = link.to;
-  }
-  return out + text.slice(at);
+  return text.replace(TOKEN, (found) => OPAQUE.repeat(found.length));
 }
 
 /** Where one text node's text sits in the block gathered around it. */

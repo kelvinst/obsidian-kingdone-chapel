@@ -168,6 +168,11 @@ describe('renderMarks', () => {
     expect(el.innerHTML).toBe('<p>Veja ((A#^x)) e depois ((B#^y)) também.</p>');
   });
 
+  it('leaves the caret of a soft link written with an empty label alone', () => {
+    const el = rendered('<p>Veja ((A#^x|)) e depois ((B#^y|)) fim.</p>');
+    expect(marks(el)).toEqual([]);
+  });
+
   it('marks a run written beside a soft link', () => {
     const el = rendered('<p>2^10^ e ((A#^x|A)) fim.</p>');
     expect(marks(el)).toEqual(['sup:10']);
