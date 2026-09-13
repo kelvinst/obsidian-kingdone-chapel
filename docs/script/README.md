@@ -1,7 +1,7 @@
-# Kingdone — opening story
+# Kingdone — opening script
 
-The opening script, one file per act. Acts 1 to 3 are written; act 4 (The Gates)
-is still an open outline.
+The game script, one file per act, the way a film script is broken up. Acts 1 to
+3 are written; act 4 (The Gates) is still an open outline.
 
 | Act              | File                                             |
 | ---------------- | ------------------------------------------------ |
