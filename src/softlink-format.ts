@@ -49,12 +49,12 @@ function textOf(node: InlineNode): string {
  */
 export function gluedSentence(children: InlineNode[]): InlineNode[] {
   const text = children.map(textOf).join('');
-  // A link already broken by an earlier format run has a `\n` where a space
-  // used to be — `softLinksIn` bars `\n` from a token on purpose, so it would
-  // never find that link again. Searching the text with every newline stood
-  // in for by a space finds it once more, and since the two are both one
-  // character the swap costs nothing: every offset below still lands on the
-  // same child it would have without it.
+  // A link written across lines has a `\n` inside it, and `softLinksIn` bars
+  // `\n` from a token on purpose, so it would never find that link at all.
+  // Searching the text with every newline stood in for by a space finds it,
+  // and since the two are both one character the swap costs nothing: every
+  // offset below still lands on the same child it would have without it. The
+  // swap is for the search alone — the children keep their newlines.
   const links = softLinksIn(text.replace(/\n/g, ' '));
   if (links.length === 0) return children;
 
@@ -85,10 +85,11 @@ export function gluedSentence(children: InlineNode[]): InlineNode[] {
     out.push({
       ...merged[0],
       type: 'word',
-      // A `\n` a merged child still carries is the same soft break, rejoined
-      // as the space markdown already reads it as — nothing about the
-      // rendered prose changes, only the link's text becomes matchable again.
-      value: merged.map(textOf).join('').replace(/\n/g, ' '),
+      // A `\n` a merged child carries stays in the word: a link already
+      // spanning lines is left as written, the way Prettier leaves a
+      // `[[wikilink]]` it finds broken, and the printer prints the break back
+      // where it was.
+      value: merged.map(textOf).join(''),
       hasTrailingPunctuation:
         merged[merged.length - 1].hasTrailingPunctuation ?? false,
     });
