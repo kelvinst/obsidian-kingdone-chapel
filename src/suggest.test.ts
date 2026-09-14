@@ -68,23 +68,6 @@ function typed(line: string) {
   return { editor, cursor: editor.at(0) };
 }
 
-/**
- * The popup's view of a bookless query typed after a link and a semicolon —
- * `[[...]]; @3.1` — which is what a carried reference is written as. `start`
- * sits on the `@`, where `onTrigger` puts it, so the line behind it is the
- * reference the book is carried on from.
- */
-function carried(line: string, query: string, file: TFile | null = null) {
-  const at = line.lastIndexOf('@');
-  return {
-    query,
-    file,
-    editor: new FakeEditor(line) as unknown as Editor,
-    start: { line: 0, ch: at },
-    end: { line: 0, ch: line.length },
-  } as unknown as EditorSuggestContext;
-}
-
 beforeEach(() => {
   world = harness(vault, { language: 'pt', defaultVersion: 'NVI' });
   suggest = new ReferenceSuggest(world.plugin);
@@ -767,118 +750,6 @@ describe('renderSuggestion', () => {
   });
 });
 
-describe('a reference carried on after a semicolon', () => {
-  /** `Gn 1.1` linked, then a semicolon, then the numbers alone. */
-  const after = (numbers: string) =>
-    `Veja [[NVI-01-GEN-001#^nvi-gen-1-1|Gn 1.1]]; @${numbers}`;
-
-  /** A vault with a second chapter, for the references that name one. */
-  function twoChapters() {
-    const world = harness(
-      {
-        ...chapter('NVI', 1, 'GEN', 1, ['No princípio', 'Era a terra']),
-        ...chapter('NVI', 1, 'GEN', 2, ['Assim foram concluídos os céus']),
-      },
-      { language: 'pt', defaultVersion: 'NVI' },
-    );
-    return { world, suggest: new ReferenceSuggest(world.plugin) };
-  }
-
-  it('counts a bare number as a verse of the chapter carried from', async () => {
-    const rows = await offered(carried(after('3'), '3'));
-    expect(rows.map((r) => r.ref)).toEqual(['3', 'Gênesis 1.3']);
-    expect(rows[0].markdown).toBe('[[NVI-01-GEN-001#^nvi-gen-1-3|3]]');
-    expect(rows[0].book).toBe('Gênesis');
-    expect(rows[0].preview).toBe('Disse Deus: "Haja luz".');
-  });
-
-  it('takes the chapter from the reference when it names one', async () => {
-    const { suggest } = twoChapters();
-    const rows = await offered(carried(after('2.1'), '2.1'), suggest);
-    expect(rows.map((r) => r.ref)).toEqual(['2.1', 'Gênesis 2.1']);
-    expect(rows[0].markdown).toBe('[[NVI-01-GEN-002#^nvi-gen-2-1|2.1]]');
-  });
-
-  it('carries a run of verses as one link, to a quote of the passage', async () => {
-    const rows = await offered(carried(after('1-2'), '1-2'));
-    expect(rows[0].ref).toBe('1,2');
-    // The same id the spelled-out reference writes, so a carried run finds the
-    // quote that is already there rather than writing a second one.
-    expect(rows[0].markdown).toBe('[[#^quote-nvi-gen-1-1-2|1,2]]');
-    expect(rows[0].passage?.id).toBe('quote-nvi-gen-1-1-2');
-  });
-
-  it('names the chapter alone where the reference gave no verse', async () => {
-    const { suggest } = twoChapters();
-    const rows = await offered(carried(after('2.'), '2.'), suggest);
-    expect(rows.map((r) => r.ref)).toEqual(['2', 'Gênesis 2']);
-  });
-
-  it('embeds the carried passage', async () => {
-    const rows = await offered(carried(after('!3'), '!3'));
-    expect(rows[0].markdown).toBe('![[NVI-01-GEN-001#^nvi-gen-1-3]]');
-    expect(rows[0].ref).toBe('Gênesis 1.3');
-  });
-
-  it('resolves the link from the note it is being written in', async () => {
-    const from = world.vault.getAbstractFileByPath(
-      chapterPath('NVI', 43, 'JHN', 1),
-    ) as TFile;
-    const place = vi.spyOn(world.metadataCache, 'getFirstLinkpathDest');
-    await offered(carried(after('3'), '3', from));
-    expect(place).toHaveBeenCalledWith('NVI-01-GEN-001', from.path);
-  });
-
-  it('carries nothing where no link comes before the semicolon', async () => {
-    expect(await offered(carried('Veja ; @2', '2'))).toEqual([]);
-  });
-
-  it('carries nothing from a link to something that is no chapter', async () => {
-    const line = 'Veja [[NVI-01-Gênesis]]; @2';
-    expect(await offered(carried(line, '2'))).toEqual([]);
-  });
-
-  it('carries nothing from a link the vault cannot place', async () => {
-    const line = 'Veja [[Não existe]]; @2';
-    expect(await offered(carried(line, '2'))).toEqual([]);
-  });
-
-  it('carries nothing from a version the vault does not hold', async () => {
-    const line = 'Veja [[ACF-01-GEN-001]]; @2';
-    world.vault.write('Outros/ACF-01-GEN-001.md', '1. No princípio ^a');
-    expect(await offered(carried(line, '2'))).toEqual([]);
-  });
-
-  it('carries nothing from a note that only reads like a chapter', async () => {
-    // Outside the Bible folder, so the index never took it — which is the one
-    // thing that tells a chapter from a note named to look like one.
-    world.vault.write('Estudos/NVI-01-GEN-009.md', 'Uma nota.');
-    const line = 'Veja [[Estudos/NVI-01-GEN-009]]; @2';
-    expect(await offered(carried(line, '2'))).toEqual([]);
-  });
-
-  it('leaves a bare verse to the books where the book is one file', async () => {
-    const mens = harness(
-      { 'Bibles/MENS/MENS-01-GEN-000.md': '1. Todo o livro ^mens-gen-0-1' },
-      { language: 'pt', defaultVersion: 'MENS' },
-    );
-    const suggest = new ReferenceSuggest(mens.plugin);
-    const line = 'Veja [[MENS-01-GEN-000]]; @2';
-    expect(await offered(carried(line, '2'), suggest)).toEqual([]);
-  });
-
-  it('carries nothing where the version has no such chapter', async () => {
-    const rows = await offered(carried(after('40.1'), '40.1'));
-    expect(rows).toEqual([]);
-  });
-
-  it('leaves the passage out where the file has gone away', async () => {
-    world.plugin.index();
-    world.vault.contents.delete(chapterPath('NVI', 1, 'GEN', 1));
-    expect(await offered(carried(after('3'), '3'))).toEqual([]);
-  });
-});
-
 describe('a number read against the passage the note is about', () => {
   /**
    * A note that links one chapter, and the popup for a query typed in it. The
@@ -1222,6 +1093,28 @@ describe('a number read against the passages linked before it', () => {
     ]);
   });
 
+  it('reads a number after a semicolon the way it reads one without', async () => {
+    const line = 'Veja [[NVI-43-JHN-001|Jo 1.1]]; @2';
+    const { from, suggest } = walking([
+      { link: 'NVI-01-GEN-001', line: 0 },
+      { link: 'NVI-43-JHN-001', line: 5, col: 5 },
+    ]);
+    const after = {
+      query: '2',
+      file: from,
+      editor: new FakeEditor(`\n\n\n\n\n${line}`) as unknown as Editor,
+      start: { line: 5, ch: line.lastIndexOf('@') },
+      end: { line: 5, ch: line.length },
+    } as unknown as EditorSuggestContext;
+
+    // The link before the semicolon is one of the links before the reference,
+    // so the semicolon adds nothing to what the note already says.
+    const carried = await offered(after, suggest);
+    const plain = await offered(below('2', from, 9), suggest);
+
+    expect(carried).toEqual(plain);
+  });
+
   it('leaves out a passage linked below the reference being written', async () => {
     const { from, suggest } = walking([
       { link: 'NVI-01-GEN-001', line: 0 },
@@ -1397,29 +1290,6 @@ describe('a number read against the passages linked before it', () => {
 
     expect(rows).toHaveLength(12);
     expect(rows.every((r) => r.book.startsWith('Gênesis'))).toBe(true);
-  });
-
-  it('still carries the book on from the link before a semicolon', async () => {
-    const { from, suggest } = walking([
-      { link: 'NVI-01-GEN-001', line: 0 },
-      { link: 'NVI-43-JHN-001', line: 9, col: 5 },
-    ]);
-    const line = 'Veja [[NVI-43-JHN-001]]; @1.1';
-
-    const rows = await offered(
-      {
-        query: '1.1',
-        file: from,
-        editor: new FakeEditor('\n'.repeat(9) + line) as unknown as Editor,
-        start: { line: 9, ch: line.lastIndexOf('@') },
-        end: { line: 9, ch: line.length },
-      } as unknown as EditorSuggestContext,
-      suggest,
-    );
-
-    // The semicolon says which book outright, so no passage read off the
-    // note's links gets a say — least of all Gênesis, its first.
-    expect(rows.every((r) => r.book.startsWith('João'))).toBe(true);
   });
 
   it('says there is no passage where nothing the note links is one', async () => {

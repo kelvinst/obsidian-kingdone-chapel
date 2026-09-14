@@ -136,6 +136,14 @@ describe('refresh', () => {
     expect(view.key).toBe('NVI/1/1/1:static');
   });
 
+  it('names the chapter alone where no verse is being read', async () => {
+    currentLocation.mockReturnValue({ ...loc, verse: null });
+    await view.refresh();
+    expect(view.headerEl.querySelector('.kcp-ref')?.textContent).toBe(
+      'Gênesis 1',
+    );
+  });
+
   it('says what to open when nothing is', async () => {
     currentLocation.mockReturnValue(null);
     await view.refresh();

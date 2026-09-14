@@ -104,13 +104,12 @@ export class ReferenceSuggest extends EditorSuggest<Row> {
   /**
    * The rows for what was typed, read off the line the popup opened on: the
    * query as the popup hands it back, the note it is being written in, and
-   * what stands in front of the `@` for a book to be carried on from.
+   * where the `@` stands, for the passages linked before it.
    */
   async getSuggestions(ctx: EditorSuggestContext): Promise<Row[]> {
     return this.rows.getSuggestions({
       query: ctx.query,
       file: ctx.file,
-      before: ctx.editor.getLine(ctx.start.line).slice(0, ctx.start.ch),
       at: ctx.start,
     });
   }

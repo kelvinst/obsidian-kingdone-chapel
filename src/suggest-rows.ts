@@ -1,16 +1,6 @@
+import { abbrLabel, langsFor, matchBooks, plain } from './books';
 import {
-  abbrLabel,
-  bookName,
-  langsFor,
-  matchBooks,
-  nameLang,
-  plain,
-} from './books';
-import {
-  booklessLabels,
-  booklessPassageLabel,
   fitsChapters,
-  parseBookless,
   parseContextRef,
   parseReference,
   passageId,
@@ -18,28 +8,13 @@ import {
   referenceLabels,
   shortReference,
 } from './reference';
-import { parseChapterName, verseWords } from './utils';
+import { verseWords } from './utils';
 import type { App, EditorPosition, TFile } from 'obsidian';
 import type { BookMatch } from './books';
-import type { BooklessRef, ParsedContextRef, ParsedRef } from './reference';
+import type { ParsedContextRef, ParsedRef } from './reference';
 import type { ChapterTarget, Location } from './types';
-import type { ChapterName } from './utils';
 import type KingdoneChapelPlugin from './main';
 
-/**
- * The reference a new one carries on from: a link this plugin wrote, closed by
- * the semicolon that separates one reference from the next. References are
- * chained that way on paper — `Jn 2.9; Ap 7.10` — and the second of a pair
- * names its book only when it is a different one, so `Jn 2.9; 3.1` is John
- * again. Only the link right before the semicolon is read: it is the reference
- * being carried on from, and anything earlier on the line was left behind by
- * the one that already replaced it.
- *
- * A link inside a table writes its label after an escaped pipe (`\|`), since a
- * bare one would end the cell, so both forms are read here.
- */
-const CARRIED =
-  /\[\[([^[\]|#\\]+)(?:#[^[\]|\\]*)?(?:\\?\|[^[\]]*)?\]\]\s*;\s*$/;
 /** Rows a whole popup may hold, so a query naming no version and matching
  * every book cannot read the vault for a page nobody will scroll to. */
 const MAX_ROWS = 12;
@@ -158,8 +133,8 @@ const TOO_MANY_CHAPTERS: HintSuggestion = {
 
 /**
  * What the rows are read out of: the reference being written, and enough of
- * where it is being written for the links to be shortened and a book to be
- * carried on from the one before. No editor, so a modal field or a settings
+ * where it is being written for the links to be shortened and the passages
+ * before it to be read. Nothing is read off the line itself. No editor, so a modal field or a settings
  * input can ask for the same rows a note asks for.
  */
 export interface RowContext {
@@ -167,12 +142,6 @@ export interface RowContext {
   query: string;
   /** The note the reference goes into, which links are shortened against. */
   file: TFile | null;
-  /**
-   * What stands in front of the reference, for a book carried on from a link
-   * ending in a semicolon. Somewhere with no line in front of it — a field of
-   * its own — leaves it empty, and the numbers fall to the books.
-   */
-  before: string;
   /**
    * Where the reference is being written, for the passages linked before it to
    * be read nearest first. Somewhere with no line of the note under it — a
@@ -225,13 +194,12 @@ export class ReferenceRows {
   }
 
   /**
-   * A reference written after a semicolon may leave its book out and carry it
-   * on from the one before, the way the second of a pair is written by hand.
-   * With no semicolon in front of them, numbers on their own are read against
-   * the passage the note is about instead — the same reference, counted from
-   * what the note already says rather than from what the line already wrote.
+   * Numbers on their own are read against the passages the note is already
+   * about, whatever stands in front of them on the line: a link written right
+   * before a semicolon is one of the links before the reference, so `Jn 2.9;
+   * 3.1` is counted from John 2 the way any bare number after it is.
    *
-   * The books answer under either of them: `@1` is a chapter of the book at
+   * The books answer under them too: `@1` is a chapter of the book at
    * hand as much as it is the start of `1 Samuel`, and one suggestion costs
    * nothing to show next to the other.
    */
@@ -243,107 +211,99 @@ export class ReferenceRows {
     // A hint is not a row anyone can pick, so it goes below every row that is:
     // the popup opens on its first one, and Enter has to write something.
     const hints: Row[] = [];
-    const bookless = parseBookless(query);
-    const carried = bookless ? this.carriedFrom(ctx.before, ctx.file) : null;
-    if (bookless && carried) {
-      out.push(
-        ...(await this.carriedSuggestions(carried, bookless, embed, ctx.file)),
+    const asked = parseContextRef(
+      query,
+      (word) => this.plugin.findCompleteVersion(word) !== null,
+    );
+    if (asked && asked.numbers === null) {
+      // Numbers, and nothing wrong with them but how many they came to.
+      hints.push(TOO_MANY);
+    } else if (asked) {
+      // The note's own passage leads, and the ones linked nearer the
+      // reference follow it: a note that walks through several passages is
+      // very often writing about the one linked a line or two above, and
+      // each row already says which passage it was counted against.
+      const contexts = this.plugin.linkContexts(
+        ctx.file,
+        ctx.at || null,
+        MAX_CONTEXTS,
       );
-    } else {
-      const asked = parseContextRef(
-        query,
-        (word) => this.plugin.findCompleteVersion(word) !== null,
-      );
-      if (asked && asked.numbers === null) {
-        // Numbers, and nothing wrong with them but how many they came to.
-        hints.push(TOO_MANY);
-      } else if (asked) {
-        // The note's own passage leads, and the ones linked nearer the
-        // reference follow it: a note that walks through several passages is
-        // very often writing about the one linked a line or two above, and
-        // each row already says which passage it was counted against.
-        const contexts = this.plugin.linkContexts(
-          ctx.file,
-          ctx.at || null,
-          MAX_CONTEXTS,
-        );
-        if (!contexts.length) hints.push(NO_CONTEXT);
-        else {
-          // A version nobody named is the passage's own, which the labels leave
-          // unsaid; one that was asked for is offered in every version it could
-          // still be finished as, and said in what the row writes. What was
-          // asked for reads the same against every passage, so it is read once.
-          const named = asked.versionPrefix || asked.version !== null;
-          const askedFor = named ? this.versionsFor(asked, ctx.file) : null;
-          // A half-written version stands for every version starting with it,
-          // and a lone dash for every version there is — each of them reading
-          // the vault for rows the popup has no room to show. Stop at the room
-          // there is, rather than filling it several times over.
-          const room = MAX_ROWS - hints.length;
-          // The note's own passage may take the whole popup, the way it always
-          // could. A passage read off a nearer link is the lesser guess, so it
-          // takes only what the books can spare.
-          const shared = room - BOOK_ROOM;
-          // What the passages before this one have already put in the popup.
-          // A reading that names the chapter itself — `2.1`, or the chapter a
-          // bare number is read as — is the book's rather than the passage's,
-          // so every passage in the one book writes it the same way. Saying it
-          // twice spends a row on nothing: each reading is offered once, by
-          // the passage that reached it first.
-          //
-          // Only a passage before it may take a row away. A passage's own
-          // readings stand together however alike they are written: a chapter
-          // with no ids in it leaves a verse nothing to point at, so the verse
-          // reading writes the chapter link the chapter reading writes, and
-          // they are still the two readings the number has.
-          const written = new Set<string>();
-          for (const [at, here] of contexts.entries()) {
-            const mine: RefSuggestion[] = [];
-            const limit = at === 0 ? room : shared;
+      if (!contexts.length) hints.push(NO_CONTEXT);
+      else {
+        // A version nobody named is the passage's own, which the labels leave
+        // unsaid; one that was asked for is offered in every version it could
+        // still be finished as, and said in what the row writes. What was
+        // asked for reads the same against every passage, so it is read once.
+        const named = asked.versionPrefix || asked.version !== null;
+        const askedFor = named ? this.versionsFor(asked, ctx.file) : null;
+        // A half-written version stands for every version starting with it,
+        // and a lone dash for every version there is — each of them reading
+        // the vault for rows the popup has no room to show. Stop at the room
+        // there is, rather than filling it several times over.
+        const room = MAX_ROWS - hints.length;
+        // The note's own passage may take the whole popup, the way it always
+        // could. A passage read off a nearer link is the lesser guess, so it
+        // takes only what the books can spare.
+        const shared = room - BOOK_ROOM;
+        // What the passages before this one have already put in the popup.
+        // A reading that names the chapter itself — `2.1`, or the chapter a
+        // bare number is read as — is the book's rather than the passage's,
+        // so every passage in the one book writes it the same way. Saying it
+        // twice spends a row on nothing: each reading is offered once, by
+        // the passage that reached it first.
+        //
+        // Only a passage before it may take a row away. A passage's own
+        // readings stand together however alike they are written: a chapter
+        // with no ids in it leaves a verse nothing to point at, so the verse
+        // reading writes the chapter link the chapter reading writes, and
+        // they are still the two readings the number has.
+        const written = new Set<string>();
+        for (const [at, here] of contexts.entries()) {
+          const mine: RefSuggestion[] = [];
+          const limit = at === 0 ? room : shared;
+          if (out.length >= limit) break;
+          // A passage's own version only stands while a link may point at
+          // it. A note about a partial version is read for the passage it is
+          // about all the same — that is what `linkContexts` answered — but
+          // the link goes where it can be followed, which is what the
+          // reference with no version of its own falls back on. Falling back
+          // that far is said in the row: a version left unsaid reads as the
+          // passage's own, and this one is not it.
+          const versions =
+            askedFor ??
+            [
+              this.plugin.findCompleteVersion(here.version) ??
+                this.plugin.defaultVersion(ctx.file),
+            ].filter((v): v is string => v !== null);
+          for (const version of versions) {
             if (out.length >= limit) break;
-            // A passage's own version only stands while a link may point at
-            // it. A note about a partial version is read for the passage it is
-            // about all the same — that is what `linkContexts` answered — but
-            // the link goes where it can be followed, which is what the
-            // reference with no version of its own falls back on. Falling back
-            // that far is said in the row: a version left unsaid reads as the
-            // passage's own, and this one is not it.
-            const versions =
-              askedFor ??
-              [
-                this.plugin.findCompleteVersion(here.version) ??
-                  this.plugin.defaultVersion(ctx.file),
-              ].filter((v): v is string => v !== null);
-            for (const version of versions) {
-              if (out.length >= limit) break;
-              const rows = await this.contextSuggestions(
-                { ...here, version },
-                asked,
-                embed,
-                ctx.file,
-                named || version !== here.version ? version : null,
-              );
-              for (const row of rows) {
-                mine.push(row);
-                if (written.has(row.markdown)) continue;
-                out.push(row);
-              }
+            const rows = await this.contextSuggestions(
+              { ...here, version },
+              asked,
+              embed,
+              ctx.file,
+              named || version !== here.version ? version : null,
+            );
+            for (const row of rows) {
+              mine.push(row);
+              if (written.has(row.markdown)) continue;
+              out.push(row);
             }
-            for (const row of mine) written.add(row.markdown);
           }
-          // The numbers were read as verses alone, the run being longer than
-          // a run of chapters may be. A chapter of 0 numbers no verses, so
-          // there was no verse reading either and nothing to say they were
-          // read as. Said of any passage that could have numbered chapters,
-          // since the rows come from all of them and not only the first.
-          if (
-            contexts.some((here) => here.chapter !== 0) &&
-            asked.chapter === null &&
-            asked.numbers &&
-            !fitsChapters(asked.numbers)
-          ) {
-            hints.push(TOO_MANY_CHAPTERS);
-          }
+          for (const row of mine) written.add(row.markdown);
+        }
+        // The numbers were read as verses alone, the run being longer than
+        // a run of chapters may be. A chapter of 0 numbers no verses, so
+        // there was no verse reading either and nothing to say they were
+        // read as. Said of any passage that could have numbered chapters,
+        // since the rows come from all of them and not only the first.
+        if (
+          contexts.some((here) => here.chapter !== 0) &&
+          asked.chapter === null &&
+          asked.numbers &&
+          !fitsChapters(asked.numbers)
+        ) {
+          hints.push(TOO_MANY_CHAPTERS);
         }
       }
     }
@@ -532,140 +492,6 @@ export class ReferenceRows {
       }
     }
     return out.slice(0, limit);
-  }
-
-  /**
-   * The reference the query carries its book on from: the link written right
-   * before the semicolon the query follows, read back into the passage it
-   * points at. A link to anything that is not a chapter of a version the vault
-   * still holds carries nothing, and the numbers are left to the books.
-   */
-  carriedFrom(before: string, from: TFile | null): ChapterName | null {
-    const m = before.match(CARRIED);
-    if (!m) return null;
-
-    const file = this.app.metadataCache.getFirstLinkpathDest(
-      m[1].trim(),
-      from ? from.path : '',
-    );
-    const name = file ? parseChapterName(file.basename) : null;
-    if (!name) return null;
-    // The file names the version the way the file is named; the vault names it
-    // the way the folder is. Take the vault's, since that is what everything
-    // else here is looked up by.
-    const version = this.plugin.findCompleteVersion(name.version);
-    if (!version) return null;
-
-    // A name is not a chapter: an ordinary note called `NVI-2-Notas-3` reads
-    // as one. The index is what says which files are chapters, so the passage
-    // only carries when the index answers this very file.
-    return this.plugin.referenceFile(version, name.bookIndex, name.chapter) ===
-      file
-      ? { ...name, version }
-      : null;
-  }
-
-  /**
-   * The carried passage, under both labels it could be written with: the
-   * numbers as they were typed, and the reference spelled out. The typed one
-   * leads — someone writing `Jn 2.9; 3.1` wants the note to go on saying
-   * `3.1`, and the whole point of the semicolon is that the book is already
-   * said. The version goes unnamed for the same reason: it is the one the
-   * reference before it was already in.
-   */
-  async carriedSuggestions(
-    here: ChapterName,
-    bookless: BooklessRef,
-    embed: boolean,
-    from: TFile | null,
-  ): Promise<RefSuggestion[]> {
-    // A commentary keeps one file for the whole book, indexed as chapter zero,
-    // and there is no chapter there for a bare verse number to be counted in.
-    // Such a reference has to name its own chapter, and one that does not is
-    // left to the books below.
-    if (bookless.chapter === null && here.chapter === 0) return [];
-
-    const chapter = bookless.chapter === null ? here.chapter : bookless.chapter;
-    const file = this.plugin.referenceFile(
-      here.version,
-      here.bookIndex,
-      chapter,
-    );
-    if (!file) return [];
-
-    // A carried reference names the one chapter, so there is the one file to
-    // link into, written the way the vault already holds it.
-    const target: ChapterTarget = { chapter, file, path: file.path };
-    // The file name holds the book's code, which names a book this table never
-    // heard of as well as one it did — better in a label than the number is.
-    const name = bookName(here.book, nameLang(this.plugin.settings.language));
-    try {
-      // The anchors and the opening verse are the passage, not the wording, so
-      // both labellings share the one read.
-      const anchors = await this.plugin.findAnchors(
-        file,
-        chapter,
-        bookless.verses,
-      );
-      const preview = await this.previewOf(file, chapter, bookless.verses);
-      const full = referenceLabels(name, [chapter], bookless.verses);
-
-      if (embed) {
-        // An embed carries no label, so both labellings write the same thing
-        // and the row names the passage instead. What it may still be asked
-        // in is the same as anywhere else: a chapter whole, or verse by verse.
-        const parsed: ParsedRef = {
-          version: null,
-          versionPrefix: false,
-          book: name,
-          chapters: [chapter],
-          verses: bookless.verses,
-        };
-        const base = { ref: full.join(','), book: name, preview };
-        return (await this.embeds([target], parsed, anchors, from)).map(
-          (row) => ({ ...base, ...row }),
-        );
-      }
-
-      // A carried run of verses is one reference as much as a spelled-out one
-      // is, and is written the same way: one link, to a quote of the passage
-      // kept under the note's own heading.
-      if (bookless.verses.length > 1) {
-        const id = passageId(here.version, here.book, chapter, bookless.verses);
-        const callout = this.callout(
-          passageLabel(name, chapter, bookless.verses, here.version),
-          this.embedLines(target, anchors, from),
-          id,
-        );
-        const quoted = (label: string): RefSuggestion => ({
-          ref: label,
-          book: name,
-          note: 'quote at the end',
-          preview,
-          markdown: `[[#^${id}|${label}]]`,
-          passage: { id, callout },
-        });
-        return [
-          quoted(booklessPassageLabel(bookless, chapter)),
-          quoted(passageLabel(name, chapter, bookless.verses)),
-        ];
-      }
-
-      const row = (labels: string[]): RefSuggestion => ({
-        ref: labels.join(','),
-        book: name,
-        preview,
-        markdown: labels
-          .map((label, i) => this.link(target, anchors[i] || null, label, from))
-          .join(','),
-      });
-      return [row(booklessLabels(bookless, chapter)), row(full)];
-    } catch (e) {
-      // The read goes to the file the index named, which may have gone away
-      // since it was indexed. Leave the passage out rather than taking the
-      // whole popup down with it.
-      return [];
-    }
   }
 
   /**

@@ -2181,8 +2181,8 @@ const SCAN_BACK = 24;
 /**
  * Whether a link starting at `start` was written before the cursor at `at`.
  * A link on the line being typed counts only where it stands in front of the
- * reference — the one a semicolon carries a book on from is written right
- * there, and what follows the cursor has not been read yet.
+ * reference — `Jn 2.9; 3.1` writes the passage it goes on from right there,
+ * and what follows the cursor has not been read yet.
  */
 function startsBefore(
   start: { line: number; col: number },

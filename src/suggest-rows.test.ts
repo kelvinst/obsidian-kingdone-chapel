@@ -20,22 +20,14 @@ let world: Harness;
 let rows: ReferenceRows;
 
 /**
- * A query asked with nothing in front of it, which is what a field of its own
- * hands over: no line to carry a book on from, and no editor to read one out
- * of. `file` is the note the reference is bound for, which the links are
- * shortened against and the numbers are counted in.
+ * A query asked away from any line of a note, which is what a field of its own
+ * hands over: no editor to read a place out of. `file` is the note the
+ * reference is bound for, which the links are shortened against and the
+ * numbers are counted in.
  */
 function asked(query: string, file: TFile | null = null): RowContext {
-  return { query, file, before: '' };
+  return { query, file };
 }
-
-/** The same query, written after a reference the book may be carried on from. */
-function following(before: string, query: string): RowContext {
-  return { query, file: null, before };
-}
-
-/** `Gn 1.1` linked, then the semicolon that carries its book on. */
-const CARRIED = 'Veja [[NVI-01-GEN-001#^nvi-gen-1-1|Gn 1.1]]; ';
 
 /** The rows that link, which is every row but the ones that only say why. */
 async function offered(
@@ -116,36 +108,9 @@ describe('a reference counted against the note own passage', () => {
       'No link in this note to read a book from — write one',
     ]);
   });
-});
-
-describe('a book carried on from what stands before the reference', () => {
-  it('counts a bare number as a verse of the chapter carried from', async () => {
-    const found = await offered(following(CARRIED, '3'));
-    expect(found.map((r) => r.ref)).toEqual(['3', 'Gênesis 1.3']);
-    expect(found[0].markdown).toBe('[[NVI-01-GEN-001#^nvi-gen-1-3|3]]');
-  });
-
-  it('takes the chapter from the reference where it names one', async () => {
-    const found = await offered(following(CARRIED, '2.1'));
-    expect(found[0].markdown).toBe('[[NVI-01-GEN-002#^nvi-gen-2-1|2.1]]');
-  });
-
-  it('carries nothing where nothing stands in front of the reference', async () => {
-    // What a field of its own hands over. The numbers fall to the books, which
-    // no bare number answers, so there is nothing to offer at all.
+  it('offers nothing for numbers bound for no note at all', async () => {
+    // No note, so no passage to count them in, and no book a bare number
+    // names — there is nothing to offer.
     expect(await offered(asked('3'))).toEqual([]);
-  });
-
-  it('reads the passage a carried link points at', () => {
-    expect(rows.carriedFrom(CARRIED, null)).toEqual({
-      version: 'NVI',
-      bookIndex: 1,
-      book: 'GEN',
-      chapter: 1,
-    });
-  });
-
-  it('carries nothing from a line ending in no link', () => {
-    expect(rows.carriedFrom('Veja ; ', null)).toBeNull();
   });
 });

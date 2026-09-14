@@ -64,9 +64,8 @@ describe('the reference popup on a field', () => {
   });
 
   it('asks the rows for the note it writes into, with no line in front', async () => {
-    // A bare number in the editor may be a chapter of the book the line before
-    // it named. A field has no line before it, which is what the empty `before`
-    // says: the numbers fall to the books and to the note itself.
+    // A field has no line of the note under it, which is what leaving `at`
+    // unset says: the numbers fall to the books and to the note itself.
     const file = world.vault.getAbstractFileByPath(
       chapterPath('NVI', 43, 'JHN', 14),
     ) as TFile;
@@ -75,7 +74,7 @@ describe('the reference popup on a field', () => {
     const asked = vi.spyOn(suggest.rows, 'getSuggestions');
     await suggest.getSuggestions('14');
 
-    expect(asked).toHaveBeenCalledWith({ query: '14', file, before: '' });
+    expect(asked).toHaveBeenCalledWith({ query: '14', file });
   });
 
   it('hands the row picked over, and closes on it', () => {
