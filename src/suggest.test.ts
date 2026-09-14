@@ -846,16 +846,79 @@ describe('a number read against the passage the note is about', () => {
   it('reads a run both ways, and says each the short way', async () => {
     const { from, suggest } = about('NVI-01-GEN-001');
     const rows = await offered(context('1-3', from), suggest);
+    // The verses are one passage and read as one label; the chapters are a
+    // link each, and their label spells every number the way the links read.
     expect(rows.map((r) => r.ref)).toEqual([
+      '1-3',
       '1,2,3',
-      '1,2,3',
-      'Gênesis 1.1,2,3',
+      'Gênesis 1.1-3',
       'Gênesis 1,2,3',
     ]);
-    // The label spells every number, the way the links read once written;
-    // the chip beside it closes the run up, the way it is said.
     expect(rows[0].book).toBe('Gênesis 1.1-3');
     expect(rows[1].book).toBe('Gênesis 1-3');
+  });
+
+  it('writes a run of verses as one link, to a quote of the passage', async () => {
+    const { from, suggest } = about('NVI-01-GEN-001');
+    const [bare, , full] = await offered(context('1-3', from), suggest);
+    const passage = {
+      id: 'quote-nvi-gen-1-1-3',
+      callout: [
+        '> [!quote]+ Gênesis 1.1-3 - NVI',
+        '> ![[NVI-01-GEN-001#^nvi-gen-1-1]]',
+        '> ![[NVI-01-GEN-001#^nvi-gen-1-2]]',
+        '> ![[NVI-01-GEN-001#^nvi-gen-1-3]] ^quote-nvi-gen-1-1-3',
+      ].join('\n'),
+    };
+    // Both labellings point at the one quote.
+    expect(bare).toMatchObject({
+      note: 'quote at the end',
+      markdown: '[[#^quote-nvi-gen-1-1-3|1-3]]',
+      passage,
+    });
+    expect(full).toMatchObject({
+      note: 'quote at the end',
+      markdown: '[[#^quote-nvi-gen-1-1-3|Gênesis 1.1-3]]',
+      passage,
+    });
+  });
+
+  it('quotes the same passage the book path quotes, under the same id', async () => {
+    const { from, suggest } = about('NVI-01-GEN-001');
+    const [booked] = await offered(context('Gn 1.1-3', from), suggest);
+    const [bookless] = await offered(context('1-3', from), suggest);
+    expect(bookless.passage).toEqual(booked.passage);
+  });
+
+  it('names the book by its code where the file name spells it otherwise', async () => {
+    const { from, suggest } = about('ARA-19-Salmos-001', {
+      'Bibles/ARA/ARA.md': '',
+      'Bibles/ARA/ARA-19-Salmos-001.md':
+        '1. Bem-aventurado ^ara-psa-1-1\n2. Antes ^ara-psa-1-2',
+    });
+    const rows = await offered(context('1,2 -ara', from), suggest);
+    expect(rows[0].passage?.id).toBe('quote-ara-psa-1-1-2');
+  });
+
+  it('names a book the table never heard of by its file name', async () => {
+    const { from, suggest } = about('NVI-90-XYZ-001', {
+      ...vault,
+      ...chapter('NVI', 90, 'XYZ', 1, ['Um', 'Dois']),
+    });
+    const [row] = await offered(context('1,2', from), suggest);
+    expect(row.passage?.id).toBe('quote-nvi-xyz-1-1-2');
+  });
+
+  it('keeps a chapter typed in front of a quoted run', async () => {
+    const { from, suggest } = about('NVI-01-GEN-002', {
+      ...vault,
+      ...chapter('NVI', 1, 'GEN', 2, ['Assim', 'E no sétimo', 'E abençoou']),
+    });
+    const rows = await offered(context('1.1-3 -nvi', from), suggest);
+    expect(rows.map((r) => r.markdown)).toEqual([
+      '[[#^quote-nvi-gen-1-1-3|1.1-3]]',
+      '[[#^quote-nvi-gen-1-1-3|Gênesis 1.1-3 - NVI]]',
+    ]);
   });
 
   it('takes a chapter written in front of the numbers as its own', async () => {
@@ -1011,6 +1074,30 @@ describe('a number read against the passage the note is about', () => {
     );
     expect(rows.bare).toBeNull();
     expect(rows.full.map((r) => r.ref)).toEqual(['Gênesis 1']);
+  });
+
+  it('quotes a run with no bare row where nothing was typed to label it', async () => {
+    const { world, suggest } = about('NVI-01-GEN-001');
+    const here = world.plugin.locationOf(
+      world.vault.getAbstractFileByPath(
+        chapterPath('NVI', 1, 'GEN', 1),
+      ) as TFile,
+      null,
+    );
+    if (!here) throw new Error('no passage to read against');
+    const rows = await suggest.passageRows(
+      here,
+      [1],
+      [1, 2],
+      [],
+      false,
+      null,
+      null,
+    );
+    expect(rows.bare).toBeNull();
+    expect(rows.full.map((r) => r.markdown)).toEqual([
+      '[[#^quote-nvi-gen-1-1-2|Gênesis 1.1,2]]',
+    ]);
   });
 
   it('stops reading versions once the popup has no room left', async () => {

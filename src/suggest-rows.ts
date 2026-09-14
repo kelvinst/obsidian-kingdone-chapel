@@ -1,4 +1,4 @@
-import { abbrLabel, langsFor, matchBooks, plain } from './books';
+import { abbrLabel, bookCodeAt, langsFor, matchBooks, plain } from './books';
 import {
   fitsChapters,
   parseContextRef,
@@ -7,6 +7,7 @@ import {
   passageLabel,
   referenceLabels,
   shortReference,
+  verseSpec,
 } from './reference';
 import { verseWords } from './utils';
 import type { App, EditorPosition, TFile } from 'obsidian';
@@ -700,6 +701,45 @@ export class ReferenceRows {
       return {
         bare: null,
         full: shapes.map((shape) => ({ ...base, ...shape })),
+      };
+    }
+
+    // A run of verses is one reference however the book was reached, and is
+    // written the way `bookSuggestions` writes it: one link, to a quote of the
+    // passage kept at the end of the note.
+    if (head.chapter !== null && verses.length > 1) {
+      const chapter = head.chapter;
+      // The id names the book by the table's code, as the book path does, so
+      // `@Jo 1.1-3` and `@1-3` find the one quote rather than writing two. A
+      // book the table never heard of has no code but the one its file name
+      // carries, which is what the location fell back on for its name.
+      const code = bookCodeAt(here.bookIndex) ?? here.book;
+      const id = passageId(here.version, code, chapter, verses);
+      const callout = this.callout(
+        passageLabel(here.book, chapter, verses, here.version),
+        this.embedLines(head, anchors, from),
+        id,
+      );
+      const quoted = (label: string, book: string): RefSuggestion => ({
+        ref: label,
+        book,
+        note: 'quote at the end',
+        preview,
+        markdown: `[[#^${id}|${label}]]`,
+        passage: { id, callout },
+      });
+      const full = passageLabel(here.book, chapter, verses, name);
+      return {
+        // The typed labels open on the first verse, with the chapter in front
+        // of it where one was typed. Keep what stood before that verse and
+        // close the run up after it: `1-3`, or `2.1-3`.
+        bare: bare.length
+          ? quoted(
+              bare[0].slice(0, -String(verses[0]).length) + verseSpec(verses),
+              said,
+            )
+          : null,
+        full: [quoted(full, full)],
       };
     }
 

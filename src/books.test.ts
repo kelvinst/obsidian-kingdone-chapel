@@ -6,6 +6,7 @@ import {
   CATEGORIES,
   TESTAMENTS,
   abbrLabel,
+  bookCodeAt,
   bookName,
   bookNameAt,
   fold,
@@ -210,6 +211,16 @@ describe('bookNameAt', () => {
 
   it('falls back to the number for a book it has never heard of', () => {
     expect(bookNameAt(67)).toBe('67');
+  });
+});
+
+describe('bookCodeAt', () => {
+  it('gives the code the table files a book number under', () => {
+    expect(bookCodeAt(19)).toBe('PSA');
+  });
+
+  it('gives nothing for a book it has never heard of', () => {
+    expect(bookCodeAt(67)).toBeNull();
   });
 });
 
