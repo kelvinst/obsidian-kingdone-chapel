@@ -22,9 +22,9 @@ export type Chose = (
  *
  * The same rows the editor's `@` offers, read the same way and drawn the same:
  * the field *is* the reference, so what would be typed after the `@` is the
- * whole of what is typed here. Nothing stands in front of it, so a book is
- * never carried on from the line before — the numbers fall to the books, which
- * is what `RowContext.before` being empty says.
+ * whole of what is typed here. No line of the note stands under it, so a
+ * number is read against the note's own passage alone, which is what
+ * `RowContext.at` being unset says.
  */
 export class ReferenceInputSuggest extends AbstractInputSuggest<Row> {
   rows: ReferenceRows;
@@ -56,7 +56,7 @@ export class ReferenceInputSuggest extends AbstractInputSuggest<Row> {
     // chapter saying itself twice. Said rather than silently read as a link:
     // the `!` was typed on purpose.
     if (query.trimStart().startsWith('!')) return Promise.resolve([NO_EMBEDS]);
-    return this.rows.getSuggestions({ query, file: this.file, before: '' });
+    return this.rows.getSuggestions({ query, file: this.file });
   }
 
   renderSuggestion(item: Row, el: HTMLElement) {

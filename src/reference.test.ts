@@ -1,11 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  booklessLabels,
-  booklessPassageLabel,
   fitsChapters,
   numberRuns,
-  parseBookless,
   parseContextRef,
   parseReference,
   passageId,
@@ -370,70 +367,6 @@ describe('referenceLabels', () => {
   });
 });
 
-describe('parseBookless', () => {
-  it('reads a chapter and a verse written without a book', () => {
-    expect(parseBookless('3.1')).toEqual({ chapter: 3, verses: [1] });
-  });
-
-  it('reads a colon the way it reads a dot', () => {
-    expect(parseBookless('3:1')).toEqual({ chapter: 3, verses: [1] });
-  });
-
-  it('expands a run of verses', () => {
-    expect(parseBookless('3.1-4')).toEqual({
-      chapter: 3,
-      verses: [1, 2, 3, 4],
-    });
-  });
-
-  it('reads numbers alone as verses of the chapter carried in', () => {
-    expect(parseBookless('9,10')).toEqual({ chapter: null, verses: [9, 10] });
-  });
-
-  it('keeps a chapter still missing its verse', () => {
-    expect(parseBookless('3.')).toEqual({ chapter: 3, verses: [] });
-  });
-
-  it('leaves anything carrying a letter to `parseReference`', () => {
-    expect(parseBookless('Joao 1.1')).toBeNull();
-    expect(parseBookless('3.1 -ara')).toBeNull();
-  });
-
-  it('reads nothing out of nothing', () => {
-    expect(parseBookless('   ')).toBeNull();
-  });
-
-  it('refuses numbers that name no verse', () => {
-    expect(parseBookless('0')).toBeNull();
-    expect(parseBookless('1.2.3')).toBeNull();
-  });
-
-  it('refuses a run reaching past the verse cap', () => {
-    expect(parseBookless('1.1-60')).toBeNull();
-    expect(parseBookless('1-60')).toBeNull();
-  });
-});
-
-describe('booklessLabels', () => {
-  it('writes the chapter it was given when no verse was', () => {
-    expect(booklessLabels({ chapter: 3, verses: [] }, 3)).toEqual(['3']);
-  });
-
-  it('keeps the chapter the reference wrote, verse by verse', () => {
-    expect(booklessLabels({ chapter: 3, verses: [1, 2] }, 3)).toEqual([
-      '3.1',
-      '2',
-    ]);
-  });
-
-  it('leaves carried verses as the bare numbers they were typed as', () => {
-    expect(booklessLabels({ chapter: null, verses: [9, 10] }, 2)).toEqual([
-      '9',
-      '10',
-    ]);
-  });
-});
-
 describe('verseSpec', () => {
   it('writes a single verse as itself', () => {
     expect(verseSpec([1])).toBe('1');
@@ -528,26 +461,6 @@ describe('passageId', () => {
   it('answers the same passage with the same id, however it was asked for', () => {
     expect(passageId('NVI', 'JHN', 1, [1, 2, 3])).toBe(
       passageId('nvi', 'jhn', 1, [1, 2, 3]),
-    );
-  });
-});
-
-describe('booklessPassageLabel', () => {
-  it('reads a carried run as the verses alone', () => {
-    expect(booklessPassageLabel({ chapter: null, verses: [1, 2, 3] }, 3)).toBe(
-      '1-3',
-    );
-  });
-
-  it('says the chapter the carried reference named itself', () => {
-    expect(booklessPassageLabel({ chapter: 3, verses: [1, 2, 3] }, 3)).toBe(
-      '3.1-3',
-    );
-  });
-
-  it('lists verses that are not a run, as they were written', () => {
-    expect(booklessPassageLabel({ chapter: null, verses: [1, 4] }, 3)).toBe(
-      '1,4',
     );
   });
 });
