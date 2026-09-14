@@ -656,6 +656,17 @@ export function bookNameAt(index: number, lang: Lang = 'pt'): string {
 }
 
 /**
+ * The code this table files a book number under, which is what a quote's id
+ * names the book by. A file name may spell the book its own way — `Salmos`
+ * where the table says `PSA` — and the id has to come out the same however
+ * the passage was reached. Null for a book the table never heard of.
+ */
+export function bookCodeAt(index: number): string | null {
+  const book = BY_INDEX.get(index);
+  return book ? book.code : null;
+}
+
+/**
  * A run of consecutive books read together — a testament, or one of the
  * divisions inside it. The books are numbered in canonical order, so every
  * division any of them belongs to is a range, and a book's section is found by
