@@ -897,8 +897,9 @@ export default class KingdoneChapelPlugin extends Plugin {
    * one first. A chapter linked over and over is the one passage, kept at its
    * best place.
    *
-   * `at` is where the reference is being written; with none — a modal field,
-   * a note read rather than typed in — the whole note stands before it.
+   * `at` is where the reference is being written. With none — a modal field,
+   * with no line of the note under it — nothing is near the reference, and
+   * the note's own passage is offered alone.
    *
    * Links are always to a chapter, so every passage here is one. Reading
    * stops at `max`, since this runs on every keystroke and the popup has room
@@ -927,11 +928,15 @@ export default class KingdoneChapelPlugin extends Plugin {
       if (take(this.linkLocation(link.link, from))) break;
     }
 
+    // Without a cursor there is nothing to be near: the last link in the file
+    // is no closer to the reference than the first.
+    if (!at) return out;
+
     // Back from the cursor, so the passage being written about is reached
     // first and a long note is never walked further than the popup can show.
-    const before = at
-      ? links.filter((link) => startsBefore(link.position.start, at))
-      : links;
+    const before = links.filter((link) =>
+      startsBefore(link.position.start, at),
+    );
     const stop = Math.max(0, before.length - SCAN_BACK);
     for (let i = before.length - 1; i >= stop && out.length < max; i -= 1) {
       take(this.linkLocation(before[i].link, from));

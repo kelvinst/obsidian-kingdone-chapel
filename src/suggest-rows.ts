@@ -175,8 +175,8 @@ export interface RowContext {
   before: string;
   /**
    * Where the reference is being written, for the passages linked before it to
-   * be read nearest first. Somewhere with no note under it — a modal field —
-   * leaves it unset, and the whole note stands before the reference.
+   * be read nearest first. Somewhere with no line of the note under it — a
+   * modal field — leaves it unset, and is offered the note's own passage alone.
    */
   at?: EditorPosition | null;
 }
