@@ -76,7 +76,7 @@ describe('gluedSentence', () => {
     });
   });
 
-  it('merges a link split by a soft line break, keeping the break', () => {
+  it('merges each line of a link split by a soft line break', () => {
     const children = [
       { type: 'word', value: '((a#^b|1' },
       { type: 'whitespace', value: ' ' },
@@ -85,7 +85,26 @@ describe('gluedSentence', () => {
       { type: 'word', value: '16.4))' },
     ];
     expect(shape(gluedSentence(children))).toEqual([
-      'word:((a#^b|1 Cr\n16.4))',
+      'word:((a#^b|1 Cr',
+      'whitespace:\n',
+      'word:16.4))',
+    ]);
+  });
+
+  it('marks the break inside a link as one the printer must keep', () => {
+    const children = [
+      { type: 'word', value: '((a|1' },
+      { type: 'whitespace', value: '\n' },
+      { type: 'word', value: 'Cr))' },
+      { type: 'whitespace', value: '\n' },
+      { type: 'word', value: 'fim' },
+    ];
+    expect(gluedSentence(children)).toEqual([
+      { type: 'word', value: '((a|1', hasTrailingPunctuation: false },
+      { type: 'whitespace', value: '\n', softLinkBreak: true },
+      { type: 'word', value: 'Cr))', hasTrailingPunctuation: false },
+      { type: 'whitespace', value: '\n' },
+      { type: 'word', value: 'fim' },
     ]);
   });
 
@@ -98,7 +117,9 @@ describe('gluedSentence', () => {
       { type: 'word', value: '((b|5));' },
     ];
     expect(shape(gluedSentence(children))).toEqual([
-      'word:((a|1\nCr)),',
+      'word:((a|1',
+      'whitespace:\n',
+      'word:Cr)),',
       'whitespace: ',
       'word:((b|5));',
     ]);

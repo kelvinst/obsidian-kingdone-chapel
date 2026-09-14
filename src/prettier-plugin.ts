@@ -22,22 +22,17 @@ const base: Printer = markdown.printers.mdast;
  * What the base printer prints, with a link written across lines printed across
  * the same lines.
  *
- * Only a word the glue merged can hold a `\n` — Prettier's own split never puts
- * one in a word — so this touches nothing else. The break goes out as a hardline
- * and not as the raw newline because the split has already taken the
- * continuation line's prefix out of the text: a list item's indent, a quote's
- * `>`. A raw newline would print the next line without it; a hardline is given
- * it back by the list item or quote the link sits in.
+ * Only a break the glue found inside a soft link is marked, so this touches
+ * nothing else. It goes out as a hardline and not as the raw newline because
+ * Prettier's split has already taken the continuation line's prefix out of the
+ * text: a list item's indent, a quote's `>`. A raw newline would print the next
+ * line without it; a hardline is given it back by the list item or quote the
+ * link sits in.
  */
-const print: Printer['print'] = (path, options, printChild, args) => {
-  const doc = base.print(path, options, printChild, args);
-  if ((path.node as { type: string }).type !== 'word') return doc;
-  // A word prints as its own text, escaped where it needs to be: a string.
-  const text = doc as string;
-  return text.includes('\n')
-    ? builders.join(builders.hardline, text.split('\n'))
-    : text;
-};
+const print: Printer['print'] = (path, options, printChild, args) =>
+  (path.node as { softLinkBreak?: boolean }).softLinkBreak
+    ? builders.hardline
+    : base.print(path, options, printChild, args);
 
 export const parsers = {
   markdown: markdown.parsers.markdown,

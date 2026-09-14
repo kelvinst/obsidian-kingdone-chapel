@@ -78,25 +78,43 @@ export function gluedSentence(children: InlineNode[]): InlineNode[] {
       end += textOf(children[j]).length;
       j++;
     }
-    const merged = children.slice(i, j);
-    // A soft link opens on `(` and closes on `)`, both non-space, so
-    // `splitText` always puts them in a `word` node: the run's first and
-    // last children are words whatever falls between them.
-    out.push({
-      ...merged[0],
-      type: 'word',
-      // A `\n` a merged child carries stays in the word: a link already
-      // spanning lines is left as written, the way Prettier leaves a
-      // `[[wikilink]]` it finds broken, and the printer prints the break back
-      // where it was.
-      value: merged.map(textOf).join(''),
-      hasTrailingPunctuation:
-        merged[merged.length - 1].hasTrailingPunctuation ?? false,
-    });
+    // A link already spanning lines is left as written, the way Prettier
+    // leaves a `[[wikilink]]` it finds broken: each of its lines becomes one
+    // word, and the break between them stays a whitespace marked as one the
+    // printer must keep. Keeping the break out of the word is what lets
+    // Prettier measure the line after it — a word holding a hard break tells
+    // Prettier everything following it fits, and whatever follows the link is
+    // glued onto its last line however long that makes it.
+    let line: InlineNode[] = [];
+    for (const child of children.slice(i, j)) {
+      if (child.type === 'whitespace' && textOf(child).includes('\n')) {
+        out.push(wordOf(line), { ...child, softLinkBreak: true });
+        line = [];
+      } else {
+        line.push(child);
+      }
+    }
+    out.push(wordOf(line));
     at = end;
     i = j;
   }
   return out;
+}
+
+/**
+ * One word standing for a run of children.
+ *
+ * A soft link opens on `(` and closes on `)`, both non-space, and a line of one
+ * starts and ends where a break inside it falls, so the run's first and last
+ * children are always words whatever falls between them.
+ */
+function wordOf(run: InlineNode[]): InlineNode {
+  return {
+    ...run[0],
+    type: 'word',
+    value: run.map(textOf).join(''),
+    hasTrailingPunctuation: run[run.length - 1].hasTrailingPunctuation ?? false,
+  };
 }
 
 /** The same tree, every sentence in it glued. */
