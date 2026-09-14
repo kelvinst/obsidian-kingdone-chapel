@@ -1022,15 +1022,14 @@ describe('linkContexts', () => {
     expect(contexts(here, 2)).toEqual([GEN_ONE(), JHN_ONE()]);
   });
 
-  it('reads the whole note where there is no cursor to count back from', () => {
+  it('offers only the note’s own passage where there is no cursor', () => {
     const here = note(
       { link: 'NVI-01-GEN-001', line: 0 },
       { link: 'NVI-43-JHN-001', line: 6 },
     );
-    expect(world.plugin.linkContexts(here, null, 3)).toEqual([
-      GEN_ONE(),
-      JHN_ONE(),
-    ]);
+    // A field with no line under it — the refs modal — has nothing to be near,
+    // and the last link in the file is no nearer than any other.
+    expect(world.plugin.linkContexts(here, null, 3)).toEqual([GEN_ONE()]);
   });
 
   it('gives up walking back long before a whole note has been read', () => {
