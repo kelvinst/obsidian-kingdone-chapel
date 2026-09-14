@@ -201,20 +201,26 @@ if [ "$DO_BUILD" = 1 ]; then
   # it would break the day that checkout is removed. The config is left to the
   # reader — unlike community-plugins.json, which Obsidian rewrites anyway, a
   # .prettierrc is a file a person maintains.
-  PLUGIN_MJS="$VAULT/.prettier-plugins/obsidian-kingdone-chapel.mjs"
-  mkdir -p "$(dirname "$PLUGIN_MJS")"
-  cp -f "$TARGET/prettier-plugin.mjs" "$PLUGIN_MJS"
-  echo "prettier: copied the plugin to $PLUGIN_MJS"
-  if ! grep -q 'prettier-plugins/obsidian-kingdone-chapel.mjs' "$VAULT/.prettierrc.json" 2>/dev/null; then
-    echo "prettier: add it to the vault's .prettierrc.json:"
-    echo '            "plugins": [".prettier-plugins/obsidian-kingdone-chapel.mjs"]'
-  fi
-  # The copy is generated, and a vault formatting everything would rewrite a
-  # large file nobody edits on every run — and fail its check straight after
-  # each copy. Left to the reader for the same reason as the config.
-  if ! grep -qE '^/?\.prettier-plugins/?$' "$VAULT/.prettierignore" 2>/dev/null; then
-    echo "prettier: add the plugin folder to the vault's .prettierignore:"
-    echo '            .prettier-plugins/'
+  # A checkout from before the plugin existed builds no such file, and linking
+  # it is still a link that worked.
+  if [ -f "$TARGET/prettier-plugin.mjs" ]; then
+    PLUGIN_MJS="$VAULT/.prettier-plugins/obsidian-kingdone-chapel.mjs"
+    mkdir -p "$(dirname "$PLUGIN_MJS")"
+    cp -f "$TARGET/prettier-plugin.mjs" "$PLUGIN_MJS"
+    echo "prettier: copied the plugin to $PLUGIN_MJS"
+    if ! grep -q 'prettier-plugins/obsidian-kingdone-chapel.mjs' "$VAULT/.prettierrc.json" 2>/dev/null; then
+      echo "prettier: add it to the vault's .prettierrc.json:"
+      echo '            "plugins": [".prettier-plugins/obsidian-kingdone-chapel.mjs"]'
+    fi
+    # The copy is generated, and a vault formatting everything would rewrite a
+    # large file nobody edits on every run — and fail its check straight after
+    # each copy. Left to the reader for the same reason as the config.
+    if ! grep -qE '^/?\.prettier-plugins/?$' "$VAULT/.prettierignore" 2>/dev/null; then
+      echo "prettier: add the plugin folder to the vault's .prettierignore:"
+      echo '            .prettier-plugins/'
+    fi
+  else
+    echo "note: $TARGET builds no prettier-plugin.mjs - vault formatter plugin not copied" >&2
   fi
 
   echo "done - Hot Reload picks up the new main.js"
