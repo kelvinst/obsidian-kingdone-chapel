@@ -96,6 +96,20 @@ describe('the plugin', () => {
     expect(await thrice(text)).toEqual([text, text, text]);
   });
 
+  it('wraps what follows a link spanning lines by the width', async () => {
+    // Shedd-19-PSA-000.md as it stands in the vault: a link already broken
+    // across two lines, then a run of links too long for what is left of the
+    // line. The run belongs on a line of its own. Printed as one word holding a
+    // hardline, the link told Prettier everything after it fit, and the run
+    // was glued onto the link's second line, 196 columns long.
+    const text =
+      'os mesmos (((Shedd-13-1CH-016#^shedd-1ch-16-4|1 Cr\n' +
+      '16.4)),((Shedd-13-1CH-016#^shedd-1ch-16-5|5));\n' +
+      '((Shedd-13-1CH-025#^shedd-1ch-25-1|25.1)),((Shedd-13-1CH-025#^shedd-1ch-25-2|2)),((Shedd-13-1CH-025#^shedd-1ch-25-3|3))).\n' +
+      'Os enigmáticos termos musicais.\n';
+    expect(await thrice(text)).toEqual([text, text, text]);
+  });
+
   it('leaves a link closed lines after it opened as written', async () => {
     const text =
       'antes ((x|abre aqui\nsegunda linha de prosa\nterceira linha e agora )) fecha\n';
