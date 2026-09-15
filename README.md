@@ -316,17 +316,17 @@ what you typed with ordinary internal links. Each row reads as the reference it 
 so what you pick is what the note ends up saying. Enter inserts it; Tab inserts the same
 thing and leaves the label selected, so the next thing you type renames the link — `@Sl 1.1`
 then Tab writes `[[ARA-19-Salmos-001#^ara-psa-1-1|Sl 1.1]]` with `Sl 1.1` highlighted, ready
-to become `Salmo 1` or anything else. A run of verses writes a link each and Tab selects the
+to become `Salmo 1` or anything else. A run of chapters writes a link each and Tab selects the
 first label, the only one spelling the reference out; embeds carry no label, so there Tab
 inserts the way Enter does.
 
-| You type      | You get                                                                 |
-| ------------- | ----------------------------------------------------------------------- |
-| `@Joao`       | `[[NVI-43-Joao\|João]]` — the note listing the book's chapters          |
-| `@Joao 1`     | `[[NVI-43-JHN-001\|João 1]]`                                            |
-| `@Joao 1.1`   | `[[NVI-43-JHN-001#^nvi-jhn-1-1\|João 1.1]]`                             |
-| `@Joao 1.1,2` | `[[#^nvi-jhn-1-1-2\|João 1.1,2]]` — one link, to a quote of the passage |
-| `@Joao 1.1-3` | `[[#^nvi-jhn-1-1-3\|João 1.1-3]]` — the same, written as the run it is  |
+| You type      | You get                                                                       |
+| ------------- | ----------------------------------------------------------------------------- |
+| `@Joao`       | `[[NVI-43-Joao\|João]]` — the note listing the book's chapters                |
+| `@Joao 1`     | `[[NVI-43-JHN-001\|João 1]]`                                                  |
+| `@Joao 1.1`   | `[[NVI-43-JHN-001#^nvi-jhn-1-1\|João 1.1]]`                                   |
+| `@Joao 1.1,2` | `[[#^quote-nvi-jhn-1-1-2\|João 1.1,2]]` — one link, to a quote of the passage |
+| `@Joao 1.1-3` | `[[#^quote-nvi-jhn-1-1-3\|João 1.1-3]]` — the same, written as the run it is  |
 
 A reference to more than one verse is written as a single link, the way it is read out loud,
 and the verses it stands for go into a quote under a `## Citações` heading at the end of the
@@ -338,7 +338,7 @@ note — one embed per verse, exactly what `!@` would have written inline:
 > [!quote]+ João 1.1-3 - NVI
 > ![[NVI-43-JHN-001#^nvi-jhn-1-1]]
 > ![[NVI-43-JHN-001#^nvi-jhn-1-2]]
-> ![[NVI-43-JHN-001#^nvi-jhn-1-3]] ^nvi-jhn-1-1-3
+> ![[NVI-43-JHN-001#^nvi-jhn-1-3]] ^quote-nvi-jhn-1-1-3
 ```
 
 The line you are writing keeps the reference and nothing else, hovering it shows the whole
@@ -356,11 +356,11 @@ pair names its book only when it is a different one. Write it the same way here:
 on from the link right before the semicolon. The books still answer under those rows, so
 `;@3` is verse 3 of the chapter being carried as much as it is the start of `3 João`.
 
-| You type, after `[[NVI-43-JHN-002\|João 2.9]];` | You get                                                                    |
-| ----------------------------------------------- | -------------------------------------------------------------------------- |
-| `@3.1`                                          | `[[NVI-43-JHN-003#^nvi-jhn-3-1\|3.1]]` — John again, chapter 3             |
-| `@10`                                           | `[[NVI-43-JHN-002#^nvi-jhn-2-10\|10]]` — another verse of the same chapter |
-| `@3.1,2`                                        | one link per verse, the way a spelled-out reference writes them            |
+| You type, after `[[NVI-43-JHN-002\|João 2.9]];` | You get                                                                            |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `@3.1`                                          | `[[NVI-43-JHN-003#^nvi-jhn-3-1\|3.1]]` — John again, chapter 3                     |
+| `@10`                                           | `[[NVI-43-JHN-002#^nvi-jhn-2-10\|10]]` — another verse of the same chapter         |
+| `@3.1,2`                                        | `[[#^quote-nvi-jhn-3-1-2\|3.1,2]]` — one link, to a quote, as a spelled-out run is |
 
 Each of those comes twice: once labelled with the numbers as you typed them, once with the
 reference spelled out (`João 3.1`), for when the sentence needs the book said again.
