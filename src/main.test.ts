@@ -1038,13 +1038,33 @@ describe('linkContexts', () => {
       { link: 'NVI-43-JHN-001', line: 1 },
     ];
     for (let line = 2; line < 60; line += 1) {
-      far.push({ link: 'Estudos/Romanos', line });
+      far.push({ link: `Estudos/Romanos ${line}`, line });
     }
 
     // Every link between the cursor and João is a link to nothing, and the
     // walk back stops before reaching it: a passage that far up is not what
     // the paragraph is about, and this runs on every keystroke.
     expect(contexts(note(...far), 3, { line: 60, ch: 0 })).toEqual([GEN_ONE()]);
+  });
+
+  it('walks past a long quote as the one chapter it cites', () => {
+    const here = note(
+      { link: 'NVI-01-GEN-001', line: 0 },
+      { link: 'NVI-43-JHN-001', line: 1 },
+    );
+    const verses: LinkAt[] = [];
+    for (let line = 2; line < 40; line += 1) {
+      verses.push({ link: `NVI-01-GEN-002#^nvi-gen-2-${line}`, line, col: 2 });
+    }
+    world.metadataCache.embeds.set(here.path, verses);
+
+    // Every verse the quote embeds is in the one chapter, so the quote spends
+    // one step of the walk back, not one for each verse.
+    expect(contexts(here, 3, { line: 40, ch: 0 })).toEqual([
+      GEN_ONE(),
+      GEN_TWO(),
+      JHN_ONE(),
+    ]);
   });
 
   it('carries nothing from a link to nothing the vault holds', () => {

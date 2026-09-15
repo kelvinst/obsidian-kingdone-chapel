@@ -953,8 +953,18 @@ export default class KingdoneChapelPlugin extends Plugin {
     const before = links.filter((link) =>
       startsBefore(link.position.start, at),
     );
-    const stop = Math.max(0, before.length - SCAN_BACK);
-    for (let i = before.length - 1; i >= stop && out.length < max; i -= 1) {
+    // A target is walked past once: the verses a quote embeds all land in the
+    // one chapter, and they would otherwise spend the whole walk on it. A link
+    // into the note itself names no file, so each block it points at is its own.
+    const walked = new Set<string>();
+    for (
+      let i = before.length - 1;
+      i >= 0 && walked.size < SCAN_BACK && out.length < max;
+      i -= 1
+    ) {
+      const target = getLinkpath(before[i].link) || before[i].link;
+      if (walked.has(target)) continue;
+      walked.add(target);
       take(this.citedLocation(before[i].link, from, cache));
     }
     return out.slice(0, max);
