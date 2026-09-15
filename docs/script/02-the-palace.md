@@ -16,11 +16,21 @@ He wakes mid-sentence, like a man who never stopped.
 
 > — Your day's roll, my lord.
 
-Natural, courteous, the way he does it every day. He gives the office its full weight, the way a man does who has said it every morning of his life. **[the player chooses: King / Queen]**
+Natural, courteous, the way he does it every day.
 
 I step back. I ask whether he knows me.
 
-He finds it funny, almost laughs, not getting the joke. And he says my name, whole, with no hunting for it. The same name the book took from me a moment ago.
+He finds it funny, almost laughs, not getting the joke.
+
+> — Of course I know my lord. My lord is —
+
+And he says my name. Whole, at once, with none of the hunting it cost me on the bedroom floor. Out of his mouth it is the most ordinary thing in the world. He does not stop there either, because to him it is all one sentence:
+
+> — — the —
+
+**[the player chooses: King / Queen]**
+
+> — — of this kingdom.
 
 And then he sees that I am not joking. He looks at my face. He looks at my clothes. And then he looks around, for the first time.
 

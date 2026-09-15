@@ -62,7 +62,9 @@ are how the kingdom is run, and they have been here longer than the people
 staffing it — the chronicle predates the Steward.
 
 **The chronicle.** It records everything that happens in the kingdom: what you
-do, what changes, what is kept, what is lost. It writes itself, letter by
+do, what changes, what is kept, what is lost. It writes in your own voice, in
+the first person and in lower case, and what it writes is not only your acts —
+in the bedroom it puts down the thought before you have finished having it. It writes itself, letter by
 letter, with no quill and no hand, and it does not stop for being watched. It
 asks nothing, begs no leave, and passes no judgment. It records your corrections
 too, because the truth of a day includes your having changed your mind partway
@@ -115,9 +117,14 @@ self.
 
 - **Kept.** Who they are. Their office and how it is done. How the kingdom works,
   the chronicle and the book of hours included, which is why none of it strikes
-  them as remarkable. And you — name and face, on sight.
+  them as remarkable. And you — name and face, on sight. The Steward says your
+  name at once, without hunting for it.
 - **Lost.** How they got here. What they were doing. How long it has been.
   Anything that happened in this place, up to the moment of waking.
+- **Slow, but not lost: your own name.** On waking you reach for it and it is not
+  on top, where it should be. It comes back inside the first scene, whole, the
+  way a word you have said all your life comes back. Nobody else has this
+  trouble, and nobody else's name is ever in question.
 - They do not learn they lost anything until they look around. The Steward is
   courteous and ordinary until he sees the dust and the web on his own sleeve;
   the Herald bows before he understands where he is standing. Then the same
@@ -154,12 +161,15 @@ book writes, that is what it is for.
 
 ## How the player is named
 
-- The chronicle asks in the bedroom, as a recap and not as a question:
-  `to recap, my name is`. You already know the answer — the book is reading it
-  back to you. The player writes the name there.
-- The title comes with the Steward's first greeting in act 2. He says it the way
-  he has said it every morning of his life; the player picks whether it is King
-  or Queen.
+- **The name, in the bedroom.** Your own name is the one thing that is slow to
+  come back, and it comes back within the scene. The chronicle writes the
+  hunting for it in your own voice — `wait`, `who am i`, `i am not remembering.
+it is here. think` — the player writes the name, and it lands as a thing
+  recovered, not invented: `yes. that is my name`. Everything else about
+  yourself was there from the moment you woke.
+- **The title, with the Steward.** He knows you and says your name without
+  hunting, then runs straight on into the office in the same sentence; the
+  player picks whether the word is King or Queen.
 - The title settles the form of address for the whole script. It is written
   **my lord** throughout, and reads _my lady_ for a Queen.
 
