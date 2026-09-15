@@ -44,8 +44,8 @@ I open it. A ribbon marks today. And today's page has four lines, all struck thr
 
 > ~~Wake up~~
 > ~~Find the chronicle~~
-> ~~Speak with the Steward~~
 > ~~Say my name~~
+> ~~Speak with the Steward~~
 
 Written beforehand, in the infinitive, the way you note down what is still to be done. And struck through afterward, one by one, as I did them.
 

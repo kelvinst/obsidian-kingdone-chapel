@@ -22,6 +22,10 @@ After a while, I go back. I open it. And there it is:
 
 > i shut the book and stepped away
 
-I wait for more. Nothing comes. It has nothing to write while I stand there staring at it.
+Then a new line appears, slowly:
+
+> to recap, my name is
+
+And the space sits there, waiting, as if the book were reading back to me what I already have. **[the player writes the name]**
 
 I take the book under my arm, because there is no leaving that thing there, and I go out through the half-open door.
