@@ -1068,6 +1068,107 @@ describe('linkContexts', () => {
     const here = note('NVI-43-JHN-001#^nvi-jhn-1-1');
     expect(contexts(here)).toEqual([JHN_ONE()]);
   });
+
+  describe('a run of verses cited as a quote', () => {
+    /**
+     * A note about Gênesis 1 that goes on to cite `link` on its second line,
+     * with the quote it points at kept on its foot, made of `embeds`, the way
+     * a run of verses is written. The note's own passage is taken, and the
+     * quote stands past the cursor, so only the link itself can answer João.
+     */
+    function quoted(link: string, ...embeds: string[]): TFile {
+      const quote = [
+        '> [!quote]+ João 1.1-4 (NVI)',
+        ...embeds.map((embed) => `> ![[${embed}]]`),
+      ];
+      quote[quote.length - 1] += ' ^nvi-jhn-1-1-4';
+      const text = [
+        'Sobre [[NVI-01-GEN-001|Gn 1]].',
+        'E [[#^nvi-jhn-1-1-4|Jo 1.1-4]];',
+        '',
+        ...quote,
+      ];
+      const file = world.vault.write('Estudos/Salmo.md', text.join('\n'));
+      world.metadataCache.links.set(file.path, [
+        { link: 'NVI-01-GEN-001', line: 0, col: 6 },
+        { link, line: 1, col: 2 },
+      ]);
+      world.metadataCache.blocks.set(file.path, ['nvi-jhn-1-1-4']);
+      world.metadataCache.embeds.set(
+        file.path,
+        embeds.map((embed, at) => ({ link: embed, line: 4 + at, col: 2 })),
+      );
+      return file;
+    }
+
+    const EMBEDS = [
+      'NVI-43-JHN-001#^nvi-jhn-1-1',
+      'NVI-43-JHN-001#^nvi-jhn-1-2',
+    ];
+    const CURSOR = { line: 1, ch: 32 };
+
+    it('reads the passage off what the quote is made of', () => {
+      const here = quoted('#^nvi-jhn-1-1-4', ...EMBEDS);
+      expect(contexts(here, 3, CURSOR)).toEqual([GEN_ONE(), JHN_ONE()]);
+    });
+
+    it('reads the quote a table links, its pipe escaped, the same', () => {
+      const here = quoted('#^nvi-jhn-1-1-4\\', ...EMBEDS);
+      expect(contexts(here, 3, CURSOR)).toEqual([GEN_ONE(), JHN_ONE()]);
+    });
+
+    it('carries nothing from a quote of something that is not a passage', () => {
+      const here = quoted('#^nvi-jhn-1-1-4', 'Estudos/Romanos#^um');
+      expect(contexts(here, 3, CURSOR)).toEqual([GEN_ONE()]);
+    });
+
+    it('carries nothing from a link to a block that embeds nothing', () => {
+      const here = quoted('#^nvi-jhn-1-1-4');
+      world.metadataCache.embeds.delete(here.path);
+      expect(contexts(here, 3, CURSOR)).toEqual([GEN_ONE()]);
+    });
+
+    it('carries nothing from a link to a block in a note that holds none', () => {
+      const here = quoted('#^nvi-jhn-1-1-4', ...EMBEDS);
+      world.metadataCache.blocks.delete(here.path);
+      world.metadataCache.embeds.delete(here.path);
+      expect(contexts(here, 3, CURSOR)).toEqual([GEN_ONE()]);
+    });
+
+    it('carries nothing from a link to a block the note does not hold', () => {
+      const here = quoted('#^outro', ...EMBEDS);
+      expect(contexts(here, 3, CURSOR)).toEqual([GEN_ONE()]);
+    });
+  });
+
+  it('reads an embed and a link on the one line in the order they stand', () => {
+    const here = note(
+      { link: 'NVI-01-GEN-001', line: 0 },
+      { link: 'NVI-01-GEN-002', line: 4, col: 20 },
+    );
+    world.metadataCache.embeds.set(here.path, [
+      { link: 'NVI-43-JHN-001#^nvi-jhn-1-1', line: 4, col: 2 },
+    ]);
+    expect(contexts(here, 3, { line: 4, ch: 30 })).toEqual([
+      GEN_ONE(),
+      GEN_TWO(),
+      JHN_ONE(),
+    ]);
+  });
+
+  it('reads the passage off a note that only embeds it', () => {
+    const file = world.vault.write('Estudos/Salmo.md', 'Um estudo.');
+    world.metadataCache.embeds.set(file.path, ['NVI-43-JHN-001#^nvi-jhn-1-1']);
+    expect(contexts(file)).toEqual([JHN_ONE()]);
+  });
+
+  it('counts a passage embedded before the cursor as one linked there', () => {
+    const here = note({ link: 'NVI-01-GEN-001', line: 0 });
+    world.metadataCache.embeds.set(here.path, [
+      { link: 'NVI-43-JHN-001#^nvi-jhn-1-1', line: 4 },
+    ]);
+    expect(contexts(here)).toEqual([GEN_ONE(), JHN_ONE()]);
+  });
 });
 describe('cursorVerse', () => {
   function editing(text: string) {

@@ -45,6 +45,17 @@ function lineAt(line: number, col: number): LinkPos {
   return { start: { line, col }, end: { line, col } };
 }
 
+/** Links as the cache holds them, each at the place it was said to stand. */
+function placed(
+  links: (string | LinkAt)[],
+): { link: string; position: LinkPos }[] {
+  return links.map((link, at) =>
+    typeof link === 'string'
+      ? { link, position: lineAt(at, 0) }
+      : { link: link.link, position: lineAt(link.line, link.col || 0) },
+  );
+}
+
 /**
  * Where a link stands in the note, for the reading that goes by how far back
  * from the cursor it was written. A link given as a bare target stands on a
@@ -188,6 +199,9 @@ export class FakeMetadataCache extends Emitter {
   blocks = new Map<string, string[]>();
   /** path -> the links the file writes, in the order it writes them. */
   links = new Map<string, (string | LinkAt)[]>();
+  /** path -> the embeds the file writes, `![[...]]`, kept apart from its links
+   * the way Obsidian keeps them. */
+  embeds = new Map<string, (string | LinkAt)[]>();
   /** path -> the frontmatter the cache read off it. */
   frontmatter = new Map<string, Record<string, unknown>>();
 
@@ -212,12 +226,14 @@ export class FakeMetadataCache extends Emitter {
   getFileCache(file: TFile): {
     blocks?: Record<string, { position: BlockLines }>;
     links?: { link: string; position: LinkPos }[];
+    embeds?: { link: string; position: LinkPos }[];
     frontmatter?: Record<string, unknown>;
   } | null {
     const ids = this.blocks.get(file.path);
     const links = this.links.get(file.path);
+    const embeds = this.embeds.get(file.path);
     const front = this.frontmatter.get(file.path);
-    if (!ids && !links && !front) return null;
+    if (!ids && !links && !embeds && !front) return null;
 
     const lines = (this.vault.contents.get(file.path) || '').split('\n');
     const blocks: Record<string, { position: BlockLines }> = {};
@@ -229,18 +245,8 @@ export class FakeMetadataCache extends Emitter {
     }
     return {
       ...(ids ? { blocks } : {}),
-      ...(links
-        ? {
-            links: links.map((link, at) =>
-              typeof link === 'string'
-                ? { link, position: lineAt(at, 0) }
-                : {
-                    link: link.link,
-                    position: lineAt(link.line, link.col || 0),
-                  },
-            ),
-          }
-        : {}),
+      ...(links ? { links: placed(links) } : {}),
+      ...(embeds ? { embeds: placed(embeds) } : {}),
       ...(front ? { frontmatter: front } : {}),
     };
   }

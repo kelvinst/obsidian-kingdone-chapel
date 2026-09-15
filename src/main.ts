@@ -6,7 +6,13 @@ import {
   WorkspaceLeaf,
   getLinkpath,
 } from 'obsidian';
-import type { Editor, EditorPosition, PaneType, TAbstractFile } from 'obsidian';
+import type {
+  CachedMetadata,
+  Editor,
+  EditorPosition,
+  PaneType,
+  TAbstractFile,
+} from 'obsidian';
 
 import { DEFAULT_SETTINGS, VIEW_TYPE } from './types';
 import type {
@@ -901,6 +907,11 @@ export default class KingdoneChapelPlugin extends Plugin {
    * with no line of the note under it — nothing is near the reference, and
    * the note's own passage is offered alone.
    *
+   * A passage embedded is cited as much as one linked, so the embeds are read
+   * with the links, in the order the note writes them. A run of verses is
+   * cited as a link to a quote in the note itself, and that link is read for
+   * the passage the quote is made of.
+   *
    * Links are always to a chapter, so every passage here is one. Reading
    * stops at `max`, since this runs on every keystroke and the popup has room
    * for only so many.
@@ -912,7 +923,12 @@ export default class KingdoneChapelPlugin extends Plugin {
   ): Location[] {
     if (!from || max <= 0) return [];
     const cache = this.app.metadataCache.getFileCache(from);
-    const links = (cache && cache.links) || [];
+    if (!cache) return [];
+    const links = [...(cache.links || []), ...(cache.embeds || [])].sort(
+      (a, b) =>
+        a.position.start.line - b.position.start.line ||
+        a.position.start.col - b.position.start.col,
+    );
 
     const out: Location[] = [];
     const seen = new Set<string>();
@@ -925,7 +941,7 @@ export default class KingdoneChapelPlugin extends Plugin {
 
     // The note's own passage, which leads however far back it was written.
     for (const link of links) {
-      if (take(this.linkLocation(link.link, from))) break;
+      if (take(this.citedLocation(link.link, from, cache))) break;
     }
 
     // Without a cursor there is nothing to be near: the last link in the file
@@ -939,9 +955,36 @@ export default class KingdoneChapelPlugin extends Plugin {
     );
     const stop = Math.max(0, before.length - SCAN_BACK);
     for (let i = before.length - 1; i >= stop && out.length < max; i -= 1) {
-      take(this.linkLocation(before[i].link, from));
+      take(this.citedLocation(before[i].link, from, cache));
     }
     return out.slice(0, max);
+  }
+
+  /**
+   * The passage a link written in `from` cites. A link to a block of the note
+   * itself — `[[#^nvi-jhn-1-1-4|Jo 1.1-4]]` — cites the quote kept there, and
+   * the quote names its passage in the first verse it embeds. A table escapes
+   * the pipe after the id, and the escape is no part of it.
+   *
+   * A quote of something that is not a passage cites nothing: its embed lands
+   * in no chapter, and the block id is never read as though it named one.
+   */
+  citedLocation(
+    link: string,
+    from: TFile,
+    cache: CachedMetadata,
+  ): Location | null {
+    const quote = /^#\^([\w-]+)\\?$/.exec(link);
+    if (!quote) return this.linkLocation(link, from);
+    const block = cache.blocks?.[quote[1]];
+    if (!block) return null;
+    const { start, end } = block.position;
+    const embed = (cache.embeds || []).find(
+      (e) =>
+        e.position.start.line >= start.line &&
+        e.position.start.line <= end.line,
+    );
+    return embed ? this.linkLocation(embed.link, from) : null;
   }
 
   /** Where a link written in `from` lands, for the links that land in a
