@@ -68,6 +68,19 @@ describe('chapterDiagnostics', () => {
     ]);
   });
 
+  it('says nothing about a book intro holding no verses', () => {
+    expect(of('# Jó - Shedd', 0)).toEqual([]);
+  });
+
+  it('still reads a book intro that does hold verses', () => {
+    expect(
+      of('1. Um\n2. Dois ^ara-gen-1-2', 0).map((d) => [d.kind, d.verse]),
+    ).toEqual([
+      ['unanchored-verse', 1],
+      ['foreign-block-id', 2],
+    ]);
+  });
+
   it('reports every unanchored verse of a chapter, in reading order', () => {
     expect(
       of('1. Um\n2. Dois ^ara-gen-1-2\n3. Tres').map((d) => d.verse),
