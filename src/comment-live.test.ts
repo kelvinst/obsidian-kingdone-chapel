@@ -209,6 +209,145 @@ describe('build', () => {
   });
 });
 
+describe('a comment written inside a line', () => {
+  /**
+   * The comments taken off inside a line, by their text: what is replaced
+   * with nothing standing in for it, as opposed to a whole line's fold.
+   */
+  function gone(doc: string, cursor = 0, live = true): string[] {
+    const state = EditorState.create({
+      doc,
+      selection: { anchor: cursor },
+      extensions: [editorLivePreviewField.init(() => live)],
+    });
+    const out: string[] = [];
+    build(state).between(0, doc.length, (from, to, value) => {
+      if (from < to && !value.spec.widget) out.push(doc.slice(from, to));
+    });
+    return out;
+  }
+
+  it('takes the comment off and leaves the line', () => {
+    // Reading view renders `Test <!-- test -->` as `Test`; the comment is as
+    // invisible to the reader as one written on a line of its own.
+    expect(gone(below('Test <!-- test -->'))).toEqual(['<!-- test -->']);
+  });
+
+  it('folds nothing and shrinks nothing for it', () => {
+    // The line stays in layout at its own size, so the down arrow lands on it
+    // as on any other line.
+    const doc = below('Test <!-- test -->');
+    expect(hidden(doc)).toEqual([]);
+    expect(small(doc)).toEqual([]);
+  });
+
+  it('takes off every comment the line holds', () => {
+    expect(gone(below('Um <!-- a --> dois <!-- b --> três'))).toEqual([
+      '<!-- a -->',
+      '<!-- b -->',
+    ]);
+  });
+
+  it('takes off a comment the line opens with and goes on past', () => {
+    // Not a comment whole, so no fold — but the comment is still one.
+    expect(gone(below('<!-- conferir --> Verso.'))).toEqual([
+      '<!-- conferir -->',
+    ]);
+  });
+
+  it('takes a comment off a quoted line and leaves the markers', () => {
+    expect(gone(below('> [!note]', '> Verso <!-- a -->'))).toEqual([
+      '<!-- a -->',
+    ]);
+  });
+
+  it('gives the comment back when the cursor is inside it', () => {
+    const doc = below('Test <!-- test -->');
+    expect(gone(doc, doc.indexOf('test -->'))).toEqual([]);
+  });
+
+  it('gives it back when the selection reaches into it', () => {
+    const doc = below('Test <!-- test -->');
+    const state = EditorState.create({
+      doc,
+      selection: { anchor: doc.indexOf('Test'), head: doc.indexOf('<!--') + 2 },
+    });
+    const replaced: number[] = [];
+    build(state).between(0, doc.length, (from, to) => {
+      replaced.push(from);
+    });
+    expect(replaced).toEqual([]);
+  });
+
+  it('leaves a comment standing inside inline code', () => {
+    // A comment in backticks is one the note is showing, not one it is
+    // addressing anybody with.
+    expect(gone(below('Escreva `<!-- x -->` assim.'))).toEqual([]);
+  });
+
+  it('leaves a comment standing inside a fenced block', () => {
+    expect(gone(below('```', 'Test <!-- a -->', '```'))).toEqual([]);
+  });
+
+  it('leaves every comment standing in source mode', () => {
+    expect(gone(below('Test <!-- test -->'), 0, false)).toEqual([]);
+  });
+
+  it('does not also replace a comment that is a line whole', () => {
+    // The fold is already standing over it; a second replacement over the
+    // same span would be two decorations fighting for one comment.
+    const doc = below('<!-- prettier-ignore -->');
+    const state = EditorState.create({ doc, selection: { anchor: 0 } });
+    let count = 0;
+    build(state).between(0, doc.length, (from, to) => {
+      if (from < to) count++;
+    });
+    expect(count).toBe(1);
+  });
+
+  it('leaves a comment that closes on a later line standing', () => {
+    expect(gone(below('Test <!-- a', 'b --> mais'))).toEqual([]);
+  });
+
+  it('hides nothing written inside such a comment', () => {
+    // The `<!-- y` here is the comment's own text, and the `-->` after it
+    // closes the one opened a line above.
+    expect(gone(below('Test <!-- a', 'x <!-- y --> z'))).toEqual([]);
+  });
+
+  it('takes off a comment written after such a comment closes', () => {
+    expect(gone(below('Test <!-- a', 'b --> mais <!-- c -->'))).toEqual([
+      '<!-- c -->',
+    ]);
+  });
+
+  it('takes off a comment after a block whose closing line goes on', () => {
+    expect(gone(below('<!--', 'por quê', '--> Verso. <!-- b -->'))).toEqual([
+      '<!-- b -->',
+    ]);
+  });
+
+  it('carries such a comment through a line that does not close it', () => {
+    expect(
+      gone(below('Test <!-- a', 'b <!-- c', 'd --> mais <!-- e -->')),
+    ).toEqual(['<!-- e -->']);
+  });
+
+  it('does not carry an unclosed comment past a fence', () => {
+    expect(
+      gone(below('Test <!-- a', '```', 'x', '```', 'Verso <!-- b -->')),
+    ).toEqual(['<!-- b -->']);
+  });
+
+  it('does not carry an unclosed comment past a blank line', () => {
+    // A blank line ends the paragraph, and a comment cannot outlive the
+    // paragraph it was opened in.
+    expect(gone(below('Test <!-- a', '', 'Verso <!-- b -->'))).toEqual([
+      '<!-- b -->',
+    ]);
+  });
+});
+
 describe('small', () => {
   it('draws the lines a comment covers small', () => {
     // The same size an aside written `,,so,,` takes, and taken the same way:
@@ -399,22 +538,22 @@ describe('liveComments', () => {
     view.destroy();
   });
 
-  it('keeps the runs it read when only the cursor moved', () => {
+  it('keeps the comments it read when only the cursor moved', () => {
     // Reading them costs a regex over every line of the note, and an arrow key
     // cannot move a comment — only which one the cursor is in.
     const doc = below('<!-- a -->');
     const view = editing(doc, true);
-    const before = view.state.field(liveComments).runs;
+    const before = view.state.field(liveComments).comments;
     view.dispatch({ selection: { anchor: doc.length } });
-    expect(view.state.field(liveComments).runs).toBe(before);
+    expect(view.state.field(liveComments).comments).toBe(before);
     view.destroy();
   });
 
   it('reads the note again when it is edited', () => {
     const view = editing(below('<!-- a -->'), true);
-    const before = view.state.field(liveComments).runs;
+    const before = view.state.field(liveComments).comments;
     view.dispatch({ changes: { from: 0, insert: 'Outro. ' } });
-    expect(view.state.field(liveComments).runs).not.toBe(before);
+    expect(view.state.field(liveComments).comments).not.toBe(before);
     view.destroy();
   });
 
