@@ -14,13 +14,29 @@ I hesitate. And I take what is on the tray: a wooden clipboard with a sheet clam
 
 He wakes mid-sentence, like a man who never stopped.
 
-> — Your day's roll, my lord.
+> — Your day's roll.
 
-Natural, courteous, the way he does it every day.
+Natural, courteous, the way he does it every day. He holds the bow a moment too long, and there is a gap where a title should have gone.
 
 I step back. I ask whether he knows me.
 
-He finds it funny, almost laughs, not getting the joke. And he says my name. The same name I just gave the book.
+He finds it funny, almost laughs, not getting the joke.
+
+> — Of course I know you. I know you as I know my own name. You are —
+
+And he stops there. Mouth open, on the word that was to come next. He tries again, from further back, the way you take a run at a step you have already missed once. Nothing comes. The name is not in him.
+
+What is still in him is the office. He holds on to it, because it is the part he did not lose.
+
+> — You are the —
+
+**[the player chooses: King / Queen]**
+
+> — — of this kingdom. Of this one, of the whole of it. And your name, my lord, your name is —
+
+And the space sits there, in the middle of his sentence, waiting. **[the player writes the name]**
+
+He repeats it after me, quietly, twice. He is relieved. The relief does not last, because he is the one who should have said it first, and we both heard that he could not.
 
 And then he sees that I am not joking. He looks at my face. He looks at my clothes. And then he looks around, for the first time.
 
