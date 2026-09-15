@@ -31,7 +31,7 @@ export type DiagnosticKind =
   | 'book-conflict'
   /** A block id naming a chapter other than the one it is written in. */
   | 'foreign-block-id'
-  /** A chapter file holding no verses at all. */
+  /** A chapter file holding no verses at all, other than a book's intro. */
   | 'empty-chapter'
   /** A folder declared a version, holding no chapter. */
   | 'empty-version';
@@ -101,7 +101,11 @@ export function chapterDiagnostics(
     verse,
   });
 
-  if (!verses.length) return [row('empty-chapter', null)];
+  // Chapter 0 is the introduction a book opens with, which holds no verses by
+  // definition — an empty one is what it should be, not a chapter left out.
+  if (!verses.length) {
+    return at.chapter === 0 ? [] : [row('empty-chapter', null)];
+  }
 
   const out: Diagnostic[] = [];
   const named = new Map<number, number[]>();
