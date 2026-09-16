@@ -285,6 +285,30 @@ describe('a comment written inside a line', () => {
     expect(gone(below('Escreva `<!-- x -->` assim.'))).toEqual([]);
   });
 
+  it('leaves a comment standing inside an indented code block', () => {
+    // The `^ {0,3}` a fold is held to is the same bound here: four spaces is a
+    // code block, and the reader is handed what is in it as code.
+    expect(gone(below('    Test <!-- a -->'))).toEqual([]);
+    expect(gone(below('    <!-- prettier-ignore -->'))).toEqual([]);
+    expect(gone(below('\tTest <!-- a -->'))).toEqual([]);
+  });
+
+  it("leaves one standing inside the note's own `%%` comment", () => {
+    // The `%%` comment stays on the page because it is addressed to whoever
+    // writes the note; taking a piece out of it would leave the writer unable
+    // to tell what had been cut.
+    expect(gone(below('%% ver <!-- a --> %%'))).toEqual([]);
+  });
+
+  it('closes an empty comment on itself', () => {
+    // `<!-->` is a comment whole. Read as unclosed, it would swallow the prose
+    // up to the next `-->` — the note's own text taken off the page.
+    expect(gone(below('Test <!--> depois <!-- a -->'))).toEqual([
+      '<!-->',
+      '<!-- a -->',
+    ]);
+  });
+
   it('leaves a comment standing inside a fenced block', () => {
     expect(gone(below('```', 'Test <!-- a -->', '```'))).toEqual([]);
   });

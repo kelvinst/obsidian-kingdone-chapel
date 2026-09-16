@@ -42,6 +42,9 @@ import { CODE_BLOCK, NOT_PROSE_SOURCE, touched, unquoted } from './source';
  */
 const OPEN = /^ {0,3}<!--/;
 
+/** A line indented far enough to be a code block, fences or no fences. */
+const INDENTED_CODE = /^(?: {4}|\t)/;
+
 /**
  * What follows the end of a comment on the line that closes it, if anything.
  * Anything at all and the line is not folded: a line is folded for being a
@@ -56,8 +59,13 @@ const CLOSE = /-->(.*)$/;
  * not a comment — and maths and links with it. Masked with the same
  * alternation `live.ts` and `softlink-live.ts` mask with, so the three agree
  * on what in a line is prose.
+ *
+ * A `%%…%%` comment is masked on top of that alternation, and only here: it
+ * stays on the page because it is addressed to whoever writes the note, so
+ * taking a piece out of it would leave the writer looking at a gap in
+ * something of their own with nothing saying what was cut.
  */
-const NOT_PROSE = new RegExp(NOT_PROSE_SOURCE, 'g');
+const NOT_PROSE = new RegExp(`%%[^%\\n]*%%|${NOT_PROSE_SOURCE}`, 'g');
 
 function mask(text: string): string {
   return text.replace(NOT_PROSE, (found) => '\uFFFC'.repeat(found.length));
@@ -204,7 +212,10 @@ function within(
 ): boolean {
   let from = masked.indexOf('<!--', at);
   while (from !== -1) {
-    const close = said.indexOf('-->', from + 4);
+    // From the second `-` on, so `<!-->` and `<!--->` — comments whole, with
+    // nothing in them — close on themselves rather than running on to the
+    // next `-->` and taking the note's own words between with them.
+    const close = said.indexOf('-->', from + 2);
     if (close === -1) return true;
     into.push({ from: offset + from, to: offset + close + 3 });
     from = masked.indexOf('<!--', close + 3);
@@ -280,7 +291,13 @@ function blocks(state: EditorState): Comments {
 
     if (!open) {
       if (!OPEN.test(said)) {
-        spilling = within(said, masked, 0, offset, inline);
+        // Four spaces or a tab is a code block, which is why `OPEN` stops at
+        // three: what is written in one is being shown, comment or not. The
+        // bound has to be carried here as well, or a line `OPEN` turned down
+        // for being code would lose its comment to this instead.
+        if (!INDENTED_CODE.test(said)) {
+          spilling = within(said, masked, 0, offset, inline);
+        }
         continue;
       }
       open = {
