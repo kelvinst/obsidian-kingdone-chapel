@@ -4,6 +4,8 @@ The corridor is far too long to belong to a house. Portraits I do not recognize,
 
 And that is where I understand the size of the thing. Courtyards below. Walls. Rooftops. A huge gate, shut. And across the courtyard, a tower with a clock on its face, the hands stopped. All of it overgrown, all of it quiet, not a soul moving.
 
+Out past the gate the clouds are crossing and the leaves in the road turn over in a wind, and the wind never arrives. Here on the balcony the air does nothing at all: no breeze, no sound, not warm, not cold. The dust hangs in the light where it hangs.
+
 I was inside a castle this whole time. And it is abandoned.
 
 I go back to the corridor. And that is when I see, at the far end, a man standing. Faded clothes, a tray held out to nobody, a thick web linking his arm to the handrail.
@@ -68,7 +70,7 @@ I ask whether that is magic.
 
 He almost laughs.
 
-> — Magic? It is a book, my lord. It has been here since before me.
+> — Magic? It is a book, my lord. It works. It has always worked.
 
 And he explains, the way you explain that water runs downhill: everything that happens in this kingdom goes in there. What my lord does, what changes, what is kept, what is lost. It asks nothing, it begs no leave and it passes no judgment. It only records. And it records even what my lord corrects later, because the truth of a day includes my lord having changed his mind partway through it.
 
