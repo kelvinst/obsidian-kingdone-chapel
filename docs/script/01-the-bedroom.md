@@ -6,7 +6,7 @@ I get up slowly. It is a bedroom. There is a bed beside me, the linen buried in 
 
 I woke where I was supposed to wake. Only on the floor, and far too late.
 
-I do not know what room this is. And then comes the worse part: I do not know who I am. I reach for my name and it is not there.
+I do not know what room this is. I do not know how long I have been lying in it.
 
 That is when I saw the book. Open on the floor, a few steps away, with something written on the page.
 
@@ -22,10 +22,20 @@ After a while, I go back. I open it. And there it is:
 
 > i shut the book and stepped away
 
-Then a new line appears, slowly:
+And then it keeps going, under its own last line, and what it writes now is not something I did:
 
-> to recap, my name is
+> wait
 
-And the space sits there, waiting. **[the player writes the name]**
+> who am i
+
+I read it and the floor goes out from under me, because it is my own question. It got there first, and it is right: I reach for my name and it is not on top, where it should be. It is somewhere further back, behind something.
+
+> i am not remembering. it is here. think
+
+And the space waits for me. **[the player writes the name]**
+
+And there it is, the way a word you have said all your life comes back — no effort, no ceremony, it simply arrives, and I cannot see how it was ever gone.
+
+> yes. that is my name
 
 I take the book under my arm, because there is no leaving that thing there, and I go out through the half-open door.

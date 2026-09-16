@@ -16,19 +16,19 @@ I climb. Some fifteen steps, a full turn, my footfalls echoing. Another turn. Th
 
 And then I run straight into a man.
 
-Stopped, a hand's width from me, in the middle of a step. Coming down. One foot in the air, a thick book under his arm, the other hand raised like a man about to say something. Eyes open, fixed on nothing.
+Stopped, a hand's width from me, in the middle of a step. Coming down. One foot in the air, a thick book under his arm, the other hand out for a rail that is not on that side of the stair. Eyes open, fixed on nothing.
 
 I jump and catch the wall so I do not fall backward.
 
 I call out. Nothing. I wave my hand in front of his eyes. Nothing.
 
-And it is looking over his shoulder, high above, that I see the bell. Tipped mid-swing. Stopped in the air. No rope pulled taut, nothing holding it. Simply stopped where nothing stops.
+And it is looking over his shoulder, high above, that I see the bell. Stopped in the middle of a toll, tipped past the top of its swing. No rope pulled taut, nothing holding it. Simply stopped where nothing stops.
 
 Then I remember the Steward. It worked once, when I took a thing out of his hand.
 
 I get close. I hesitate, because it is a strange thing to take something out of the hand of a stopped man. And I pull the book.
 
-And the bell rings.
+And the bell finishes its toll.
 
 Up above, a few meters off, inside the closed stone. The sound bursts out, fills the whole tower, sets the floor shaking and brings the dust down from the ceiling in a curtain. I shout and curl up. The sound does not end, it stays in there, humming in the stone.
 
