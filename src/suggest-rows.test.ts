@@ -108,6 +108,63 @@ describe('a reference counted against the note own passage', () => {
       'No link in this note to read a book from — write one',
     ]);
   });
+  describe('carried on from a run of verses, written as a quote', () => {
+    /**
+     * A note that cites João 1.1-4 the way a run of verses is written — one
+     * link to a quote kept at its foot — and carries on after it with `; @`.
+     */
+    function afterQuote(link = '#^nvi-jhn-1-1-4') {
+      const made = harness(
+        {
+          ...chapter('NVI', 43, 'JHN', 1, ['a', 'b', 'c', 'd']),
+          ...chapter('NVI', 43, 'JHN', 2, ['e', 'f', 'g', 'h']),
+        },
+        { language: 'pt', defaultVersion: 'NVI' },
+      );
+      const from = made.vault.write(
+        'Estudos/Nota.md',
+        [
+          'Veja [[#^nvi-jhn-1-1-4|Jo 1.1-4]]; ',
+          '',
+          '> [!quote]+ João 1.1-4 (NVI)',
+          '> ![[NVI-43-JHN-001#^nvi-jhn-1-1]] ^nvi-jhn-1-1-4',
+        ].join('\n'),
+      );
+      made.metadataCache.links.set(from.path, [{ link, line: 0, col: 5 }]);
+      made.metadataCache.blocks.set(from.path, ['nvi-jhn-1-1-4']);
+      made.metadataCache.embeds.set(from.path, [
+        { link: 'NVI-43-JHN-001#^nvi-jhn-1-1', line: 3, col: 2 },
+      ]);
+      const ctx = (query: string): RowContext => ({
+        query,
+        file: from,
+        at: { line: 0, ch: 36 },
+      });
+      return { ctx, rows: new ReferenceRows(made.plugin) };
+    }
+
+    it('offers the chapter the quoted passage is in', async () => {
+      const made = afterQuote();
+      const found = await offered(made.ctx('2.1'), made.rows);
+      expect(found[0].markdown).toBe('[[NVI-43-JHN-002#^nvi-jhn-2-1|2.1]]');
+    });
+
+    it('writes a run of verses carried on from it as a quote of its own', async () => {
+      // The chapter to count in is what the quote link answers; writing the
+      // run as a quote is okc-nge's, and the two meet here.
+      const made = afterQuote();
+      const found = await offered(made.ctx('2-4'), made.rows);
+      expect(found[0].markdown).toBe('[[#^quote-nvi-jhn-1-2-4|2-4]]');
+      expect(found[0].passage?.id).toBe('quote-nvi-jhn-1-2-4');
+    });
+
+    it('carries on the same from the quote a table links', async () => {
+      const made = afterQuote('#^nvi-jhn-1-1-4\\');
+      const found = await offered(made.ctx('2.1'), made.rows);
+      expect(found[0].markdown).toBe('[[NVI-43-JHN-002#^nvi-jhn-2-1|2.1]]');
+    });
+  });
+
   it('offers nothing for numbers bound for no note at all', async () => {
     // No note, so no passage to count them in, and no book a bare number
     // names — there is nothing to offer.
