@@ -4,7 +4,7 @@ import { StateField } from '@codemirror/state';
 import type { EditorState, Range } from '@codemirror/state';
 import { editorLivePreviewField } from 'obsidian';
 
-import { CODE_BLOCK, touched, unquoted } from './source';
+import { CODE_BLOCK, NOT_PROSE_SOURCE, touched, unquoted } from './source';
 
 /**
  * The HTML comments, out of the way while the note is being written.
@@ -42,12 +42,41 @@ import { CODE_BLOCK, touched, unquoted } from './source';
  */
 const OPEN = /^ {0,3}<!--/;
 
+/** A line indented far enough to be a code block, fences or no fences. */
+const INDENTED_CODE = /^(?: {4}|\t)/;
+
 /**
  * What follows the end of a comment on the line that closes it, if anything.
- * Anything at all and the line stays: a line is hidden for being a comment
- * whole, never for holding one — `text <!-- why -->` is text.
+ * Anything at all and the line is not folded: a line is folded for being a
+ * comment whole, never for holding one — `text <!-- why -->` is text, and only
+ * the comment inside it comes off, the way `**` comes off bold.
  */
 const CLOSE = /-->(.*)$/;
+
+/**
+ * What a line holds that a comment written in it would only be shown by:
+ * inline code above all — `` `<!-- x -->` `` is a note explaining a comment,
+ * not a comment — and maths and links with it. Masked with the same
+ * alternation `live.ts` and `softlink-live.ts` mask with, so the three agree
+ * on what in a line is prose.
+ *
+ * A `%%…%%` comment is masked on top of that alternation, and only here: it
+ * stays on the page because it is addressed to whoever writes the note, so
+ * taking a piece out of it would leave the writer looking at a gap in
+ * something of their own with nothing saying what was cut.
+ */
+const NOT_PROSE = new RegExp(`%%[^%\\n]*%%|${NOT_PROSE_SOURCE}`, 'g');
+
+function mask(text: string): string {
+  return text.replace(NOT_PROSE, (found) => '\uFFFC'.repeat(found.length));
+}
+
+/**
+ * The comment nothing stands in for: taken off a line that goes on being a
+ * line, as `**` is taken off bold. A fold would say something was there, and
+ * a line with text on it already says the row is not empty.
+ */
+const GONE = Decoration.replace({});
 
 /**
  * The row a folded comment leaves behind: an ellipsis, and nothing else.
@@ -154,8 +183,49 @@ interface Run {
   lines: number[];
 }
 
+/** A comment written inside a line, by where it lies. */
+interface Span {
+  from: number;
+  to: number;
+}
+
+/** The comments a note holds: whole runs of lines, and spans inside a line. */
+interface Comments {
+  runs: Run[];
+  inline: Span[];
+}
+
 /**
- * The runs of lines that are a comment and nothing else.
+ * The comments `said` holds inside it from `at` on, onto `into`, and whether
+ * the last of them opens and does not close on this line.
+ *
+ * An opener is looked for in the masked line, since one inside inline code
+ * opens nothing. A closer is looked for in the line as written: once a comment
+ * is open, backticks are only its text.
+ */
+function within(
+  said: string,
+  masked: string,
+  at: number,
+  offset: number,
+  into: Span[],
+): boolean {
+  let from = masked.indexOf('<!--', at);
+  while (from !== -1) {
+    // From the second `-` on, so `<!-->` and `<!--->` — comments whole, with
+    // nothing in them — close on themselves rather than running on to the
+    // next `-->` and taking the note's own words between with them.
+    const close = said.indexOf('-->', from + 2);
+    if (close === -1) return true;
+    into.push({ from: offset + from, to: offset + close + 3 });
+    from = masked.indexOf('<!--', close + 3);
+  }
+  return false;
+}
+
+/**
+ * The runs of lines that are a comment and nothing else, and the comments
+ * written inside a line that is not one.
  *
  * A comment is not one line's business the way a mark is: `<!--` on one line
  * and `-->` three below it is one comment covering four, and it hides and
@@ -166,8 +236,15 @@ interface Run {
  * being shown rather than one being addressed to anybody, and a note
  * explaining the note format would otherwise lose the lines it is explaining.
  */
-function blocks(state: EditorState): Run[] {
+function blocks(state: EditorState): Comments {
   const found: Run[] = [];
+  const inline: Span[] = [];
+  // A comment opened inside a line that did not close on it. v1 leaves it
+  // standing whole rather than taking half of one line and half of another
+  // off: it is fiddlier, and a comment half on the page is worse than one
+  // left showing. But it is still open, so nothing written inside it is read
+  // as a comment of its own.
+  let spilling = false;
   let code = false;
   let codeDepth = 0;
   let open: {
@@ -189,13 +266,40 @@ function blocks(state: EditorState): Run[] {
       if (!code || quoted === codeDepth) {
         code = !code;
         codeDepth = quoted;
+        // A fence ends the paragraph a comment was opened in.
+        spilling = false;
         continue;
       }
     }
     if (code) continue;
 
+    const offset = line.to - said.length;
+    const masked = mask(said);
+
+    if (spilling) {
+      // So does a blank line.
+      if (said.trim() === '') {
+        spilling = false;
+        continue;
+      }
+      const close = said.indexOf('-->');
+      if (close !== -1) {
+        spilling = within(said, masked, close + 3, offset, inline);
+      }
+      continue;
+    }
+
     if (!open) {
-      if (!OPEN.test(said)) continue;
+      if (!OPEN.test(said)) {
+        // Four spaces or a tab is a code block, which is why `OPEN` stops at
+        // three: what is written in one is being shown, comment or not. The
+        // bound has to be carried here as well, or a line `OPEN` turned down
+        // for being code would lose its comment to this instead.
+        if (!INDENTED_CODE.test(said)) {
+          spilling = within(said, masked, 0, offset, inline);
+        }
+        continue;
+      }
       open = {
         from: line.from,
         opens: line.to - said.length,
@@ -225,11 +329,17 @@ function blocks(state: EditorState): Run[] {
         to: line.to,
         lines: open.lines,
       });
+    } else if (closed[1].trim() !== '') {
+      // Not folded, but what the line holds is still read: a comment on one
+      // line from its start, and on the closing line of several, whatever
+      // follows the `-->` that closed them.
+      const at = open.lines.length === 1 ? 0 : closed.index + 3;
+      spilling = within(said, masked, at, offset, inline);
     }
     open = null;
   }
 
-  return found;
+  return { runs: found, inline };
 }
 
 /**
@@ -244,11 +354,11 @@ function blocks(state: EditorState): Run[] {
  * comments on every toggle would be a note moving under whoever toggled.
  * Absent, as in a state built by hand, take it for live preview.
  */
-function drawn(state: EditorState, runs: readonly Run[]): DecorationSet {
+function drawn(state: EditorState, comments: Comments): DecorationSet {
   const hiding = state.field(editorLivePreviewField, false) ?? true;
   const into: Range<Decoration>[] = [];
 
-  for (const block of runs) {
+  for (const block of comments.runs) {
     for (const from of block.lines) into.push(SMALL.range(from));
     // Inside the comment, the comment is what is being edited.
     if (!hiding || touched(state, block.from, block.to)) continue;
@@ -261,6 +371,14 @@ function drawn(state: EditorState, runs: readonly Run[]): DecorationSet {
         widget: new CommentFold(block.lines.length),
       }).range(block.opens, block.to),
     );
+  }
+
+  // The same answer to the cursor as a fold, and the same stand on source
+  // mode. The runs above and these never cover one line both: a line that is
+  // a comment whole is a run, and is never read for spans.
+  for (const span of comments.inline) {
+    if (!hiding || touched(state, span.from, span.to)) continue;
+    into.push(GONE.range(span.from, span.to));
   }
 
   return Decoration.set(into, true);
@@ -280,9 +398,9 @@ export function build(state: EditorState): DecorationSet {
   return drawn(state, blocks(state));
 }
 
-/** The runs the note holds, and the folds standing over them. */
+/** The comments the note holds, and what is drawn over them. */
 interface Folds {
-  runs: Run[];
+  comments: Comments;
   over: DecorationSet;
 }
 
@@ -306,15 +424,15 @@ interface Folds {
  */
 export const liveComments = StateField.define<Folds>({
   create(state) {
-    const runs = blocks(state);
-    return { runs, over: drawn(state, runs) };
+    const comments = blocks(state);
+    return { comments, over: drawn(state, comments) };
   },
 
   update(folds, tr) {
     // The note under them is the one thing that can move a run.
     if (tr.docChanged) {
-      const runs = blocks(tr.state);
-      return { runs, over: drawn(tr.state, runs) };
+      const comments = blocks(tr.state);
+      return { comments, over: drawn(tr.state, comments) };
     }
     // The selection among them: a comment comes back when the cursor arrives
     // and goes again when it leaves. And the view the editor is drawing —
@@ -327,7 +445,10 @@ export const liveComments = StateField.define<Folds>({
     ) {
       return folds;
     }
-    return { runs: folds.runs, over: drawn(tr.state, folds.runs) };
+    return {
+      comments: folds.comments,
+      over: drawn(tr.state, folds.comments),
+    };
   },
 
   provide: (field) => EditorView.decorations.from(field, (folds) => folds.over),
